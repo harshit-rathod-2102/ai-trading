@@ -22,3 +22,12 @@ lerna-debug.log*
 # temp directory
 .temp
 .tmp
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+
+# OS files
+.DS_Store
+Thumbs.db
