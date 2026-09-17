@@ -9,6 +9,7 @@ export interface MetaWebhookMessageDto {
   readonly timestamp?: unknown;
   readonly type?: unknown;
   readonly text?: unknown;
+  readonly context?: unknown;
 }
 
 export interface MetaWebhookStatusDto {

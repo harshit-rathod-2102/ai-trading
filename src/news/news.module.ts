@@ -7,8 +7,13 @@ import { GNewsProvider } from '../providers/news/gnews/gnews.provider';
 import { GNEWS_CONFIG, createGNewsConfig } from '../providers/news/gnews/gnews.config';
 import { NewsController } from './news.controller';
 import { NewsService } from './news.service';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { TradeCandidate } from '../candidates/entities/trade-candidate.entity';
+import { Instrument } from '../instruments/entities/instrument.entity';
+import { NewsEnrichmentService } from './news-enrichment.service';
 
 @Module({
+  imports: [TypeOrmModule.forFeature([TradeCandidate, Instrument])],
   controllers: [NewsController],
   providers: [
     { provide: GNEWS_CONFIG, inject: [ConfigService], useFactory: createGNewsConfig },
@@ -25,7 +30,8 @@ import { NewsService } from './news.service';
       },
     },
     NewsService,
+    NewsEnrichmentService,
   ],
-  exports: [NewsService, NEWS_PROVIDER],
+  exports: [NewsService, NewsEnrichmentService, NEWS_PROVIDER],
 })
 export class NewsModule {}

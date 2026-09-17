@@ -32,12 +32,21 @@ export interface ApplicationConfiguration {
     apiKey: string | null;
     baseUrl: string;
     model: string;
+    fastModel: string;
+    deepModel: string;
     httpTimeoutMs: number;
     appName: string;
     siteUrl: string | null;
     maxRetries: number;
     retryBaseDelayMs: number;
     cacheTtlMs: number;
+  };
+  aiRouting: {
+    topRankThreshold: number;
+  };
+  aiEvaluation: {
+    enabled: boolean;
+    runsPerFixture: number;
   };
   metaWhatsapp: {
     accessToken: string | null;
@@ -58,6 +67,7 @@ export interface ApplicationConfiguration {
     nodeEnv: string;
     port: number;
     logLevel: string;
+    logPretty: boolean;
   };
   database: {
     host: string;
@@ -65,6 +75,7 @@ export interface ApplicationConfiguration {
     name: string;
     user: string;
     password: string;
+    queryLogging: boolean;
   };
   redis: {
     host: string;
@@ -109,12 +120,21 @@ export default (): ApplicationConfiguration => ({
     apiKey: process.env.OPENROUTER_API_KEY || null,
     baseUrl: process.env.OPENROUTER_BASE_URL ?? 'https://openrouter.ai/api/v1',
     model: process.env.OPENROUTER_MODEL ?? 'openrouter/free',
+    fastModel: process.env.OPENROUTER_FAST_MODEL ?? process.env.OPENROUTER_MODEL ?? 'openrouter/free',
+    deepModel: process.env.OPENROUTER_DEEP_MODEL ?? 'nvidia/nemotron-3-ultra:free',
     httpTimeoutMs: Number.parseInt(process.env.OPENROUTER_HTTP_TIMEOUT_MS ?? '30000', 10),
     appName: process.env.OPENROUTER_APP_NAME ?? 'swing-trading-assistant',
     siteUrl: process.env.OPENROUTER_SITE_URL || null,
     maxRetries: Number.parseInt(process.env.OPENROUTER_MAX_RETRIES ?? '2', 10),
     retryBaseDelayMs: Number.parseInt(process.env.OPENROUTER_RETRY_BASE_DELAY_MS ?? '1000', 10),
     cacheTtlMs: Number.parseInt(process.env.OPENROUTER_CACHE_TTL_MS ?? '900000', 10),
+  },
+  aiRouting: {
+    topRankThreshold: Number.parseInt(process.env.AI_ROUTING_TOP_RANK_THRESHOLD ?? '3', 10),
+  },
+  aiEvaluation: {
+    enabled: process.env.AI_EVALUATION_ENABLED === 'true',
+    runsPerFixture: Number.parseInt(process.env.AI_EVAL_RUNS_PER_FIXTURE ?? '1', 10),
   },
   metaWhatsapp: {
     accessToken: process.env.META_WHATSAPP_ACCESS_TOKEN || null,
@@ -135,6 +155,7 @@ export default (): ApplicationConfiguration => ({
     nodeEnv: process.env.NODE_ENV ?? 'development',
     port: Number.parseInt(process.env.APP_PORT ?? '3000', 10),
     logLevel: process.env.LOG_LEVEL ?? 'log',
+    logPretty: process.env.LOG_PRETTY === 'true',
   },
   database: {
     host: process.env.DATABASE_HOST as string,
@@ -142,6 +163,7 @@ export default (): ApplicationConfiguration => ({
     name: process.env.DATABASE_NAME as string,
     user: process.env.DATABASE_USER as string,
     password: process.env.DATABASE_PASSWORD as string,
+    queryLogging: process.env.DB_QUERY_LOGGING === 'true',
   },
   redis: {
     host: process.env.REDIS_HOST as string,

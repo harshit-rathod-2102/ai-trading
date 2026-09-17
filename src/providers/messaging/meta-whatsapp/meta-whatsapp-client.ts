@@ -33,17 +33,30 @@ export class MetaWhatsAppClient {
         const details = await errorDetails(response);
         const error = mapHttpError(response, details);
         if (!shouldRetry(response.status) || attempt === this.config.maxRetries) {
-          this.logger.warn(`Meta WhatsApp provider error category: ${error.code} (HTTP ${response.status}${details.code ? `, code ${details.code}` : ''})`);
+          this.logger.error({ event: 'provider.request.failed', module: MetaWhatsAppClient.name,
+            provider: 'meta-whatsapp', operation: 'sendMessage', endpoint: '/messages',
+            statusCode: response.status, providerErrorCode: error.code,
+            providerResponseCode: details.code, retryable: error.retryable,
+            attempt: attempt + 1, maxAttempts: this.config.maxRetries + 1 },
+          'Meta WhatsApp request failed');
           throw error;
         }
         const delayMs = retryDelay(attempt, this.config.retryBaseDelayMs, response);
-        this.logger.warn(`Meta WhatsApp transient HTTP ${response.status}; retrying in ${delayMs}ms`);
+        this.logger.warn({ event: 'provider.request.retrying', module: MetaWhatsAppClient.name,
+          provider: 'meta-whatsapp', operation: 'sendMessage', endpoint: '/messages',
+          statusCode: response.status, attempt: attempt + 1,
+          maxAttempts: this.config.maxRetries + 1, delayMs,
+          reason: error.code }, 'Meta WhatsApp request will be retried');
         await delay(delayMs, context?.signal);
       } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
         if (context?.signal?.aborted) throw cancelled();
         if (attempt === this.config.maxRetries) {
-          this.logger.warn('Meta WhatsApp provider error category: UNAVAILABLE (network or timeout failure)');
+          this.logger.error({ event: 'provider.request.failed', module: MetaWhatsAppClient.name,
+            provider: 'meta-whatsapp', operation: 'sendMessage', endpoint: '/messages',
+            providerErrorCode: ProviderErrorCode.UNAVAILABLE, retryable: true,
+            attempt: attempt + 1, maxAttempts: this.config.maxRetries + 1 },
+          'Meta WhatsApp request failed after retries');
           throw new ProviderUnavailableError(
             'meta-whatsapp',
             'Meta WhatsApp request failed after bounded retries',
@@ -51,7 +64,10 @@ export class MetaWhatsAppClient {
           );
         }
         const delayMs = retryDelay(attempt, this.config.retryBaseDelayMs);
-        this.logger.warn(`Meta WhatsApp network failure; retrying in ${delayMs}ms`);
+        this.logger.warn({ event: 'provider.request.retrying', module: MetaWhatsAppClient.name,
+          provider: 'meta-whatsapp', operation: 'sendMessage', endpoint: '/messages',
+          attempt: attempt + 1, maxAttempts: this.config.maxRetries + 1,
+          delayMs, reason: 'network_failure' }, 'Meta WhatsApp request will be retried');
         await delay(delayMs, context?.signal);
       }
     }

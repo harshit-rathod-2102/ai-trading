@@ -1,6 +1,7 @@
 import { Global, Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { TypeOrmModule, TypeOrmModuleOptions } from '@nestjs/typeorm';
+import { DatabaseLifecycleService } from './database-lifecycle.service';
 
 @Global()
 @Module({
@@ -17,9 +18,13 @@ import { TypeOrmModule, TypeOrmModuleOptions } from '@nestjs/typeorm';
         autoLoadEntities: true,
         synchronize: false,
         migrationsRun: false,
+        logging: configService.getOrThrow<boolean>('database.queryLogging')
+          ? ['query', 'error', 'warn']
+          : false,
       }),
     }),
   ],
+  providers: [DatabaseLifecycleService],
   exports: [TypeOrmModule],
 })
 export class DatabaseModule {}

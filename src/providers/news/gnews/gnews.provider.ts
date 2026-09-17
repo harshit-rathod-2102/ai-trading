@@ -8,6 +8,7 @@ import { GNEWS_CONFIG, GNewsConfig } from './gnews.config';
 import { GNewsClient } from './gnews-client';
 import { GNewsArticleDto, GNewsSearchResponseDto } from './dto/gnews-response.dto';
 import { mapGNewsArticle } from './mappers/gnews-article.mapper';
+import { elapsedMilliseconds, structuredError } from '../../../logging/logging.utils';
 
 interface CachedSearch {
   readonly expiresAt: number;
@@ -29,14 +30,19 @@ export class GNewsProvider implements NewsProvider {
     const cacheKey = parameters.toString();
     const cached = this.cache.get(cacheKey);
     if (cached && cached.expiresAt > Date.now()) {
-      this.logger.log(`GNews search cache hit: ${summary(query.query)}, page ${parameters.get('page')}`);
+      this.logger.debug({ event: 'provider.cache.hit', module: GNewsProvider.name,
+        provider: 'gnews', operation: 'search', query: summary(query.query),
+        page: parameters.get('page'), resultCount: cached.articles.length }, 'GNews cache hit');
       return cached.articles;
     }
     if (cached) this.cache.delete(cacheKey);
 
-    this.logger.log(
-      `GNews search: ${summary(query.query)}, ${parameters.get('from') ?? 'no-from'} to ${parameters.get('to') ?? 'no-to'}, page ${parameters.get('page')}`,
-    );
+    const startedAt = performance.now();
+    const fields = { module: GNewsProvider.name, provider: 'gnews', operation: 'search',
+      endpoint: '/search', query: summary(query.query), from: parameters.get('from') ?? undefined,
+      to: parameters.get('to') ?? undefined, page: parameters.get('page') };
+    this.logger.debug({ event: 'provider.request.started', ...fields }, 'GNews search started');
+    try {
     const response = await this.client.search<GNewsSearchResponseDto>(parameters, context);
     if (!Array.isArray(response.articles)) throw invalidResponse('GNews response is missing articles');
 
@@ -60,7 +66,8 @@ export class GNewsProvider implements NewsProvider {
     if (response.articles.length > 0 && normalized.length === 0) {
       throw invalidResponse('Every GNews article in the response was malformed');
     }
-    if (malformed) this.logger.warn(`Skipped ${malformed} malformed GNews article(s)`);
+    if (malformed) this.logger.warn({ event: 'provider.response.partial', ...fields,
+      rejectedCount: malformed }, 'Malformed GNews articles were skipped');
 
     const from = parameters.get('from');
     const to = parameters.get('to');
@@ -75,8 +82,18 @@ export class GNewsProvider implements NewsProvider {
     }).slice(0, Number(parameters.get('max')));
 
     this.remember(cacheKey, articles);
-    this.logger.log(`GNews search returned ${articles.length} normalized article(s)`);
+    this.logger.debug({ event: 'provider.request.completed', ...fields,
+      resultCount: articles.length, durationMs: elapsedMilliseconds(startedAt),
+      status: 'completed' }, 'GNews search completed');
     return articles;
+    } catch (error: unknown) {
+      this.logger.error({ event: 'provider.request.failed', ...fields,
+        providerErrorCode: error instanceof ProviderError ? error.code : undefined,
+        retryable: error instanceof ProviderError ? error.retryable : undefined,
+        durationMs: elapsedMilliseconds(startedAt), status: 'failed',
+        ...structuredError(error) }, 'GNews search failed');
+      throw error;
+    }
   }
 
   private parameters(query: NewsQuery): URLSearchParams {

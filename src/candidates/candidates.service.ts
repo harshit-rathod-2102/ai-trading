@@ -52,13 +52,21 @@ export class CandidatesService {
       });
       return created;
     });
-    this.logger.log(`Candidate created: ${candidate.id} (${candidate.symbol})`);
+    this.logger.log({ event: 'candidate.created', module: CandidatesService.name,
+      operation: 'create', candidateId: candidate.id, symbol: candidate.symbol,
+      strategy: candidate.strategy, strategyVersion: candidate.strategyVersion,
+      status: candidate.status }, 'Candidate created');
     return candidate;
   }
 
   list(filters: ListCandidatesDto): Promise<TradeCandidate[]> {
     return this.candidates.find({
-      where: { status: filters.status, symbol: filters.symbol },
+      where: {
+        status: filters.status,
+        symbol: filters.symbol,
+        strategy: filters.strategy,
+        scanRunId: filters.scanRunId,
+      },
       order: { createdAt: 'DESC', id: 'ASC' },
     });
   }
@@ -69,12 +77,13 @@ export class CandidatesService {
     return candidate;
   }
 
-  private async lockUndecided(manager: EntityManager, id: string): Promise<TradeCandidate> {
+  private async lockForUserDecision(manager: EntityManager, id: string): Promise<TradeCandidate> {
     const candidate = await manager.getRepository(TradeCandidate).findOne({
       where: { id }, lock: { mode: 'pessimistic_write' },
     });
     if (!candidate) throw new NotFoundException('Candidate not found');
-    if (candidate.status !== CandidateStatus.NEW) {
+    if (candidate.status !== CandidateStatus.NEW && candidate.status !== CandidateStatus.QUALIFIED &&
+        candidate.status !== CandidateStatus.NOTIFIED) {
       throw new ConflictException(`Candidate in ${candidate.status} cannot be bought or skipped`);
     }
     return candidate;
@@ -82,22 +91,26 @@ export class CandidatesService {
 
   async skip(id: string, reason?: string, source: EventSource = EventSource.SYSTEM): Promise<TradeCandidate> {
     const candidate = await this.dataSource.transaction(async (manager) => {
-      const locked = await this.lockUndecided(manager, id);
+      const locked = await this.lockForUserDecision(manager, id);
+      const previousStatus = locked.status;
       locked.status = CandidateStatus.SKIPPED;
       const saved = await manager.getRepository(TradeCandidate).save(locked);
       await this.journal.record(manager, {
         candidateId: id, eventType: TradeEventType.CANDIDATE_SKIPPED, source,
-        data: { previousStatus: CandidateStatus.NEW, status: CandidateStatus.SKIPPED, reason: reason ?? null },
+        data: { previousStatus, status: CandidateStatus.SKIPPED, reason: reason ?? null },
       });
       return saved;
     });
-    this.logger.log(`Candidate skipped: ${id}`);
+    this.logger.log({ event: 'candidate.skipped', module: CandidatesService.name,
+      operation: 'skip', candidateId: id, symbol: candidate.symbol,
+      strategy: candidate.strategy, status: candidate.status }, 'Candidate skipped');
     return candidate;
   }
 
   async buy(id: string, command: OpenTradeCommand, source: EventSource = EventSource.SYSTEM): Promise<Trade> {
     const trade = await this.dataSource.transaction(async (manager) => {
-      const candidate = await this.lockUndecided(manager, id);
+      const candidate = await this.lockForUserDecision(manager, id);
+      const previousStatus = candidate.status;
       if (await manager.getRepository(Trade).existsBy({ candidateId: id })) {
         throw new ConflictException('Candidate already has a trade');
       }
@@ -108,15 +121,20 @@ export class CandidatesService {
         candidateId: id, tradeId: opened.id, eventType: TradeEventType.TRADE_OPENED, source,
         price: opened.actualEntry, quantity: opened.quantity,
         data: {
-          previousStatus: CandidateStatus.NEW, status: CandidateStatus.ACCEPTED,
+          previousStatus, status: CandidateStatus.ACCEPTED,
           plannedEntry: opened.plannedEntry, initialStop: opened.initialStop,
           initialRiskAmount: opened.initialRiskAmount,
         },
       });
       return opened;
     });
-    this.logger.log(`Candidate accepted: ${id}`);
-    this.logger.log(`Trade opened: ${trade.id} for candidate ${id}`);
+    this.logger.log({ event: 'candidate.buy.accepted', module: CandidatesService.name,
+      operation: 'buy', candidateId: id, tradeId: trade.id, symbol: trade.symbol,
+      strategy: trade.strategy, status: CandidateStatus.ACCEPTED }, 'Candidate accepted');
+    this.logger.log({ event: 'trade.opened', module: CandidatesService.name,
+      operation: 'buy', tradeId: trade.id, candidateId: id, symbol: trade.symbol,
+      strategy: trade.strategy, eventType: TradeEventType.TRADE_OPENED,
+      status: trade.status }, 'Trade opened');
     return trade;
   }
 

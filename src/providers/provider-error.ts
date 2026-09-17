@@ -1,6 +1,7 @@
 export enum ProviderErrorCode {
   AUTHENTICATION = 'AUTHENTICATION',
   RATE_LIMIT = 'RATE_LIMIT',
+  TIMEOUT = 'TIMEOUT',
   UNAVAILABLE = 'UNAVAILABLE',
   INVALID_RESPONSE = 'INVALID_RESPONSE',
   REQUEST_REJECTED = 'REQUEST_REJECTED',
@@ -70,5 +71,17 @@ export class ProviderUnavailableError extends ProviderError {
       cause,
     });
     this.name = ProviderUnavailableError.name;
+  }
+}
+
+export class ProviderTimeoutError extends ProviderError {
+  constructor(provider: string, message = 'Provider request timed out', cause?: unknown) {
+    super(message, {
+      provider,
+      code: ProviderErrorCode.TIMEOUT,
+      retryable: true,
+      cause,
+    });
+    this.name = ProviderTimeoutError.name;
   }
 }

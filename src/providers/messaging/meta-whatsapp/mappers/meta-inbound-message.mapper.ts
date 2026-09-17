@@ -25,14 +25,29 @@ export function mapMetaInboundMessage(
   const receivedAt = new Date(Number(timestamp) * 1000);
   if (Number.isNaN(receivedAt.getTime())) throw invalid('Meta WhatsApp message timestamp is invalid');
 
+  const replyToProviderMessageId = isRecord(value.context)
+    ? optionalString(value.context.id)
+    : undefined;
   const metadata: JsonObject = {
     provider: 'meta-whatsapp',
     messageType: 'text',
     ...(context.phoneNumberId ? { phoneNumberId: context.phoneNumberId } : {}),
     ...(context.displayPhoneNumber ? { displayPhoneNumber: context.displayPhoneNumber } : {}),
     ...(context.contactName ? { contactName: context.contactName } : {}),
+    ...(replyToProviderMessageId ? { replyToProviderMessageId } : {}),
   };
-  return { sender, text, providerMessageId, receivedAt: receivedAt.toISOString(), metadata };
+  return {
+    sender,
+    text,
+    providerMessageId,
+    ...(replyToProviderMessageId ? { replyToProviderMessageId } : {}),
+    receivedAt: receivedAt.toISOString(),
+    metadata,
+  };
+}
+
+function optionalString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
 }
 
 function requiredString(value: unknown, field: string): string {

@@ -13,14 +13,30 @@ import { InboundMessageService } from './inbound-message.service';
 import { MessagingController } from './messaging.controller';
 import { MessagingService } from './messaging.service';
 import { WhatsAppWebhookController } from './whatsapp-webhook.controller';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { TradeCandidate } from '../candidates/entities/trade-candidate.entity';
+import { Instrument } from '../instruments/entities/instrument.entity';
+import { Trade } from '../trades/entities/trade.entity';
+import { CandidatesModule } from '../candidates/candidates.module';
+import { JournalModule } from '../journal/journal.module';
+import { CandidateNotificationService } from './candidate-notification.service';
+import { CandidateNotificationController } from './candidate-notification.controller';
+import { WhatsAppCommandService } from './whatsapp-command.service';
 
 @Module({
-  controllers: [MessagingController, WhatsAppWebhookController],
+  imports: [
+    TypeOrmModule.forFeature([TradeCandidate, Instrument, Trade]),
+    CandidatesModule,
+    JournalModule,
+  ],
+  controllers: [MessagingController, WhatsAppWebhookController, CandidateNotificationController],
   providers: [
     { provide: META_WHATSAPP_CONFIG, inject: [ConfigService], useFactory: createMetaWhatsAppConfig },
     MetaWhatsAppClient,
     MetaWhatsAppProvider,
     MetaWhatsAppWebhookService,
+    CandidateNotificationService,
+    WhatsAppCommandService,
     InboundMessageService,
     {
       provide: MESSAGING_PROVIDER,
@@ -34,6 +50,11 @@ import { WhatsAppWebhookController } from './whatsapp-webhook.controller';
     },
     MessagingService,
   ],
-  exports: [MessagingService, MESSAGING_PROVIDER],
+  exports: [
+    MessagingService,
+    CandidateNotificationService,
+    WhatsAppCommandService,
+    MESSAGING_PROVIDER,
+  ],
 })
 export class MessagingModule {}

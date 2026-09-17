@@ -1,0 +1,1105 @@
+{
+  "info": {
+    "_postman_id": "52d62dfa-5023-4d94-9b3e-94a681e595f3",
+    "name": "AI-Assisted Swing Trading Backend",
+    "description": "Complete development collection for every NestJS API currently exposed by the backend.\n\nStart the local stack and apply Flyway migrations before running requests. Requests use collection variables, so a separate Postman environment is optional.\n\nRecommended workflow: Health -> Instruments/Universes -> Market Data -> Market Regime -> Scanner -> Risk -> Candidate Orchestration. Candidate BUY/SKIP requests remain manual human decisions.\n\nThe finite fixture market-data provider intentionally cannot produce a current 200-session regime or scanner run. Market Regime and Scanner can therefore return 503 until live/current persisted history is configured.\n\nNews, AI analysis, and messaging inspection endpoints are development-only and require their configured providers. The WhatsApp webhook POST requires a valid Meta application secret and signature.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000/api",
+      "type": "string"
+    },
+    {
+      "key": "instrumentId",
+      "value": "",
+      "type": "string",
+      "description": "List Instruments captures RELIANCE when available."
+    },
+    {
+      "key": "createdInstrumentId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "newInstrumentSymbol",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "universeCode",
+      "value": "DEVELOPMENT",
+      "type": "string"
+    },
+    {
+      "key": "createdUniverseCode",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "marketFrom",
+      "value": "2026-09-07",
+      "type": "string"
+    },
+    {
+      "key": "marketTo",
+      "value": "2026-09-11",
+      "type": "string"
+    },
+    {
+      "key": "marketDataJobId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "scanRunId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "scanResultId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "candidateId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "skipCandidateId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "tradeId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "newsFrom",
+      "value": "2026-09-01T00:00:00.000Z",
+      "type": "string"
+    },
+    {
+      "key": "newsTo",
+      "value": "2026-09-14T23:59:59.999Z",
+      "type": "string"
+    },
+    {
+      "key": "messageRecipient",
+      "value": "919999999999",
+      "type": "string"
+    },
+    {
+      "key": "whatsappVerifyToken",
+      "value": "",
+      "type": "string",
+      "description": "Must equal META_WHATSAPP_VERIFY_TOKEN."
+    },
+    {
+      "key": "whatsappChallenge",
+      "value": "1234567890",
+      "type": "string"
+    },
+    {
+      "key": "metaWhatsappAppSecret",
+      "value": "",
+      "type": "string",
+      "description": "Used only by the webhook pre-request signature script."
+    },
+    {
+      "key": "whatsappSignature",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "description": "Infrastructure readiness.",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/health",
+            "description": "Checks PostgreSQL and Redis connectivity."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Trading Profile",
+      "description": "Persistent V1 account and risk configuration.",
+      "item": [
+        {
+          "name": "Get Active Trading Profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/settings/trading-profile"
+          }
+        },
+        {
+          "name": "Update Active Trading Profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Default Trading Profile\",\n  \"currency\": \"INR\",\n  \"accountCapital\": \"500000.0000\",\n  \"riskPerTradePercent\": \"0.5000\",\n  \"maxPositionPercent\": \"20.0000\",\n  \"maxOpenPortfolioRiskPercent\": \"2.5000\",\n  \"maxOpenTrades\": 6,\n  \"maxSectorExposurePercent\": \"30.0000\",\n  \"minimumRiskRewardRatio\": \"2.0000\",\n  \"isActive\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/settings/trading-profile",
+            "description": "Mutates the one active profile. The example matches the seeded defaults; review values before sending."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Instruments",
+      "description": "Provider-neutral persisted NSE instruments.",
+      "item": [
+        {
+          "name": "List Instruments",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/instruments?exchange=NSE&active=true",
+            "description": "Optional filters: symbol, exchange, type, active, universe. Captures RELIANCE or the first row as instrumentId."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "  const body = pm.response.json();",
+                  "  const value = (Array.isArray(body) ? (body.find(item => item.symbol === 'RELIANCE') || body[0])?.id : undefined);",
+                  "  if (value !== undefined && value !== null) pm.collectionVariables.set('instrumentId', String(value));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Instrument",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"symbol\": \"{{newInstrumentSymbol}}\",\n  \"exchange\": \"NSE\",\n  \"name\": \"Postman Demonstration Equity\",\n  \"type\": \"EQUITY\",\n  \"sector\": \"Technology\",\n  \"industry\": \"Software\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/instruments",
+            "description": "Generates a unique demonstration symbol and captures createdInstrumentId."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('newInstrumentSymbol', `PM${Date.now().toString().slice(-10)}`);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "  const body = pm.response.json();",
+                  "  const value = body.id;",
+                  "  if (value !== undefined && value !== null) pm.collectionVariables.set('createdInstrumentId', String(value));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Instrument",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/instruments/{{instrumentId}}"
+          }
+        },
+        {
+          "name": "Set Instrument Activity",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isActive\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/instruments/{{createdInstrumentId}}/activity",
+            "description": "Changes the activity flag on the instrument created by this collection."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Universes",
+      "description": "Persisted universe definitions and memberships.",
+      "item": [
+        {
+          "name": "List Universes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/universes"
+          }
+        },
+        {
+          "name": "Create Universe",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"{{createdUniverseCode}}\",\n  \"name\": \"Postman Demonstration Universe\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/universes",
+            "description": "Creates a unique demonstration universe and captures createdUniverseCode."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('createdUniverseCode', `PM_${Date.now().toString().slice(-10)}`);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Universe Instruments",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/universes/{{universeCode}}/instruments"
+          }
+        },
+        {
+          "name": "Add Instrument to Universe",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": "{{baseUrl}}/universes/{{createdUniverseCode}}/instruments/{{createdInstrumentId}}",
+            "description": "Idempotently adds the Postman-created instrument to the Postman-created universe."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Market Data",
+      "description": "Provider information, configured universe, persisted candles, quality, and BullMQ refresh jobs.",
+      "item": [
+        {
+          "name": "Get Market Data Provider",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/market-data/provider"
+          }
+        },
+        {
+          "name": "Synchronize Provider Instruments",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/market-data/instruments/sync",
+            "description": "Imports the selected provider catalog. In Upstox mode this performs a provider network call."
+          }
+        },
+        {
+          "name": "Get Configured Market Data Universe",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/market-data/universe"
+          }
+        },
+        {
+          "name": "Get Daily Candles",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/market-data/instruments/{{instrumentId}}/candles?from={{marketFrom}}&to={{marketTo}}"
+          }
+        },
+        {
+          "name": "Get Data Quality",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/market-data/instruments/{{instrumentId}}/quality?from={{marketFrom}}&to={{marketTo}}"
+          }
+        },
+        {
+          "name": "Enqueue Instrument Refresh",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"from\": \"{{marketFrom}}\",\n  \"to\": \"{{marketTo}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/market-data/instruments/{{instrumentId}}/refresh",
+            "description": "Returns HTTP 202 and captures the BullMQ job ID."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "  const body = pm.response.json();",
+                  "  const value = body.jobId;",
+                  "  if (value !== undefined && value !== null) pm.collectionVariables.set('marketDataJobId', String(value));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Enqueue Configured Universe Refresh",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"from\": \"{{marketFrom}}\",\n  \"to\": \"{{marketTo}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/market-data/refresh-universe",
+            "description": "Enqueues one refresh per active configured-universe member and captures the first job ID."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "  const body = pm.response.json();",
+                  "  const value = body.jobs?.[0]?.jobId;",
+                  "  if (value !== undefined && value !== null) pm.collectionVariables.set('marketDataJobId', String(value));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Market Data Job",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/market-data/jobs/{{marketDataJobId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Market Regime",
+      "description": "Current deterministic market classification.",
+      "item": [
+        {
+          "name": "Calculate Current Market Regime",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/market-regime",
+            "description": "Persists the date/version snapshot. Expected to return 503 with the finite five-session fixture."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Scanner",
+      "description": "Synchronous daily scan plus persisted run and ranked result inspection.",
+      "item": [
+        {
+          "name": "Run Daily Scanner",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/scanner/run",
+            "description": "Returns an existing successful date/version run when repeated. Expected 503 with insufficient fixture NIFTY history."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "  const body = pm.response.json();",
+                  "  const value = body.run?.id;",
+                  "  if (value !== undefined && value !== null) pm.collectionVariables.set('scanRunId', String(value));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Scanner Runs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/scanner/runs"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "  const body = pm.response.json();",
+                  "  const value = Array.isArray(body) ? body[0]?.id : undefined;",
+                  "  if (value !== undefined && value !== null) pm.collectionVariables.set('scanRunId', String(value));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Scanner Run",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/scanner/runs/{{scanRunId}}"
+          }
+        },
+        {
+          "name": "List Scanner Results",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/scanner/runs/{{scanRunId}}/results",
+            "description": "Optional filters: strategy=MOMENTUM_BREAKOUT|TREND_PULLBACK, shortlisted=true|false, qualified=true|false."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "  const body = pm.response.json();",
+                  "  const value = Array.isArray(body) ? body[0]?.id : undefined;",
+                  "  if (value !== undefined && value !== null) pm.collectionVariables.set('scanResultId', String(value));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Shortlisted Momentum Results",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/scanner/runs/{{scanRunId}}/results?strategy=MOMENTUM_BREAKOUT&shortlisted=true&qualified=true"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "  const body = pm.response.json();",
+                  "  const value = Array.isArray(body) ? body[0]?.id : undefined;",
+                  "  if (value !== undefined && value !== null) pm.collectionVariables.set('scanResultId', String(value));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Risk",
+      "description": "Read-only deterministic risk-plan inspection for a persisted qualified scanner result.",
+      "item": [
+        {
+          "name": "Evaluate Scanner Result Risk",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/risk/evaluate/{{scanResultId}}",
+            "description": "Loads the active profile and open portfolio. Returns a RiskPlan and never creates a TradeCandidate."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Candidates",
+      "description": "Scanner-result orchestration plus the existing manual candidate -> BUY/SKIP development workflow.",
+      "item": [
+        {
+          "name": "Create Candidate from Scanner Result",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/candidates/from-scan-result/{{scanResultId}}",
+            "description": "Idempotently creates a NEW candidate only when the persisted shortlisted setup is complete, fresh, qualified, and accepted by current deterministic risk. Returns CREATED, ALREADY_EXISTS, or RISK_REJECTED."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "  const body = pm.response.json();",
+                  "  const value = body.candidateId;",
+                  "  if (value !== undefined && value !== null) pm.collectionVariables.set('candidateId', String(value));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Candidate for BUY",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"symbol\": \"RELIANCE\",\n  \"exchange\": \"NSE\",\n  \"strategy\": \"MOMENTUM_BREAKOUT\",\n  \"strategyVersion\": \"momentum-breakout-v1\",\n  \"proposedEntry\": \"2920.0000\",\n  \"proposedStop\": \"2850.0000\",\n  \"target1\": \"3060.0000\",\n  \"target2\": \"3130.0000\",\n  \"suggestedQuantity\": 20,\n  \"quantScore\": 87.4,\n  \"technicalSnapshot\": {\n    \"close\": \"2920.0000\",\n    \"rsi14\": \"64.2000\"\n  },\n  \"riskSnapshot\": {\n    \"riskVersion\": \"risk-v1\",\n    \"riskPerShare\": \"70.0000\",\n    \"plannedLossAtStop\": \"1400.0000\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/candidates"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "  const body = pm.response.json();",
+                  "  const value = body.id;",
+                  "  if (value !== undefined && value !== null) pm.collectionVariables.set('candidateId', String(value));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Candidates",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/candidates",
+            "description": "Optional filters: status, symbol, strategy, and scanRunId."
+          }
+        },
+        {
+          "name": "Get Candidate",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/candidates/{{candidateId}}"
+          }
+        },
+        {
+          "name": "Enrich Candidate News",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/candidates/{{candidateId}}/news/enrich",
+            "description": "Fetches or reuses a fresh, provider-neutral candidate-news-v1 evidence snapshot. The candidate must remain NEW."
+          }
+        },
+        {
+          "name": "Run or Reuse Candidate FAST AI Triage",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/candidates/{{candidateId}}/ai/triage",
+            "description": "Runs candidate-fast-triage-v1 against persisted evidence or reuses an identical evidence hash, then applies deterministic ai-routing-v1. It may select DEEP but does not execute DEEP or produce a final candidate decision."
+          }
+        },
+        {
+          "name": "Run or Reuse Candidate DEEP AI Review",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/candidates/{{candidateId}}/ai/deep-review",
+            "description": "Runs candidate-deep-review-v1 with the configured Nemotron model only when persisted routing selected DEEP. Reuses matching evidence/model results and does not transition candidate status."
+          }
+        },
+        {
+          "name": "Finalize Candidate Decision",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/candidates/{{candidateId}}/finalize",
+            "description": "Derives QUALIFIED, WAIT, or REJECTED from persisted validated AI evidence. The request accepts no caller-supplied decision."
+          }
+        },
+        {
+          "name": "Notify Qualified Candidate by WhatsApp",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/candidates/{{candidateId}}/notify",
+            "description": "Sends one actionable WhatsApp alert through MessagingProvider, then transactionally stores delivery metadata and marks the candidate NOTIFIED."
+          }
+        },
+        {
+          "name": "Get Candidate Events",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/candidates/{{candidateId}}/events"
+          }
+        },
+        {
+          "name": "Buy Candidate",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"actualEntry\": \"2918.5000\",\n  \"quantity\": 20\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/candidates/{{candidateId}}/buy",
+            "description": "Records a manually executed trade; it does not place a broker order."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "  const body = pm.response.json();",
+                  "  const value = body.id;",
+                  "  if (value !== undefined && value !== null) pm.collectionVariables.set('tradeId', String(value));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Candidate for SKIP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"symbol\": \"TCS\",\n  \"exchange\": \"NSE\",\n  \"strategy\": \"MOMENTUM_BREAKOUT\",\n  \"strategyVersion\": \"momentum-breakout-v1\",\n  \"proposedEntry\": \"3250.0000\",\n  \"proposedStop\": \"3150.0000\",\n  \"target1\": \"3450.0000\",\n  \"target2\": \"3550.0000\",\n  \"suggestedQuantity\": 20,\n  \"quantScore\": 87.4,\n  \"technicalSnapshot\": {\n    \"close\": \"2920.0000\",\n    \"rsi14\": \"64.2000\"\n  },\n  \"riskSnapshot\": {\n    \"riskVersion\": \"risk-v1\",\n    \"riskPerShare\": \"70.0000\",\n    \"plannedLossAtStop\": \"1400.0000\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/candidates"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "  const body = pm.response.json();",
+                  "  const value = body.id;",
+                  "  if (value !== undefined && value !== null) pm.collectionVariables.set('skipCandidateId', String(value));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Skip Candidate",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Postman workflow verification\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/candidates/{{skipCandidateId}}/skip"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Trades",
+      "description": "Read-only tracked trade and journal inspection.",
+      "item": [
+        {
+          "name": "List Trades",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/trades",
+            "description": "Optional filters: status=OPEN|PARTIALLY_CLOSED|CLOSED|STOPPED_OUT|CANCELLED and symbol."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "  const body = pm.response.json();",
+                  "  const value = Array.isArray(body) ? body[0]?.id : undefined;",
+                  "  if (value !== undefined && value !== null) pm.collectionVariables.set('tradeId', String(value));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Trade",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/trades/{{tradeId}}"
+          }
+        },
+        {
+          "name": "Get Trade Events",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/trades/{{tradeId}}/events"
+          }
+        }
+      ]
+    },
+    {
+      "name": "News (Development Only)",
+      "description": "Requires NEWS_PROVIDER=gnews and GNEWS_API_KEY; route is hidden in production.",
+      "item": [
+        {
+          "name": "Search News",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/news/search?q=%22Reliance%20Industries%22&from={{newsFrom}}&to={{newsTo}}&language=en&country=in&limit=10&sortBy=publishedAt&page=1"
+          }
+        }
+      ]
+    },
+    {
+      "name": "AI Analysis (Development Only)",
+      "description": "Requires AI_PROVIDER=openrouter and credentials; route is hidden in production.",
+      "item": [
+        {
+          "name": "Analyze Candidate Evidence",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"symbol\": \"RELIANCE\",\n  \"companyName\": \"Reliance Industries\",\n  \"strategy\": \"MOMENTUM_BREAKOUT\",\n  \"strategyVersion\": \"momentum-breakout-v1\",\n  \"quantScore\": 87.4,\n  \"technicalSnapshot\": {\n    \"trend\": \"UP\",\n    \"rsi14\": \"64.2000\"\n  },\n  \"riskSnapshot\": {\n    \"riskVersion\": \"risk-v1\",\n    \"plannedLossAtStop\": \"1400.0000\"\n  },\n  \"marketContext\": {\n    \"regime\": \"BULLISH\"\n  },\n  \"sectorContext\": {\n    \"sector\": \"Energy\",\n    \"strength\": \"POSITIVE\"\n  },\n  \"newsArticles\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/ai-analysis/candidate"
+          }
+        }
+      ]
+    },
+    {
+      "name": "AI Evaluation (Guarded)",
+      "description": "Requires AI_EVALUATION_ENABLED=true outside production. Evaluation uses synthetic evidence and does not mutate candidate or trade state.",
+      "item": [
+        {
+          "name": "List AI Evaluation Fixtures",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/ai-evaluation/fixtures",
+            "description": "Returns compact fixture metadata without the full persisted-style evidence payloads."
+          }
+        },
+        {
+          "name": "Run One AI Evaluation Fixture",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mode\": \"FAST_ONLY\",\n  \"runsPerFixture\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/ai-evaluation/fixtures/clean-strong/run",
+            "description": "Runs one low-cost fixture through production FAST and routing code. Change mode to FULL or FORCE_DEEP only when needed."
+          }
+        },
+        {
+          "name": "Run AI Evaluation Subset",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mode\": \"FAST_ONLY\",\n  \"runsPerFixture\": 1,\n  \"fixtureIds\": [\n    \"clean-strong\",\n    \"high-event-risk\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/ai-evaluation/run",
+            "description": "Runs all fixtures by default. Provide category or fixtureIds to conserve provider quota."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Messaging (Development Only)",
+      "description": "Requires MESSAGING_PROVIDER=meta-whatsapp and Meta credentials; route is hidden in production.",
+      "item": [
+        {
+          "name": "Send Test Text Message",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"recipient\": \"{{messageRecipient}}\",\n  \"messageType\": \"TEXT\",\n  \"text\": \"AI Trading backend Postman test\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/messaging/test"
+          }
+        },
+        {
+          "name": "Send Test Template Message",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"recipient\": \"{{messageRecipient}}\",\n  \"messageType\": \"TEMPLATE\",\n  \"templateId\": \"hello_world\",\n  \"templateVariables\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/messaging/test"
+          }
+        }
+      ]
+    },
+    {
+      "name": "WhatsApp Webhook",
+      "description": "Meta Cloud API verification and signed event receiver.",
+      "item": [
+        {
+          "name": "Verify WhatsApp Webhook",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/webhooks/whatsapp?hub.mode=subscribe&hub.verify_token={{whatsappVerifyToken}}&hub.challenge={{whatsappChallenge}}",
+            "description": "Set whatsappVerifyToken to META_WHATSAPP_VERIFY_TOKEN. A valid request echoes whatsappChallenge."
+          }
+        },
+        {
+          "name": "Receive WhatsApp Webhook Event",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-hub-signature-256",
+                "value": "{{whatsappSignature}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"object\": \"whatsapp_business_account\",\n  \"entry\": [\n    {\n      \"id\": \"POSTMAN_TEST\",\n      \"changes\": [\n        {\n          \"field\": \"messages\",\n          \"value\": {\n            \"messaging_product\": \"whatsapp\",\n            \"metadata\": {\n              \"display_phone_number\": \"0000000000\",\n              \"phone_number_id\": \"POSTMAN_TEST\"\n            },\n            \"statuses\": [\n              {\n                \"id\": \"wamid.POSTMAN\",\n                \"status\": \"delivered\",\n                \"timestamp\": \"1789401600\",\n                \"recipient_id\": \"{{messageRecipient}}\"\n              }\n            ]\n          }\n        }\n      ]\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/webhooks/whatsapp",
+            "description": "Set metaWhatsappAppSecret. The pre-request script signs the exact resolved raw body. With no secret, the backend should reject the request."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const secret = pm.collectionVariables.get('metaWhatsappAppSecret');",
+                  "if (secret) {",
+                  "  const raw = pm.variables.replaceIn(pm.request.body.raw);",
+                  "  const digest = CryptoJS.HmacSHA256(raw, secret).toString(CryptoJS.enc.Hex);",
+                  "  pm.collectionVariables.set('whatsappSignature', `sha256=${digest}`);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

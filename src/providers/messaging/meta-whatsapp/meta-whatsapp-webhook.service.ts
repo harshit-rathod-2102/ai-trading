@@ -40,10 +40,14 @@ export class MetaWhatsAppWebhookService {
     }
     if (mode !== 'subscribe' || !token || challenge === undefined
       || !constantTimeTokenEquals(token, this.config.verifyToken)) {
-      this.logger.warn('Meta WhatsApp webhook verification rejected');
+      this.logger.warn({ event: 'webhook.verification.rejected', module: MetaWhatsAppWebhookService.name,
+        provider: 'meta-whatsapp', operation: 'verifyChallenge', status: 'rejected' },
+      'Meta WhatsApp webhook verification rejected');
       throw new ForbiddenException('Webhook verification failed');
     }
-    this.logger.log('Meta WhatsApp webhook verification accepted');
+    this.logger.log({ event: 'webhook.verification.accepted', module: MetaWhatsAppWebhookService.name,
+      provider: 'meta-whatsapp', operation: 'verifyChallenge', status: 'accepted' },
+    'Meta WhatsApp webhook verification accepted');
     return challenge;
   }
 
@@ -52,7 +56,9 @@ export class MetaWhatsAppWebhookService {
       throw new ServiceUnavailableException('Meta WhatsApp app secret is not configured');
     }
     if (!rawBody || !verifyMetaWebhookSignature(rawBody, signature, this.config.appSecret)) {
-      this.logger.warn('Meta WhatsApp webhook signature rejected');
+      this.logger.error({ event: 'webhook.signature.rejected', module: MetaWhatsAppWebhookService.name,
+        provider: 'meta-whatsapp', operation: 'validateSignature', status: 'rejected' },
+      'Meta WhatsApp webhook signature rejected');
       throw new UnauthorizedException('Invalid webhook signature');
     }
   }
@@ -66,7 +72,9 @@ export class MetaWhatsAppWebhookService {
       statusesObserved: 0,
     };
     if (!isRecord(payload) || payload.object !== 'whatsapp_business_account' || !Array.isArray(payload.entry)) {
-      this.logger.warn('Ignored unrecognized Meta WhatsApp webhook payload');
+      this.logger.warn({ event: 'webhook.payload.ignored', module: MetaWhatsAppWebhookService.name,
+        provider: 'meta-whatsapp', operation: 'process', reason: 'unrecognized_payload' },
+      'Unrecognized Meta WhatsApp webhook payload ignored');
       return counts;
     }
     const allowedSender = this.allowedSender();
@@ -88,14 +96,18 @@ export class MetaWhatsAppWebhookService {
         for (const raw of value.messages) {
           if (!isRecord(raw) || raw.type !== 'text') {
             counts.unsupportedIgnored += 1;
-            this.logger.log(`Ignored unsupported Meta WhatsApp message type: ${safeType(raw)}`);
+            this.logger.debug({ event: 'webhook.message.ignored', module: MetaWhatsAppWebhookService.name,
+              provider: 'meta-whatsapp', operation: 'process', messageType: safeType(raw),
+              reason: 'unsupported_type' }, 'Unsupported Meta WhatsApp message ignored');
             continue;
           }
           try {
             const sender = normalizePhoneNumber(raw.from, 'Inbound sender');
             if (!allowedSender || sender !== allowedSender) {
               counts.unauthorizedIgnored += 1;
-              this.logger.warn(`Ignored Meta WhatsApp message from unauthorized sender ${mask(sender)}`);
+              this.logger.warn({ event: 'webhook.message.unauthorized', module: MetaWhatsAppWebhookService.name,
+                provider: 'meta-whatsapp', operation: 'process', sender: mask(sender),
+                authorizedSender: false }, 'Meta WhatsApp message from unauthorized sender ignored');
               continue;
             }
             const contact = contacts.find(item => isRecord(item) && item.wa_id === sender);
@@ -111,7 +123,9 @@ export class MetaWhatsAppWebhookService {
             );
             if (acquired !== 'OK') {
               counts.duplicatesIgnored += 1;
-              this.logger.log(`Ignored duplicate Meta WhatsApp message: ${message.providerMessageId}`);
+              this.logger.debug({ event: 'webhook.message.duplicate', module: MetaWhatsAppWebhookService.name,
+                provider: 'meta-whatsapp', operation: 'process',
+                providerMessageId: message.providerMessageId }, 'Duplicate Meta WhatsApp message ignored');
               continue;
             }
             try {
@@ -124,7 +138,9 @@ export class MetaWhatsAppWebhookService {
           } catch (error: unknown) {
             if (error instanceof ProviderError) {
               counts.unsupportedIgnored += 1;
-              this.logger.warn(`Ignored malformed Meta WhatsApp text message: ${error.code}`);
+              this.logger.warn({ event: 'webhook.message.invalid', module: MetaWhatsAppWebhookService.name,
+                provider: 'meta-whatsapp', operation: 'process', providerErrorCode: error.code },
+              'Malformed Meta WhatsApp message ignored');
               continue;
             }
             throw error;
@@ -132,6 +148,9 @@ export class MetaWhatsAppWebhookService {
         }
       }
     }
+    this.logger.log({ event: 'webhook.processed', module: MetaWhatsAppWebhookService.name,
+      provider: 'meta-whatsapp', operation: 'process', ...counts, status: 'completed' },
+    'Meta WhatsApp webhook processed');
     return counts;
   }
 
@@ -140,7 +159,9 @@ export class MetaWhatsAppWebhookService {
     try {
       return normalizePhoneNumber(this.config.allowedSender, 'META_WHATSAPP_ALLOWED_SENDER');
     } catch {
-      this.logger.warn('META_WHATSAPP_ALLOWED_SENDER is invalid; all inbound messages will be denied');
+      this.logger.warn({ event: 'messaging.sender_configuration.invalid',
+        module: MetaWhatsAppWebhookService.name, provider: 'meta-whatsapp',
+        operation: 'allowedSender' }, 'Configured Meta WhatsApp sender is invalid');
       return null;
     }
   }
@@ -150,7 +171,9 @@ export class MetaWhatsAppWebhookService {
     const status = optionalString(value.status);
     const id = optionalString(value.id);
     if (!status || !id || !['sent', 'delivered', 'read', 'failed'].includes(status)) return false;
-    this.logger.log(`Meta WhatsApp delivery status ${status}: ${id}`);
+    this.logger.log({ event: 'message.delivery.updated', module: MetaWhatsAppWebhookService.name,
+      provider: 'meta-whatsapp', operation: 'observeStatus', providerMessageId: id,
+      deliveryStatus: status }, 'Meta WhatsApp delivery status updated');
     return true;
   }
 }

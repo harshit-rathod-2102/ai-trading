@@ -10,9 +10,18 @@ import {
 } from '../providers/ai/openrouter/openrouter.config';
 import { AiAnalysisController } from './ai-analysis.controller';
 import { AiAnalysisService } from './ai-analysis.service';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { TradeCandidate } from '../candidates/entities/trade-candidate.entity';
+import { Instrument } from '../instruments/entities/instrument.entity';
+import { AiTriageService } from './ai-triage.service';
+import { AiRoutingPolicy } from './ai-routing-policy.service';
+import { DeepAiReviewService } from './deep-ai-review.service';
+import { AiEvaluationController } from './evaluation/ai-evaluation.controller';
+import { AiEvaluationRunnerService } from './evaluation/ai-evaluation-runner.service';
 
 @Module({
-  controllers: [AiAnalysisController],
+  imports: [TypeOrmModule.forFeature([TradeCandidate, Instrument])],
+  controllers: [AiAnalysisController, AiEvaluationController],
   providers: [
     { provide: OPENROUTER_CONFIG, inject: [ConfigService], useFactory: createOpenRouterConfig },
     OpenRouterClient,
@@ -28,7 +37,18 @@ import { AiAnalysisService } from './ai-analysis.service';
       },
     },
     AiAnalysisService,
+    AiRoutingPolicy,
+    AiTriageService,
+    DeepAiReviewService,
+    AiEvaluationRunnerService,
   ],
-  exports: [AiAnalysisService, AI_PROVIDER],
+  exports: [
+    AiAnalysisService,
+    AiTriageService,
+    DeepAiReviewService,
+    AiRoutingPolicy,
+    AiEvaluationRunnerService,
+    AI_PROVIDER,
+  ],
 })
 export class AiAnalysisModule {}

@@ -4,6 +4,7 @@ import {
   ProviderError,
   ProviderErrorCode,
   ProviderRateLimitError,
+  ProviderTimeoutError,
   ProviderUnavailableError,
 } from '../../provider-error';
 import { ProviderRequestContext } from '../../provider-request-context';
@@ -48,11 +49,19 @@ export class OpenRouterClient {
         }
         const error = this.httpError(response);
         if (!shouldRetry(response.status) || attempt === this.config.maxRetries) {
-          this.logger.warn(`OpenRouter provider error category: ${error.code} (HTTP ${response.status})`);
+          this.logger.error({ event: 'provider.request.failed', module: OpenRouterClient.name,
+            provider: 'openrouter', operation: 'createChatCompletion', endpoint: '/chat/completions',
+            statusCode: response.status, providerErrorCode: error.code,
+            retryable: error.retryable, attempt: attempt + 1,
+            maxAttempts: this.config.maxRetries + 1 }, 'OpenRouter request failed');
           throw error;
         }
         const delayMs = retryDelay(attempt, this.config.retryBaseDelayMs, response);
-        this.logger.warn(`OpenRouter transient HTTP ${response.status}; retrying in ${delayMs}ms`);
+        this.logger.warn({ event: 'provider.request.retrying', module: OpenRouterClient.name,
+          provider: 'openrouter', operation: 'createChatCompletion', endpoint: '/chat/completions',
+          statusCode: response.status, attempt: attempt + 1,
+          maxAttempts: this.config.maxRetries + 1, delayMs,
+          reason: error.code }, 'OpenRouter request will be retried');
         await delay(delayMs, context?.signal);
       } catch (error: unknown) {
         if (error instanceof ProviderError || error instanceof OpenRouterStructuredOutputUnsupportedError) {
@@ -60,7 +69,11 @@ export class OpenRouterClient {
         }
         if (context?.signal?.aborted) throw cancelled();
         if (attempt === this.config.maxRetries) {
-          this.logger.warn('OpenRouter provider error category: UNAVAILABLE (network or timeout failure)');
+          this.logger.error({ event: 'provider.request.failed', module: OpenRouterClient.name,
+            provider: 'openrouter', operation: 'createChatCompletion', endpoint: '/chat/completions',
+            providerErrorCode: ProviderErrorCode.UNAVAILABLE, retryable: true,
+            attempt: attempt + 1, maxAttempts: this.config.maxRetries + 1 },
+          'OpenRouter request failed after retries');
           throw new ProviderUnavailableError(
             'openrouter',
             'OpenRouter request failed after bounded retries',
@@ -68,7 +81,10 @@ export class OpenRouterClient {
           );
         }
         const delayMs = retryDelay(attempt, this.config.retryBaseDelayMs);
-        this.logger.warn(`OpenRouter network failure; retrying in ${delayMs}ms`);
+        this.logger.warn({ event: 'provider.request.retrying', module: OpenRouterClient.name,
+          provider: 'openrouter', operation: 'createChatCompletion', endpoint: '/chat/completions',
+          attempt: attempt + 1, maxAttempts: this.config.maxRetries + 1,
+          delayMs, reason: 'network_failure' }, 'OpenRouter request will be retried');
         await delay(delayMs, context?.signal);
       }
     }
@@ -82,7 +98,11 @@ export class OpenRouterClient {
     context?: ProviderRequestContext,
   ): Promise<Response> {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), this.config.httpTimeoutMs);
+    let timedOut = false;
+    const timeout = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, this.config.httpTimeoutMs);
     const cancel = () => controller.abort();
     context?.signal?.addEventListener('abort', cancel, { once: true });
     const headers: Record<string, string> = {
@@ -99,6 +119,15 @@ export class OpenRouterClient {
         body: JSON.stringify(body),
         signal: controller.signal,
       });
+    } catch (error: unknown) {
+      if (timedOut) {
+        throw new ProviderTimeoutError(
+          'openrouter',
+          `OpenRouter request timed out after ${this.config.httpTimeoutMs} ms`,
+          error,
+        );
+      }
+      throw error;
     } finally {
       clearTimeout(timeout);
       context?.signal?.removeEventListener('abort', cancel);

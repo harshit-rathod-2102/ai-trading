@@ -53,6 +53,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      target: build
     env_file:
       - .env
     environment:
@@ -69,8 +70,13 @@ services:
         condition: service_healthy
       flyway:
         condition: service_completed_successfully
+    volumes:
+      - .:/app
+      - api_node_modules:/app/node_modules
+    command: npm run start:dev
     restart: unless-stopped
 
 volumes:
   postgres_data:
   redis_data:
+  api_node_modules:

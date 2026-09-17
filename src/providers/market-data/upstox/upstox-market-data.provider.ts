@@ -20,6 +20,7 @@ import { UpstoxQuote, UpstoxQuoteResponse } from './dto/upstox-quote-response';
 import { mapUpstoxCandle, mapUpstoxQuoteCandle } from './mappers/upstox-candle.mapper';
 import { mapUpstoxInstrument } from './mappers/upstox-instrument.mapper';
 import { UpstoxClient } from './upstox-client';
+import { elapsedMilliseconds } from '../../../logging/logging.utils';
 
 const NIFTY_50_KEY = 'NSE_INDEX|Nifty 50';
 const INSTRUMENT_CACHE_MS = 15 * 60 * 1000;
@@ -38,12 +39,18 @@ export class UpstoxMarketDataProvider implements MarketDataProvider {
     request: GetInstrumentsRequest = {},
     context?: ProviderRequestContext,
   ): Promise<readonly ProviderInstrument[]> {
-    this.logger.log('Loading Upstox NSE equity and index instruments');
+    const startedAt = performance.now();
+    this.logger.debug({ event: 'provider.request.started', module: UpstoxMarketDataProvider.name,
+      provider: this.id, operation: 'getInstruments', endpoint: 'instrument-master' },
+    'Upstox instrument request started');
     const instruments = await this.loadInstrumentCatalog(context);
     const filtered = instruments.filter(instrument =>
       (!request.exchange || instrument.exchange === request.exchange) &&
       (!request.instrumentType || instrument.instrumentType === request.instrumentType));
-    this.logger.log(`Upstox instrument discovery returned ${filtered.length} records`);
+    this.logger.debug({ event: 'provider.request.completed', module: UpstoxMarketDataProvider.name,
+      provider: this.id, operation: 'getInstruments', endpoint: 'instrument-master',
+      resultCount: filtered.length, durationMs: elapsedMilliseconds(startedAt),
+      status: 'completed' }, 'Upstox instrument request completed');
     return filtered;
   }
 
@@ -52,16 +59,29 @@ export class UpstoxMarketDataProvider implements MarketDataProvider {
     context?: ProviderRequestContext,
   ): Promise<readonly ProviderCandle[]> {
     this.assertDaily(request.interval);
+    const startedAt = performance.now();
     const instrumentKey = await this.resolveInstrumentKey(request.instrument, context);
     const windows = splitDailyRange(request.from, request.to);
-    this.logger.log(`Upstox daily history: ${request.instrument.symbol}, ${request.from} to ${request.to}, ${windows.length} request window(s)`);
+    this.logger.debug({ event: 'provider.request.started', module: UpstoxMarketDataProvider.name,
+      provider: this.id, operation: 'getHistoricalCandles', symbol: request.instrument.symbol,
+      from: request.from, to: request.to, windowCount: windows.length },
+    'Upstox historical candle request started');
     const candles = new Map<string, ProviderCandle>();
     for (const window of windows) {
       const rows = await this.fetchHistoricalWindow(instrumentKey, window.from, window.to, context);
-      this.logger.log(`Upstox daily history window ${window.from} to ${window.to}: ${rows.length} records`);
+      this.logger.debug({ event: 'provider.request.chunk.completed', module: UpstoxMarketDataProvider.name,
+        provider: this.id, operation: 'getHistoricalCandles', symbol: request.instrument.symbol,
+        from: window.from, to: window.to, resultCount: rows.length },
+      'Upstox historical candle chunk completed');
       for (const candle of rows) candles.set(candle.sessionDate, candle);
     }
-    return [...candles.values()].sort((left, right) => left.sessionDate.localeCompare(right.sessionDate));
+    const result = [...candles.values()].sort((left, right) => left.sessionDate.localeCompare(right.sessionDate));
+    this.logger.debug({ event: 'provider.request.completed', module: UpstoxMarketDataProvider.name,
+      provider: this.id, operation: 'getHistoricalCandles', symbol: request.instrument.symbol,
+      from: request.from, to: request.to, resultCount: result.length,
+      durationMs: elapsedMilliseconds(startedAt), status: 'completed' },
+    'Upstox historical candle request completed');
+    return result;
   }
 
   async getLatestCandle(
@@ -69,8 +89,11 @@ export class UpstoxMarketDataProvider implements MarketDataProvider {
     context?: ProviderRequestContext,
   ): Promise<ProviderCandle | null> {
     this.assertDaily(request.interval);
+    const startedAt = performance.now();
     const instrumentKey = await this.resolveInstrumentKey(request.instrument, context);
-    this.logger.log(`Upstox latest daily OHLC: ${request.instrument.symbol}`);
+    this.logger.debug({ event: 'provider.request.started', module: UpstoxMarketDataProvider.name,
+      provider: this.id, operation: 'getLatestCandle', symbol: request.instrument.symbol },
+    'Upstox latest candle request started');
     const response = await this.client.getJson<UpstoxQuoteResponse>(
       `/v3/market-quote/ohlc?instrument_key=${encodeURIComponent(instrumentKey)}&interval=1d`,
       context,
@@ -85,7 +108,12 @@ export class UpstoxMarketDataProvider implements MarketDataProvider {
     if (!typedQuote.live_ohlc || !isRecord(typedQuote.live_ohlc)) {
       throw this.invalidResponse('Upstox quote response is missing daily OHLC');
     }
-    return mapUpstoxQuoteCandle(typedQuote.live_ohlc);
+    const result = mapUpstoxQuoteCandle(typedQuote.live_ohlc);
+    this.logger.debug({ event: 'provider.request.completed', module: UpstoxMarketDataProvider.name,
+      provider: this.id, operation: 'getLatestCandle', symbol: request.instrument.symbol,
+      resultCount: 1, durationMs: elapsedMilliseconds(startedAt), status: 'completed' },
+    'Upstox latest candle request completed');
+    return result;
   }
 
   async getTradingCalendar(

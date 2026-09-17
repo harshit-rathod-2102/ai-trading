@@ -1,7 +1,7 @@
 import { BadGatewayException, BadRequestException, ConflictException, Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'node:crypto';
-import { Between, DataSource, LessThanOrEqual, Repository } from 'typeorm';
+import { Between, DataSource, In, LessThanOrEqual, Repository } from 'typeorm';
 import Decimal from 'decimal.js';
 import { Instrument } from '../instruments/entities/instrument.entity';
 import { InstrumentsService } from '../instruments/instruments.service';
@@ -13,6 +13,8 @@ import { CandleInterval } from '../providers/market-data/models/market-data.enum
 import { TradingCalendar } from '../providers/market-data/models/market-data-request';
 import { assertRange, barIssues, calendarIssues, expectedSessions, marketDate } from './market-data.validation';
 import { DataQualityService } from './data-quality.service';
+import { ProviderError } from '../providers/provider-error';
+import { elapsedMilliseconds, structuredError } from '../logging/logging.utils';
 
 @Injectable()
 export class MarketDataService {
@@ -30,20 +32,33 @@ export class MarketDataService {
     return {
       id: this.provider.id, isSynthetic: this.provider.isSynthetic,
       adjustmentBasis: this.provider.adjustmentBasis,
-      instruments: await this.providerCall(signal =>
+      instruments: await this.providerCall('getInstruments', signal =>
         this.provider.getInstruments(undefined, { signal })),
       calendar: await this.calendar('NSE'),
     };
   }
 
   async syncInstruments() {
-    const catalog = await this.providerCall(signal => this.provider.getInstruments({
-      exchange: Exchange.NSE,
-      activeOnly: true,
-    }, { signal }));
-    const result = await this.instruments.syncProviderCatalog(this.provider.id, catalog);
-    this.logger.log(`Instrument catalog synchronized from ${this.provider.id}: ${result.upserted} records`);
-    return result;
+    const startedAt = performance.now();
+    this.logger.log({ event: 'market_data.sync.started', module: MarketDataService.name,
+      operation: 'syncInstruments', provider: this.provider.id }, 'Instrument sync started');
+    try {
+      const catalog = await this.providerCall('getInstruments', signal => this.provider.getInstruments({
+        exchange: Exchange.NSE,
+        activeOnly: true,
+      }, { signal }));
+      const result = await this.instruments.syncProviderCatalog(this.provider.id, catalog);
+      this.logger.log({ event: 'market_data.sync.completed', module: MarketDataService.name,
+        operation: 'syncInstruments', provider: this.provider.id, receivedCount: catalog.length,
+        writtenCount: result.upserted,
+        durationMs: elapsedMilliseconds(startedAt), status: 'completed' }, 'Instrument sync completed');
+      return result;
+    } catch (error: unknown) {
+      this.logger.error({ event: 'market_data.sync.failed', module: MarketDataService.name,
+        operation: 'syncInstruments', provider: this.provider.id,
+        durationMs: elapsedMilliseconds(startedAt), ...structuredError(error) }, 'Instrument sync failed');
+      throw error;
+    }
   }
 
   async list(instrumentId: string, from: string, to: string): Promise<DailyCandle[]> {
@@ -52,6 +67,16 @@ export class MarketDataService {
     return this.candles.find({
       where: { instrumentId, sessionDate: Between(from, to) },
       order: { sessionDate: 'ASC' },
+    });
+  }
+
+  async listMany(instrumentIds: readonly string[], from: string, to: string): Promise<DailyCandle[]> {
+    assertRange(from, to);
+    const ids = [...new Set(instrumentIds)];
+    if (!ids.length) return [];
+    return this.candles.find({
+      where: { instrumentId: In(ids), sessionDate: Between(from, to) },
+      order: { instrumentId: 'ASC', sessionDate: 'ASC' },
     });
   }
 
@@ -71,6 +96,12 @@ export class MarketDataService {
 
   async refresh(instrumentId: string, from: string, to: string) {
     assertRange(from, to);
+    const startedAt = performance.now();
+    this.logger.log({ event: 'market_data.sync.started', module: MarketDataService.name,
+      operation: 'refreshDailyCandles', provider: this.provider.id, instrumentId,
+      interval: CandleInterval.ONE_DAY, from, to }, 'Candle sync started');
+    let symbol: string | undefined;
+    try {
     // Serialize provider reads and writes for the same instrument. This avoids an
     // older concurrent response overwriting a newer refresh. Calls are time bounded.
     const result = await this.dataSource.transaction(async manager => {
@@ -79,12 +110,13 @@ export class MarketDataService {
       });
       if (!instrument) throw new BadRequestException('Instrument no longer exists');
       if (!instrument.isActive) throw new ConflictException('Inactive instruments cannot be refreshed');
+      symbol = instrument.symbol;
 
       const calendar = await this.calendar(instrument.exchange, from, to);
       if (from < calendar.coverageFrom || to > calendar.coverageTo) {
         throw new BadRequestException('Provider calendar does not cover the complete requested range');
       }
-      const bars = await this.providerCall(signal => this.provider.getHistoricalCandles({
+      const bars = await this.providerCall('getHistoricalCandles', signal => this.provider.getHistoricalCandles({
         instrument: {
           symbol: instrument.symbol,
           exchange: instrument.exchange as Exchange,
@@ -94,7 +126,8 @@ export class MarketDataService {
         interval: CandleInterval.ONE_DAY,
         from,
         to,
-      }, { signal }));
+      }, { signal }), { symbol: instrument.symbol, instrumentId, from, to,
+        interval: CandleInterval.ONE_DAY });
       if (!Array.isArray(bars)) throw new BadGatewayException('Provider did not return daily candles');
       const now = new Date();
       const expected = expectedSessions(calendar, from, to, now);
@@ -110,7 +143,10 @@ export class MarketDataService {
       }
       const missing = expected.filter(date => !seen.has(date));
       if (issues.length || missing.length) {
-        this.logger.warn(`Refresh rejected for ${instrumentId}: ${issues.length} invalid rows, ${missing.length} missing sessions`);
+        this.logger.warn({ event: 'market_data.quality.failed', module: MarketDataService.name,
+          operation: 'refreshDailyCandles', provider: this.provider.id, symbol: instrument.symbol,
+          instrumentId, rejectedCount: issues.length, missingSessionCount: missing.length,
+          durationMs: elapsedMilliseconds(startedAt) }, 'Candle data failed validation');
         throw new BadGatewayException({
           message: 'Provider data failed validation; no candles were written',
           issues, missingSessions: missing,
@@ -139,27 +175,45 @@ export class MarketDataService {
       return { instrumentId, from, to, upserted: bars.length, provider: this.provider.id,
         isSynthetic: this.provider.isSynthetic, adjustmentBasis: this.provider.adjustmentBasis };
     });
-    this.logger.log(`Daily candles refreshed: ${instrumentId}, ${result.upserted} sessions (${from} to ${to})`);
+    this.logger.log({ event: 'market_data.sync.completed', module: MarketDataService.name,
+      operation: 'refreshDailyCandles', provider: this.provider.id, instrumentId,
+      symbol, interval: CandleInterval.ONE_DAY, from, to, receivedCount: result.upserted,
+      writtenCount: result.upserted, rejectedCount: 0,
+      durationMs: elapsedMilliseconds(startedAt), status: 'completed' }, 'Candle sync completed');
     return result;
+    } catch (error: unknown) {
+      this.logger.error({ event: 'market_data.sync.failed', module: MarketDataService.name,
+        operation: 'refreshDailyCandles', provider: this.provider.id, instrumentId, symbol,
+        interval: CandleInterval.ONE_DAY, from, to, durationMs: elapsedMilliseconds(startedAt),
+        ...structuredError(error) }, 'Candle sync failed');
+      throw error;
+    }
   }
 
   private async calendar(exchange: string, from?: string, to?: string): Promise<TradingCalendar> {
-    const calendar = await this.providerCall(signal => this.provider.getTradingCalendar({
+    const calendar = await this.providerCall('getTradingCalendar', signal => this.provider.getTradingCalendar({
       exchange: exchange as Exchange,
       from,
       to,
-    }, { signal }));
+    }, { signal }), { exchange, from, to });
     const issues = calendarIssues(calendar);
     if (issues.length) throw new BadGatewayException({ message: 'Invalid provider calendar', issues });
     return calendar;
   }
 
-  private async providerCall<T>(operation: (signal: AbortSignal) => Promise<T>): Promise<T> {
+  private async providerCall<T>(
+    operation: string,
+    call: (signal: AbortSignal) => Promise<T>,
+    metadata: Readonly<Record<string, unknown>> = {},
+  ): Promise<T> {
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout> | undefined;
+    const startedAt = performance.now();
+    this.logger.debug({ event: 'provider.request.started', module: MarketDataService.name,
+      provider: this.provider.id, operation, ...metadata }, 'Provider request started');
     try {
-      return await Promise.race([
-        operation(controller.signal),
+      const result = await Promise.race([
+        call(controller.signal),
         new Promise<never>((_resolve, reject) => {
           timer = setTimeout(() => {
             controller.abort();
@@ -167,6 +221,18 @@ export class MarketDataService {
           }, 15000);
         }),
       ]);
+      this.logger.debug({ event: 'provider.request.completed', module: MarketDataService.name,
+        provider: this.provider.id, operation, ...metadata, status: 'completed',
+        resultCount: Array.isArray(result) ? result.length : undefined,
+        durationMs: elapsedMilliseconds(startedAt) }, 'Provider request completed');
+      return result;
+    } catch (error: unknown) {
+      this.logger.error({ event: 'provider.request.failed', module: MarketDataService.name,
+        provider: this.provider.id, operation, ...metadata, status: 'failed',
+        providerErrorCode: error instanceof ProviderError ? error.code : undefined,
+        retryable: error instanceof ProviderError ? error.retryable : undefined,
+        durationMs: elapsedMilliseconds(startedAt), ...structuredError(error) }, 'Provider request failed');
+      throw error;
     } finally {
       if (timer) clearTimeout(timer);
     }

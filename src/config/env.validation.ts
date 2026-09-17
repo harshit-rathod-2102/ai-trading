@@ -28,12 +28,17 @@ export const environmentValidationSchema = Joi.object({
   OPENROUTER_BASE_URL: Joi.string().uri({ scheme: ['https'] })
     .default('https://openrouter.ai/api/v1'),
   OPENROUTER_MODEL: Joi.string().trim().min(1).default('openrouter/free'),
+  OPENROUTER_FAST_MODEL: Joi.string().trim().min(1),
+  OPENROUTER_DEEP_MODEL: Joi.string().trim().min(1).default('nvidia/nemotron-3-ultra:free'),
   OPENROUTER_HTTP_TIMEOUT_MS: Joi.number().integer().min(1000).max(120000).default(30000),
   OPENROUTER_APP_NAME: Joi.string().trim().min(1).max(100).default('swing-trading-assistant'),
   OPENROUTER_SITE_URL: Joi.string().uri({ scheme: ['http', 'https'] }).allow('').default(''),
   OPENROUTER_MAX_RETRIES: Joi.number().integer().min(0).max(3).default(2),
   OPENROUTER_RETRY_BASE_DELAY_MS: Joi.number().integer().min(100).max(10000).default(1000),
   OPENROUTER_CACHE_TTL_MS: Joi.number().integer().min(0).max(3600000).default(900000),
+  AI_ROUTING_TOP_RANK_THRESHOLD: Joi.number().integer().min(1).max(100).default(3),
+  AI_EVALUATION_ENABLED: Joi.boolean().truthy('true').falsy('false').default(false),
+  AI_EVAL_RUNS_PER_FIXTURE: Joi.number().integer().min(1).max(5).default(1),
   MESSAGING_PROVIDER: Joi.string().valid('', 'meta-whatsapp').default(''),
   META_WHATSAPP_ACCESS_TOKEN: Joi.string().allow('').default(''),
   META_WHATSAPP_PHONE_NUMBER_ID: Joi.string().pattern(/^\d+$/).allow('').default(''),
@@ -61,6 +66,8 @@ export const environmentValidationSchema = Joi.object({
   REDIS_HOST: Joi.string().trim().required(),
   REDIS_PORT: Joi.number().port().default(6379),
   LOG_LEVEL: Joi.string()
-    .valid('fatal', 'error', 'warn', 'log', 'debug', 'verbose')
-    .default('log'),
+    .valid('fatal', 'error', 'warn', 'info', 'log', 'debug', 'trace', 'verbose')
+    .default('info'),
+  LOG_PRETTY: Joi.boolean().truthy('true').falsy('false').default(false),
+  DB_QUERY_LOGGING: Joi.boolean().truthy('true').falsy('false').default(false),
 });

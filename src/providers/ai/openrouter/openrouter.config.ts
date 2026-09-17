@@ -6,6 +6,8 @@ export interface OpenRouterConfig {
   readonly apiKey: string | null;
   readonly baseUrl: string;
   readonly model: string;
+  readonly fastModel: string;
+  readonly deepModel: string;
   readonly httpTimeoutMs: number;
   readonly appName: string;
   readonly siteUrl: string | null;
@@ -19,6 +21,8 @@ export function createOpenRouterConfig(config: ConfigService): OpenRouterConfig 
     apiKey: config.get<string>('openrouter.apiKey') || null,
     baseUrl: config.getOrThrow<string>('openrouter.baseUrl').replace(/\/$/, ''),
     model: config.getOrThrow<string>('openrouter.model'),
+    fastModel: config.getOrThrow<string>('openrouter.fastModel'),
+    deepModel: config.getOrThrow<string>('openrouter.deepModel'),
     httpTimeoutMs: config.getOrThrow<number>('openrouter.httpTimeoutMs'),
     appName: config.getOrThrow<string>('openrouter.appName'),
     siteUrl: config.get<string>('openrouter.siteUrl') || null,
