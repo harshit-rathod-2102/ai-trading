@@ -12,6 +12,7 @@ import { elapsedMilliseconds, structuredError } from '../logging/logging.utils';
 @Injectable()
 export class RiskService {
   private readonly logger = new Logger(RiskService.name);
+
   constructor(
     private readonly scanner: ScannerService,
     private readonly profiles: TradingProfileService,

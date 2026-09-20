@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import Decimal from 'decimal.js';
 import { StrategyName } from '../../strategy/models/strategy-name.enum';
 import { SCANNER_V1_CONFIG as config } from '../config/scanner-v1.config';
 import { QualifiedSetup, RankedSetup } from '../models/scan-result.model';

@@ -62,8 +62,11 @@ interface CachedDeepReview {
 @Injectable()
 export class OpenRouterAiProvider implements AiProvider {
   private readonly logger = new Logger(OpenRouterAiProvider.name);
+
   private readonly cache = new Map<string, CachedAnalysis>();
+
   private readonly fastCache = new Map<string, CachedFastTriage>();
+
   private readonly deepCache = new Map<string, CachedDeepReview>();
 
   constructor(

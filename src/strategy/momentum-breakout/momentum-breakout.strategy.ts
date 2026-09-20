@@ -32,6 +32,7 @@ import { MOMENTUM_BREAKOUT_V1_CONFIG as config } from './momentum-breakout-v1.co
 @Injectable()
 export class MomentumBreakoutStrategy implements TradingStrategy {
   readonly name = StrategyName.MOMENTUM_BREAKOUT;
+
   readonly version = config.version;
 
   evaluate(input: StrategyInput): StrategyResult {

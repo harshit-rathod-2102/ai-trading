@@ -1,6 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Exchange } from '../../../common/enums/exchange.enum';
-import { InstrumentType } from '../../../common/enums/instrument-type.enum';
 import { MarketDataProvider } from '../market-data-provider.interface';
 import { AdjustmentBasis, CandleInterval } from '../models/market-data.enums';
 import {
@@ -35,9 +34,13 @@ const INSTRUMENT_CACHE_MS = 15 * 60 * 1000;
 @Injectable()
 export class UpstoxMarketDataProvider implements MarketDataProvider {
   readonly id = 'upstox';
+
   readonly isSynthetic = false;
+
   readonly adjustmentBasis = AdjustmentBasis.UNADJUSTED;
+
   private readonly logger = new Logger(UpstoxMarketDataProvider.name);
+
   private instrumentCache?: {
     readonly loadedAt: number;
     readonly instruments: readonly ProviderInstrument[];

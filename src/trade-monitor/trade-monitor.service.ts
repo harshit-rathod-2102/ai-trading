@@ -45,6 +45,7 @@ const MONITOR_EVENT_TYPES = [
 @Injectable()
 export class TradeMonitorService {
   private readonly logger = new Logger(TradeMonitorService.name);
+
   private readonly inFlight = new Map<string, Promise<TradeMonitorResult>>();
 
   constructor(

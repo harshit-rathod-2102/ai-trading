@@ -18,6 +18,7 @@ interface CachedSearch {
 @Injectable()
 export class GNewsProvider implements NewsProvider {
   private readonly logger = new Logger(GNewsProvider.name);
+
   private readonly cache = new Map<string, CachedSearch>();
 
   constructor(

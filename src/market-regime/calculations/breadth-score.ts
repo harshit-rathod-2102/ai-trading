@@ -1,4 +1,3 @@
-import Decimal from 'decimal.js';
 import { BreadthSnapshot, UniverseIndicatorObservation } from '../models/breadth.model';
 import { MarketRegimeComponent } from '../models/market-regime-components.model';
 import { RegimeDecimal, average, decimal, formatScore } from './numeric';

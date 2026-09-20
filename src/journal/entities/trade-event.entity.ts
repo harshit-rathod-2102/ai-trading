@@ -15,12 +15,14 @@ export class TradeEvent {
   @ManyToOne(() => Trade, { onDelete: 'RESTRICT', nullable: true })
   @JoinColumn({ name: 'trade_id' })
   trade!: Trade | null;
+
   @Column({ name: 'candidate_id', type: 'uuid', nullable: true })
   candidateId!: string | null;
 
   @ManyToOne(() => TradeCandidate, { onDelete: 'RESTRICT', nullable: true })
   @JoinColumn({ name: 'candidate_id' })
   candidate!: TradeCandidate | null;
+
   @Column({ name: 'event_type', type: 'varchar', length: 32 })
   eventType!: TradeEventType;
 

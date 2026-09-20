@@ -42,8 +42,8 @@ export function selectTradeGeometry(setup: RiskSetup): TradeGeometry {
   let entryReference: Decimal;
   let entryReferenceType: string;
   let stopReferenceType: string;
-  let target: Decimal | null = null;
-  let targetType: string | null = null;
+  let target: Decimal | null;
+  let targetType: string | null;
 
   try {
     if (setup.strategy === StrategyName.MOMENTUM_BREAKOUT) {

@@ -8,7 +8,6 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
-import { AiAnalysisTier } from '../ai-analysis/models/ai-analysis-tier.enum';
 import { CandidateStatus } from '../common/enums/candidate-status.enum';
 import { EventSource } from '../common/enums/event-source.enum';
 import { TradeEventType } from '../common/enums/trade-event-type.enum';
@@ -27,6 +26,7 @@ import {
 @Injectable()
 export class CandidateNotificationService {
   private readonly logger = new Logger(CandidateNotificationService.name);
+
   private readonly inFlight = new Map<string, Promise<CandidateNotificationResult>>();
 
   constructor(

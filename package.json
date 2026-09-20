@@ -10,8 +10,8 @@
     "start:dev": "nest start --watch",
     "start:prod": "node dist/main.js",
     "ai:evaluate": "node scripts/run-ai-evaluation.cjs",
-    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\" \"*.{json,md,yml,yaml}\"",
-    "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\" \"*.{json,md,yml,yaml}\"",
+    "format": "prettier --write \"src/**/*.ts\" \"*.{json,md,yml,yaml}\"",
+    "format:check": "prettier --check \"src/**/*.ts\" \"*.{json,md,yml,yaml}\"",
     "lint": "eslint \"src/**/*.ts\"",
     "lint:fix": "eslint \"src/**/*.ts\" --fix"
   },

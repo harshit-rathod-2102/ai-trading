@@ -24,6 +24,7 @@ import { elapsedMilliseconds, structuredError } from '../logging/logging.utils';
 @Injectable()
 export class MarketRegimeService {
   private readonly logger = new Logger(MarketRegimeService.name);
+
   constructor(
     private readonly indicators: IndicatorsService,
     private readonly marketData: MarketDataService,

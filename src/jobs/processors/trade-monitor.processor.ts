@@ -5,7 +5,6 @@ import { Job } from 'bullmq';
 import { isWithinTimeRange, marketClock } from '../../common/utils/market-time';
 import { elapsedMilliseconds, structuredError } from '../../logging/logging.utils';
 import { TradeMonitorService } from '../../trade-monitor/trade-monitor.service';
-import { TRADE_MONITOR_RUN } from '../job-names';
 import { MarketJobData } from '../models/job-data.model';
 import { MARKET_MONITORING_QUEUE } from '../queues';
 import { TradingDayService } from '../services/trading-day.service';
@@ -13,6 +12,7 @@ import { TradingDayService } from '../services/trading-day.service';
 @Processor(MARKET_MONITORING_QUEUE, { concurrency: 1 })
 export class TradeMonitorProcessor extends WorkerHost {
   private readonly logger = new Logger(TradeMonitorProcessor.name);
+
   constructor(
     private readonly config: ConfigService,
     private readonly tradingDays: TradingDayService,

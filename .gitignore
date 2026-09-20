@@ -25,7 +25,8 @@ lerna-debug.log*
 
 # IDEs
 .idea/
-.vscode/
+.vscode/*
+!.vscode/settings.json
 *.swp
 
 # OS files

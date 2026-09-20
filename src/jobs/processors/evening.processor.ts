@@ -11,12 +11,14 @@ import { EveningService } from '../services/evening.service';
 @Processor(EVENING_QUEUE, { concurrency: 1 })
 export class EveningProcessor extends WorkerHost {
   private readonly logger = new Logger(EveningProcessor.name);
+
   constructor(
     private readonly evening: EveningService,
     private readonly config: ConfigService,
   ) {
     super();
   }
+
   async process(job: Job<MarketJobData>) {
     const startedAt = performance.now();
     const marketDate = marketClock(

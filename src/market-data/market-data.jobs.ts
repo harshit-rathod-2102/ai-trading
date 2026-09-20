@@ -23,6 +23,7 @@ export interface RefreshCommand {
 @Injectable()
 export class MarketDataJobs {
   private readonly logger = new Logger(MarketDataJobs.name);
+
   constructor(
     @InjectQueue(MARKET_DATA_QUEUE) private readonly queue: Queue<RefreshCommand>,
     private readonly instruments: InstrumentsService,
@@ -97,9 +98,11 @@ export class MarketDataJobs {
 @Processor(MARKET_DATA_QUEUE, { concurrency: 2 })
 export class MarketDataWorker extends WorkerHost {
   private readonly logger = new Logger(MarketDataWorker.name);
+
   constructor(private readonly marketData: MarketDataService) {
     super();
   }
+
   async process(job: Job<RefreshCommand>) {
     const startedAt = performance.now();
     const fields = {

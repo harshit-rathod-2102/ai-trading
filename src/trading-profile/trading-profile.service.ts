@@ -9,6 +9,7 @@ import { UpsertTradingProfileDto } from './dto/upsert-trading-profile.dto';
 @Injectable()
 export class TradingProfileService {
   private readonly logger = new Logger(TradingProfileService.name);
+
   constructor(private readonly dataSource: DataSource) {}
 
   async getActiveProfile(): Promise<TradingProfile> {

@@ -16,6 +16,7 @@ const configuredConcurrency = Math.max(
 @Processor(CANDIDATE_ANALYSIS_QUEUE, { concurrency: configuredConcurrency })
 export class CandidateAnalysisProcessor extends WorkerHost {
   private readonly logger = new Logger(CandidateAnalysisProcessor.name);
+
   constructor(
     private readonly analysis: CandidateAnalysisService,
     private readonly pipeline: DailyPipelineService,

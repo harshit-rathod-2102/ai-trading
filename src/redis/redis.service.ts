@@ -6,6 +6,7 @@ import { structuredError } from '../logging/logging.utils';
 @Injectable()
 export class RedisService implements OnModuleInit, OnApplicationShutdown {
   private readonly logger = new Logger(RedisService.name);
+
   private readonly client: Redis;
 
   constructor(configService: ConfigService) {

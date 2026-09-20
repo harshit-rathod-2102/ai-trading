@@ -21,6 +21,7 @@ export class Trade {
   @OneToOne(() => TradeCandidate, { onDelete: 'RESTRICT', nullable: false })
   @JoinColumn({ name: 'candidate_id' })
   candidate!: TradeCandidate;
+
   @Column({ name: 'symbol', type: 'varchar', length: 32 })
   symbol!: string;
 

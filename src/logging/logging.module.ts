@@ -19,7 +19,7 @@ import { ApplicationLifecycleService } from './application-lifecycle.service';
         pinoHttp: {
           level: pinoLevel(config.getOrThrow<string>('app.logLevel')),
           messageKey: 'message',
-          timestamp: () => `,\"timestamp\":\"${new Date().toISOString()}\"`,
+          timestamp: () => `,"timestamp":"${new Date().toISOString()}"`,
           base: { service: 'ai-trading-backend' },
           formatters: {
             level: (label: string) => ({ level: label }),

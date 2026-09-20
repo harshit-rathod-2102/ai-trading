@@ -46,7 +46,9 @@ interface ProcessedArticles {
 @Injectable()
 export class NewsEnrichmentService {
   private readonly logger = new Logger(NewsEnrichmentService.name);
+
   private readonly inFlight = new Map<string, Promise<NewsEnrichmentResult>>();
+
   private readonly providerName: string;
 
   constructor(

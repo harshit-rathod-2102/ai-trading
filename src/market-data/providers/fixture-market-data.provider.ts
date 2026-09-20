@@ -84,7 +84,9 @@ const ROWS: Readonly<Record<string, readonly [string, string, string, string, st
 @Injectable()
 export class FixtureMarketDataProvider implements MarketDataProvider {
   readonly id = 'fixture-v1';
+
   readonly isSynthetic = true;
+
   readonly adjustmentBasis = AdjustmentBasis.UNADJUSTED;
 
   async getInstruments(

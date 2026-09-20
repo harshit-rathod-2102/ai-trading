@@ -40,14 +40,23 @@ function IsProfileDecimal(integerDigits: number, maximum: string): PropertyDecor
 
 export class UpsertTradingProfileDto {
   @IsString() @Matches(/\S/) @MaxLength(160) name!: string;
+
   @IsString() @Matches(/^[A-Z]{3}$/) currency!: string;
+
   @IsProfileDecimal(14, '99999999999999.9999') accountCapital!: string;
+
   @IsProfileDecimal(3, '100') riskPerTradePercent!: string;
+
   @IsProfileDecimal(3, '100') maxPositionPercent!: string;
+
   @IsProfileDecimal(3, '100') maxOpenPortfolioRiskPercent!: string;
+
   @IsProfileDecimal(3, '100') maxSectorExposurePercent!: string;
+
   @IsProfileDecimal(14, '99999999999999.9999') minimumRiskRewardRatio!: string;
+
   @IsInt() @Min(1) @Max(2147483647) maxOpenTrades!: number;
+
   @ValidateIf((_object, value: unknown) => value !== undefined)
   @Equals(true, { message: 'This endpoint manages the active profile; isActive must be true' })
   isActive?: true;

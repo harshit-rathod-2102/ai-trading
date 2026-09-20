@@ -1,6 +1,5 @@
 import Decimal from 'decimal.js';
 import { RISK_V1_CONFIG } from '../config/risk-v1.config';
-import { decimal } from './numeric';
 import { TradeGeometry } from './stop-selection';
 
 export interface RewardRiskResult {

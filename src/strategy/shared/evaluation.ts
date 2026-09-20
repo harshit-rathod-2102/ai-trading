@@ -163,11 +163,17 @@ function validateInput(input: StrategyInput, config: CommonStrategyConfig): void
 /** Shared validation/audit handling only; each strategy owns its hard rules and component composition. */
 export class Evaluation {
   readonly reasons: string[] = [];
+
   readonly warnings: string[] = [];
+
   readonly warningCodes: WarningCode[] = [];
+
   readonly rejectionCodes: RejectionCode[] = [];
+
   readonly rejectionReasons: string[] = [];
+
   averagePriorTradedValue: string | null = null;
+
   sectorScore: string;
 
   constructor(

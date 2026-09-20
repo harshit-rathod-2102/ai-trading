@@ -32,6 +32,7 @@ import { TREND_PULLBACK_V1_CONFIG as config } from './trend-pullback-v1.config';
 @Injectable()
 export class TrendPullbackStrategy implements TradingStrategy {
   readonly name = StrategyName.TREND_PULLBACK;
+
   readonly version = config.version;
 
   evaluate(input: StrategyInput): StrategyResult {

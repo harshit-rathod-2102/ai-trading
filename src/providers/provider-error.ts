@@ -16,8 +16,11 @@ export interface ProviderErrorOptions {
 
 export class ProviderError extends Error {
   readonly provider: string;
+
   readonly code: ProviderErrorCode;
+
   readonly retryable: boolean;
+
   override readonly cause?: unknown;
 
   constructor(message: string, options: ProviderErrorOptions) {

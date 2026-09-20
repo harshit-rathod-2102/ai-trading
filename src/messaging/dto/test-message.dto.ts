@@ -4,6 +4,7 @@ import { MessageType } from '../../providers/messaging/models/message.enums';
 
 export class TestMessageDto {
   @IsString() recipient!: string;
+
   @IsEnum(MessageType) messageType!: MessageType;
 
   @ValidateIf((value) => value.messageType === MessageType.TEXT)

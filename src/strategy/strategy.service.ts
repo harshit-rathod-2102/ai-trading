@@ -10,6 +10,7 @@ import { TREND_PULLBACK_V1_CONFIG } from './trend-pullback/trend-pullback-v1.con
 @Injectable()
 export class StrategyService {
   private readonly logger = new Logger(StrategyService.name);
+
   constructor(
     private readonly breakout: MomentumBreakoutStrategy,
     private readonly pullback: TrendPullbackStrategy,
@@ -18,6 +19,7 @@ export class StrategyService {
   evaluateMomentumBreakout(input: StrategyInput): StrategyResult {
     return this.breakout.evaluate(input);
   }
+
   evaluateTrendPullback(input: StrategyInput): StrategyResult {
     return this.pullback.evaluate(input);
   }

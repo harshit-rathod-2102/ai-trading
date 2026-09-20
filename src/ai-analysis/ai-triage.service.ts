@@ -45,6 +45,7 @@ interface CandidateContext {
 @Injectable()
 export class AiTriageService {
   private readonly logger = new Logger(AiTriageService.name);
+
   private readonly inFlight = new Map<string, Promise<AiTriageExecutionResult>>();
 
   constructor(

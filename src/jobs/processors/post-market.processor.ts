@@ -11,6 +11,7 @@ import { DailyPipelineService } from '../services/daily-pipeline.service';
 @Processor(POST_MARKET_QUEUE, { concurrency: 1 })
 export class PostMarketProcessor extends WorkerHost {
   private readonly logger = new Logger(PostMarketProcessor.name);
+
   constructor(
     private readonly pipeline: DailyPipelineService,
     private readonly config: ConfigService,

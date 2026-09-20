@@ -14,22 +14,24 @@ export default tseslint.config(
   },
 
   eslint.configs.recommended,
-
   ...tseslint.configs.recommended,
-
   prettierConfig,
 
   {
     files: ['**/*.ts'],
-
     plugins: {
       prettier: prettierPlugin,
     },
-
     rules: {
       'prettier/prettier': 'error',
-
       'no-irregular-whitespace': 'error',
+
+      // This is the important rule for the line gaps you want
+      'lines-between-class-members': [
+        'error',
+        'always',
+        { exceptAfterSingleLine: false },
+      ],
 
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-unused-vars': [
