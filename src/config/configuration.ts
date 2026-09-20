@@ -81,6 +81,25 @@ export interface ApplicationConfiguration {
     host: string;
     port: number;
   };
+  scheduler: {
+    enabled: boolean;
+    timezone: string;
+    marketOpenTime: string;
+    marketCloseTime: string;
+    postMarketRunTime: string;
+    eveningRunTime: string;
+    catchUpCutoffTime: string;
+    tradeMonitorIntervalMinutes: number;
+    candidateAnalysisConcurrency: number;
+    marketDataLookbackDays: number;
+  };
+  dailySummary: {
+    maxCandidates: number;
+    maxTrades: number;
+    priceStaleMinutes: number;
+    maxMessageLength: number;
+    sendLeaseMinutes: number;
+  };
 }
 
 export default (): ApplicationConfiguration => ({
@@ -168,5 +187,30 @@ export default (): ApplicationConfiguration => ({
   redis: {
     host: process.env.REDIS_HOST as string,
     port: Number.parseInt(process.env.REDIS_PORT ?? '6379', 10),
+  },
+  scheduler: {
+    enabled: process.env.SCHEDULER_ENABLED === 'true',
+    timezone: process.env.APP_TIMEZONE ?? 'Asia/Kolkata',
+    marketOpenTime: process.env.MARKET_OPEN_TIME ?? '09:15',
+    marketCloseTime: process.env.MARKET_CLOSE_TIME ?? '15:30',
+    postMarketRunTime: process.env.POST_MARKET_RUN_TIME ?? '15:45',
+    eveningRunTime: process.env.EVENING_RUN_TIME ?? '19:00',
+    catchUpCutoffTime: process.env.POST_MARKET_CATCH_UP_CUTOFF_TIME ?? '21:00',
+    tradeMonitorIntervalMinutes: Number.parseInt(
+      process.env.TRADE_MONITOR_INTERVAL_MINUTES ?? '15', 10,
+    ),
+    candidateAnalysisConcurrency: Number.parseInt(
+      process.env.CANDIDATE_ANALYSIS_CONCURRENCY ?? '2', 10,
+    ),
+    marketDataLookbackDays: Number.parseInt(
+      process.env.POST_MARKET_SYNC_LOOKBACK_DAYS ?? '10', 10,
+    ),
+  },
+  dailySummary: {
+    maxCandidates: Number.parseInt(process.env.DAILY_SUMMARY_MAX_CANDIDATES ?? '5', 10),
+    maxTrades: Number.parseInt(process.env.DAILY_SUMMARY_MAX_TRADES ?? '8', 10),
+    priceStaleMinutes: Number.parseInt(process.env.DAILY_SUMMARY_PRICE_STALE_MINUTES ?? '360', 10),
+    maxMessageLength: Number.parseInt(process.env.DAILY_SUMMARY_MAX_MESSAGE_LENGTH ?? '4000', 10),
+    sendLeaseMinutes: Number.parseInt(process.env.DAILY_SUMMARY_SEND_LEASE_MINUTES ?? '15', 10),
   },
 });

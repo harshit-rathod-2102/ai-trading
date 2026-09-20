@@ -15,6 +15,7 @@ import { assertRange, barIssues, calendarIssues, expectedSessions, marketDate } 
 import { DataQualityService } from './data-quality.service';
 import { ProviderError } from '../providers/provider-error';
 import { elapsedMilliseconds, structuredError } from '../logging/logging.utils';
+import { LatestMarketPrice } from './models/latest-market-price.model';
 
 @Injectable()
 export class MarketDataService {
@@ -35,6 +36,38 @@ export class MarketDataService {
       instruments: await this.providerCall('getInstruments', signal =>
         this.provider.getInstruments(undefined, { signal })),
       calendar: await this.calendar('NSE'),
+    };
+  }
+
+  async tradingCalendar(exchange: Exchange, from: string, to: string): Promise<TradingCalendar> {
+    assertRange(from, to);
+    return this.calendar(exchange, from, to);
+  }
+
+  async latestPrice(instrumentId: string): Promise<LatestMarketPrice> {
+    const instrument = await this.instruments.get(instrumentId);
+    const quote = await this.providerCall('getLatestPrice', signal =>
+      this.provider.getLatestPrice({
+        instrument: {
+          symbol: instrument.symbol,
+          exchange: instrument.exchange as Exchange,
+          instrumentType: instrument.type,
+          providerInstrumentId: instrument.providerInstrumentId ?? undefined,
+        },
+      }, { signal }), { instrumentId, symbol: instrument.symbol });
+    if (!quote) throw new BadGatewayException('Market-data provider returned no latest price');
+    const price = new Decimal(quote.price);
+    const observedAt = new Date(quote.observedAt);
+    if (!price.isFinite() || price.lte(0) || Number.isNaN(observedAt.getTime())) {
+      throw new BadGatewayException('Market-data provider returned an invalid latest price');
+    }
+    return {
+      instrumentId,
+      symbol: instrument.symbol,
+      price: price.toDecimalPlaces(4).toFixed(4),
+      observedAt: observedAt.toISOString(),
+      provider: this.provider.id,
+      isSynthetic: this.provider.isSynthetic,
     };
   }
 

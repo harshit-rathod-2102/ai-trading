@@ -13,6 +13,6 @@ import { RiskService } from './risk.service';
   imports: [TradingProfileModule, ScannerModule, InstrumentsModule, TypeOrmModule.forFeature([Trade])],
   controllers: [RiskController],
   providers: [RiskService, RiskCalculatorService, PortfolioRiskReaderService],
-  exports: [RiskService, RiskCalculatorService],
+  exports: [RiskService, RiskCalculatorService, PortfolioRiskReaderService],
 })
 export class RiskModule {}

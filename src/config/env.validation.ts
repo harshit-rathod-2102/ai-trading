@@ -65,6 +65,22 @@ export const environmentValidationSchema = Joi.object({
   DATABASE_PASSWORD: Joi.string().min(1).required(),
   REDIS_HOST: Joi.string().trim().required(),
   REDIS_PORT: Joi.number().port().default(6379),
+  SCHEDULER_ENABLED: Joi.boolean().truthy('true').falsy('false').default(false),
+  APP_TIMEZONE: Joi.string().valid('Asia/Kolkata').default('Asia/Kolkata'),
+  MARKET_OPEN_TIME: Joi.string().pattern(/^(?:[01]\d|2[0-3]):[0-5]\d$/).default('09:15'),
+  MARKET_CLOSE_TIME: Joi.string().pattern(/^(?:[01]\d|2[0-3]):[0-5]\d$/).default('15:30'),
+  POST_MARKET_RUN_TIME: Joi.string().pattern(/^(?:[01]\d|2[0-3]):[0-5]\d$/).default('15:45'),
+  EVENING_RUN_TIME: Joi.string().pattern(/^(?:[01]\d|2[0-3]):[0-5]\d$/).default('19:00'),
+  POST_MARKET_CATCH_UP_CUTOFF_TIME: Joi.string()
+    .pattern(/^(?:[01]\d|2[0-3]):[0-5]\d$/).default('21:00'),
+  TRADE_MONITOR_INTERVAL_MINUTES: Joi.number().integer().valid(5, 10, 15, 20, 30).default(15),
+  CANDIDATE_ANALYSIS_CONCURRENCY: Joi.number().integer().min(1).max(5).default(2),
+  POST_MARKET_SYNC_LOOKBACK_DAYS: Joi.number().integer().min(1).max(365).default(10),
+  DAILY_SUMMARY_MAX_CANDIDATES: Joi.number().integer().min(1).max(10).default(5),
+  DAILY_SUMMARY_MAX_TRADES: Joi.number().integer().min(1).max(20).default(8),
+  DAILY_SUMMARY_PRICE_STALE_MINUTES: Joi.number().integer().min(30).max(2880).default(360),
+  DAILY_SUMMARY_MAX_MESSAGE_LENGTH: Joi.number().integer().min(1000).max(4096).default(4000),
+  DAILY_SUMMARY_SEND_LEASE_MINUTES: Joi.number().integer().min(1).max(120).default(15),
   LOG_LEVEL: Joi.string()
     .valid('fatal', 'error', 'warn', 'info', 'log', 'debug', 'trace', 'verbose')
     .default('info'),

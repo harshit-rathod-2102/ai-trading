@@ -23,6 +23,10 @@ export interface LatestCandleRequest {
   readonly interval: CandleInterval;
 }
 
+export interface LatestPriceRequest {
+  readonly instrument: ProviderInstrumentReference;
+}
+
 export interface TradingCalendarRequest {
   readonly exchange: Exchange;
   readonly from?: string;

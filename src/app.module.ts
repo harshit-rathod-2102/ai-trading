@@ -20,6 +20,8 @@ import { NewsModule } from './news/news.module';
 import { AiAnalysisModule } from './ai-analysis/ai-analysis.module';
 import { MessagingModule } from './messaging/messaging.module';
 import { LoggingModule } from './logging/logging.module';
+import { TradeMonitorModule } from './trade-monitor/trade-monitor.module';
+import { DailySummaryModule } from './daily-summary/daily-summary.module';
 
 @Module({
   imports: [
@@ -44,6 +46,8 @@ import { LoggingModule } from './logging/logging.module';
     NewsModule,
     AiAnalysisModule,
     MessagingModule,
+    TradeMonitorModule,
+    DailySummaryModule,
   ],
 })
 export class AppModule {}

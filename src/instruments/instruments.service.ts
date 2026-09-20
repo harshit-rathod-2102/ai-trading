@@ -48,6 +48,12 @@ export class InstrumentsService {
     return instrument;
   }
 
+  async findActiveByMarketIdentity(symbol: string, exchange: string): Promise<Instrument> {
+    const instrument = await this.instruments.findOneBy({ symbol, exchange, isActive: true });
+    if (!instrument) throw new NotFoundException(`Active instrument not found for ${exchange}:${symbol}`);
+    return instrument;
+  }
+
   async setActivity(id: string, isActive: boolean): Promise<Instrument> {
     const result = await this.instruments.update(id, { isActive });
     if (!result.affected) throw new NotFoundException('Instrument not found');

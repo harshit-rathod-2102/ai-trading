@@ -7,6 +7,7 @@ import {
   GetInstrumentsRequest,
   HistoricalCandlesRequest,
   LatestCandleRequest,
+  LatestPriceRequest,
   TradingCalendar,
   TradingCalendarRequest,
 } from '../models/market-data-request';
@@ -21,6 +22,9 @@ import { mapUpstoxCandle, mapUpstoxQuoteCandle } from './mappers/upstox-candle.m
 import { mapUpstoxInstrument } from './mappers/upstox-instrument.mapper';
 import { UpstoxClient } from './upstox-client';
 import { elapsedMilliseconds } from '../../../logging/logging.utils';
+import { ProviderLatestPrice } from '../models/provider-latest-price';
+import { UpstoxLatestPriceQuote, UpstoxLatestPriceResponse } from './dto/upstox-latest-price-response';
+import { mapUpstoxLatestPrice } from './mappers/upstox-latest-price.mapper';
 
 const NIFTY_50_KEY = 'NSE_INDEX|Nifty 50';
 const INSTRUMENT_CACHE_MS = 15 * 60 * 1000;
@@ -113,6 +117,33 @@ export class UpstoxMarketDataProvider implements MarketDataProvider {
       provider: this.id, operation: 'getLatestCandle', symbol: request.instrument.symbol,
       resultCount: 1, durationMs: elapsedMilliseconds(startedAt), status: 'completed' },
     'Upstox latest candle request completed');
+    return result;
+  }
+
+  async getLatestPrice(
+    request: LatestPriceRequest,
+    context?: ProviderRequestContext,
+  ): Promise<ProviderLatestPrice | null> {
+    const startedAt = performance.now();
+    const instrumentKey = await this.resolveInstrumentKey(request.instrument, context);
+    this.logger.debug({ event: 'provider.request.started', module: UpstoxMarketDataProvider.name,
+      provider: this.id, operation: 'getLatestPrice', symbol: request.instrument.symbol },
+    'Upstox latest-price request started');
+    const response = await this.client.getJson<UpstoxLatestPriceResponse>(
+      `/v3/market-quote/quotes?instrument_key=${encodeURIComponent(instrumentKey)}`,
+      context,
+    );
+    if (response.status !== 'success' || !isRecord(response.data)) {
+      throw this.invalidResponse('Upstox latest-price response is missing data');
+    }
+    const quote = Object.values(response.data).find(value =>
+      isRecord(value) && value.instrument_token === instrumentKey) ?? Object.values(response.data)[0];
+    if (!isRecord(quote)) return null;
+    const result = mapUpstoxLatestPrice(quote as UpstoxLatestPriceQuote);
+    this.logger.debug({ event: 'provider.request.completed', module: UpstoxMarketDataProvider.name,
+      provider: this.id, operation: 'getLatestPrice', symbol: request.instrument.symbol,
+      observedAt: result.observedAt, durationMs: elapsedMilliseconds(startedAt), status: 'completed' },
+    'Upstox latest-price request completed');
     return result;
   }
 

@@ -232,6 +232,20 @@ async function main() {
       [notifiedCandidate.id],
     ))[0].count, 1);
 
+    const concurrentCandidate = await createCandidate('CONCURRENT');
+    const beforeConcurrentNotification = outbound.length;
+    const [concurrentFirst, concurrentSecond] = await Promise.all([
+      notificationService.notifyCandidate(concurrentCandidate.id),
+      notificationService.notifyCandidate(concurrentCandidate.id),
+    ]);
+    assert.equal(concurrentFirst.providerMessageId, concurrentSecond.providerMessageId);
+    assert.equal(outbound.length, beforeConcurrentNotification + 1);
+    assert.equal((await dataSource.query(
+      `SELECT COUNT(*)::int AS count FROM trade_events
+       WHERE candidate_id=$1 AND event_type='CANDIDATE_NOTIFIED'`,
+      [concurrentCandidate.id],
+    ))[0].count, 1);
+
     // D: provider failure leaves the candidate QUALIFIED and retryable.
     const deliveryFailure = await createCandidate('MSGFAIL');
     failNext = true;
@@ -240,6 +254,10 @@ async function main() {
     assert.equal(failedPersisted.status, CandidateStatus.QUALIFIED);
     assert.equal(failedPersisted.notificationSnapshot, null);
     assert.equal(failedPersisted.notificationProviderMessageId, null);
+    const deliveryRetry = await notificationService.notifyCandidate(deliveryFailure.id);
+    assert.equal(deliveryRetry.notified, true);
+    assert.equal((await candidateRepository.findOneByOrFail({ id: deliveryFailure.id })).status,
+      CandidateStatus.NOTIFIED);
 
     // E: reply context resolves the notification and reuses transactional BUY logic.
     const replyBuy = await commandService.handle(inbound('BUY 2925 20', {
@@ -270,6 +288,15 @@ async function main() {
     assert.equal((await candidateRepository.findOneByOrFail({ id: quantityCandidate.id })).status,
       CandidateStatus.QUALIFIED);
     assert.equal(await tradeRepository.existsBy({ candidateId: quantityCandidate.id }), false);
+
+    const geometryCandidate = await createCandidate('PRICEGEOM');
+    const invalidGeometry = await commandService.handle(inbound(
+      `BUY ${geometryCandidate.symbol} 2845 10`,
+    ));
+    assert.equal(invalidGeometry.errorCode, 'INVALID_BUY_PRICE');
+    assert.equal((await candidateRepository.findOneByOrFail({ id: geometryCandidate.id })).status,
+      CandidateStatus.QUALIFIED);
+    assert.equal(await tradeRepository.existsBy({ candidateId: geometryCandidate.id }), false);
 
     // H: Redis provider-message deduplication prevents duplicate BUY and response.
     const dedupCandidate = await createCandidate('DEDUPBUY');

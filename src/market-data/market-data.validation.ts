@@ -5,6 +5,7 @@ import { InstrumentType } from '../common/enums/instrument-type.enum';
 import { PRICE_PATTERN } from '../common/utils/price';
 import { ProviderCandle } from '../providers/market-data/models/provider-candle';
 import { TradingCalendar } from '../providers/market-data/models/market-data-request';
+import { marketClock } from '../common/utils/market-time';
 
 export function isSessionDate(value: unknown): value is string {
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
@@ -20,11 +21,7 @@ export function IsSessionDate(): PropertyDecorator {
 }
 
 export function marketDate(now = new Date()): string {
-  const parts = new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit',
-  }).formatToParts(now);
-  const part = (type: string) => parts.find(item => item.type === type)!.value;
-  return part('year') + '-' + part('month') + '-' + part('day');
+  return marketClock(now).marketDate;
 }
 
 export function assertRange(from: string, to: string, now = new Date()): void {

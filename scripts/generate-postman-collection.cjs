@@ -68,6 +68,7 @@ const collection = {
     { key: 'candidateId', value: '', type: 'string' },
     { key: 'skipCandidateId', value: '', type: 'string' },
     { key: 'tradeId', value: '', type: 'string' },
+    { key: 'summaryMarketDate', value: '2026-09-19', type: 'string', description: 'Explicit NSE market date in YYYY-MM-DD format.' },
     { key: 'newsFrom', value: '2026-09-01T00:00:00.000Z', type: 'string' },
     { key: 'newsTo', value: '2026-09-14T23:59:59.999Z', type: 'string' },
     { key: 'messageRecipient', value: '919999999999', type: 'string' },
@@ -216,6 +217,33 @@ const collection = {
       }),
       request('Get Trade', 'GET', '/trades/{{tradeId}}'),
       request('Get Trade Events', 'GET', '/trades/{{tradeId}}/events'),
+    ]),
+    folder('Trade Monitor', 'Manual price/risk monitoring. Observes tracked trades and never places broker orders.', [
+      request('Monitor All Open Trades', 'POST', '/trade-monitor/run', {
+        description: 'Fetches provider-neutral current prices for every OPEN trade, persists monitoring metrics/events, and isolates per-trade failures.',
+      }),
+      request('Monitor One Trade', 'POST', '/trade-monitor/trades/{{tradeId}}', {
+        description: 'Monitors one OPEN trade. Stop/target observations never close the trade or change its stop/quantity.',
+      }),
+    ]),
+    folder('Operating Cycle', 'Manual BullMQ triggers use the same orchestration as scheduled jobs.', [
+      request('Enqueue Scheduled Trade Monitor Logic', 'POST', '/jobs/trade-monitor/run', {
+        description: 'Queues one guarded trade-monitor pass. Outside NSE market hours it completes with SKIPPED_OUTSIDE_MARKET_HOURS.',
+      }),
+      request('Enqueue Post-Market Pipeline', 'POST', '/jobs/post-market/run', {
+        description: 'Queues today\'s idempotent daily-pipeline-v1 run and returns HTTP 202.',
+      }),
+      request('Enqueue Evening Summary', 'POST', '/jobs/evening/run', {
+        description: 'Queues notification retry housekeeping followed by the idempotent daily-summary-v1 delivery.',
+      }),
+    ]),
+    folder('Daily Summary', 'Deterministic reporting from persisted pipeline, candidate, trade, and risk state.', [
+      request('Preview Daily Summary', 'GET', '/daily-summary/{{summaryMarketDate}}', {
+        description: 'Builds the structured summary and WhatsApp-ready text without sending or changing trading state.',
+      }),
+      request('Send Daily Summary', 'POST', '/daily-summary/{{summaryMarketDate}}/send', {
+        description: 'Sends via MessagingProvider. A SENT market-date/version record is reused; FAILED delivery retries the preserved snapshot.',
+      }),
     ]),
     folder('News (Development Only)', 'Requires NEWS_PROVIDER=gnews and GNEWS_API_KEY; route is hidden in production.', [
       request('Search News', 'GET', '/news/search?q=%22Reliance%20Industries%22&from={{newsFrom}}&to={{newsTo}}&language=en&country=in&limit=10&sortBy=publishedAt&page=1'),

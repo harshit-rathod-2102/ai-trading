@@ -38,7 +38,7 @@ Pino redaction censors authorization fields and common nested `password`, `secre
 
 ## Postman collection
 
-Import [`postman/AI-Trading-Backend.postman_collection.json`](postman/AI-Trading-Backend.postman_collection.json) into Postman to inspect or exercise every API currently exposed by the backend. The collection follows Postman Collection v2.1 and contains 51 requests covering all 48 unique routes across health, profiles, instruments, universes, market data, regime, scanner, risk, candidates, trades, news, AI analysis/evaluation, messaging, and WhatsApp webhooks.
+Import [`postman/AI-Trading-Backend.postman_collection.json`](postman/AI-Trading-Backend.postman_collection.json) into Postman to inspect or exercise every API currently exposed by the backend. The collection follows Postman Collection v2.1 and contains 58 requests covering all 55 unique routes across health, profiles, instruments, universes, market data, regime, scanner, risk, candidates, trades, trade monitoring, scheduling, daily summary, news, AI analysis/evaluation, messaging, and WhatsApp webhooks.
 
 The collection is self-contained: `baseUrl` defaults to `http://localhost:3000/api`, so a separate environment import is optional. Test scripts capture instrument, job, scan, candidate, and trade IDs for later requests. Review the active-profile update before sending it. News, AI, and messaging calls need their configured providers; those inspection routes are unavailable in production. The fixture's limited NIFTY history makes market-regime and scanner requests return the documented 503 until current persisted history is configured.
 
@@ -203,7 +203,7 @@ The GET verification handler requires `hub.mode=subscribe`, compares `hub.verify
 
 Only text messages are normalized into the internal `InboundMessage` model. Images, documents, audio, video, stickers, locations, reactions, and unknown types are acknowledged and ignored. Delivery callbacks for `sent`, `delivered`, `read`, and `failed` are logged separately and never treated as user commands.
 
-`META_WHATSAPP_ALLOWED_SENDER` is mandatory in practice for inbound personal use. Phone numbers are reduced to 8â€“15 digits before comparison; if the setting is absent or invalid, every inbound message is denied. Authorized provider message IDs are atomically claimed in Redis with `SET NX` for the configured TTL, preventing replayed webhooks from reaching the application handoff twice. The current handoff logs only the normalized provider message ID; command parsing and BUY/SKIP integration are intentionally deferred.
+`META_WHATSAPP_ALLOWED_SENDER` is mandatory in practice for inbound personal use. Phone numbers are reduced to 8â€“15 digits before comparison; if the setting is absent or invalid, every inbound message is denied. Authorized provider message IDs are atomically claimed in Redis with `SET NX` for the configured TTL, preventing replayed webhooks from reaching the application handoff twice. The normalized application handoff parses `BUY`, `SKIP`, and `STATUS` commands and delegates state changes to the existing candidate/trade services.
 
 Meta requires a publicly reachable HTTPS callback. For local development, place an ngrok or Cloudflare Tunnel URL in front of the local NestJS endpoint:
 
@@ -932,4 +932,129 @@ docker compose run --rm flyway validate
 docker compose run --rm flyway migrate
 docker compose run --rm flyway info
 node scripts/verify-whatsapp-candidate-flow.cjs
+```
+
+## Trade monitoring
+
+`TradeMonitorModule` observes internally tracked `OPEN` trades through the provider-neutral market-data layer. `MarketDataProvider.getLatestPrice()` supplies the current price and provider timestamp; the Upstox adapter uses its V3 full-market-quote endpoint. The finite development fixture exposes its final synthetic close with the original timestamp, so it is deliberately rejected as stale outside fixture coverage instead of being presented as current market data.
+
+Each successful observation stores `trade-monitor-v1` state on the trade: current price, unrealized P&L and percentage, current R, maximum favorable/adverse prices and R values, the provider observation time, and the application monitoring time. For a long position:
+
+```text
+unrealized P&L = (current price - actual entry) * open quantity
+current R = (current price - actual entry) / (actual entry - initial stop)
+```
+
+The immutable initial stop defines R even if a later user command changes the tracked current stop. V1 has no partial-exit command, so `quantity` is the open quantity. MFE starts no lower than entry and only increases; MAE starts no higher than entry and only decreases. Both persist across process restarts.
+
+The versioned thresholds detect `+1R`, `+2R`, `-0.5R` adverse movement, proximity within `0.25R` of the current stop, a current-stop breach, and target 1/2 reach. Meaningful observations become explicit `TradeEvent` rows. A database-unique monitor key plus a locked trade transaction prevents repeat and concurrent monitoring from creating duplicate events.
+
+After factual state/events commit, alerts are sent through `MessagingProvider`. Alert delivery state is kept in event data and failed delivery is retried on a later monitoring pass. Messaging failure never rolls back market observations. Stop-breach and target events are observations only: the trade remains `OPEN`, the current stop and quantity remain unchanged, and no broker order is placed.
+
+Manual endpoints are available for verification and future scheduler integration:
+
+```http
+POST /api/trade-monitor/run
+POST /api/trade-monitor/trades/:tradeId
+```
+
+The batch endpoint isolates provider/stale-price failures per trade. Continuous news monitoring, trend deterioration, partial-exit accounting, and STOP/SELL commands remain later roadmap items.
+
+Apply Flyway migration `V13` and run the database-backed verification:
+
+```bash
+npm run build
+docker compose run --rm flyway validate
+docker compose run --rm flyway migrate
+docker compose run --rm flyway info
+node scripts/verify-trade-monitor.cjs
+```
+
+## Scheduling / daily operating cycle
+
+`JobsModule` runs the NSE operating cycle through BullMQ with `Asia/Kolkata` set explicitly. Set `SCHEDULER_ENABLED=true` to register the three production schedules. When it is `false`, startup removes the known production schedulers while the manual endpoints remain available.
+
+```env
+SCHEDULER_ENABLED=false
+APP_TIMEZONE=Asia/Kolkata
+MARKET_OPEN_TIME=09:15
+MARKET_CLOSE_TIME=15:30
+POST_MARKET_RUN_TIME=15:45
+EVENING_RUN_TIME=19:00
+POST_MARKET_CATCH_UP_CUTOFF_TIME=21:00
+TRADE_MONITOR_INTERVAL_MINUTES=15
+CANDIDATE_ANALYSIS_CONCURRENCY=2
+POST_MARKET_SYNC_LOOKBACK_DAYS=10
+```
+
+The `market-monitoring` queue runs `TRADE_MONITOR_RUN` every 15 minutes in the configured market-hour range on weekdays. The processor also checks the current IST time and provider trading calendar before calling `TradeMonitorService.monitorOpenTrades()`. Firings outside the session return `SKIPPED_OUTSIDE_MARKET_HOURS`; weekends and provider-calendar holidays return `SKIPPED_NON_TRADING_DAY`. Missed intraday slots are never replayed.
+
+At 15:45 IST, `POST_MARKET_PIPELINE` performs these shared deterministic stages:
+
+1. Synchronize provider instruments and refresh daily candles for the active configured universe, including NIFTY 50 and India VIX.
+2. Require current, complete, valid benchmark data for the intended market date.
+3. Calculate and persist the market regime through the existing scanner preflight.
+4. Run or reuse the unique scanner run for the market date and scanner version.
+5. Apply deterministic risk and create/reuse candidates for shortlisted scan results.
+6. Enqueue one `CANDIDATE_ANALYSIS` job per candidate.
+
+Each candidate job runs news enrichment, FAST triage, selective DEEP review, final decisioning, and notification only for `QUALIFIED` candidates. `WAIT` and `REJECTED` candidates remain persisted without actionable alerts. Candidate workers use configurable concurrency (default `2`) to protect provider quotas. Candidate failures retry up to three times with exponential backoff and do not stop other candidates. Failed jobs remain in Redis. A notification failure can be retried without rerunning market data or the scanner; the evening hook retries eligible failed notification jobs.
+
+The `daily_pipeline_runs` table records `daily-pipeline-v1` status and counters. `FAILED` means shared stages could not produce a trustworthy scan. `PARTIAL` means shared stages succeeded but one or more candidates failed. A unique `(market_date, version)` constraint, single-concurrency post-market worker, stable scheduler IDs, deterministic candidate job IDs, and existing scanner uniqueness prevent overlapping or duplicate daily work.
+
+At 19:00 IST, `EVENING_SUMMARY` retries eligible failed candidate notifications and calls `DailySummaryService.sendSummary()` for the explicit NSE market date. If the app starts after the post-market time on a trading day, before the cutoff, and today has no successful daily run, exactly one deterministic catch-up job is enqueued. It never scans yesterday automatically.
+
+Manual triggers return HTTP 202 and enqueue the same processors with `triggerSource=MANUAL`:
+
+```http
+POST /api/jobs/trade-monitor/run
+POST /api/jobs/post-market/run
+POST /api/jobs/evening/run
+```
+
+No operating-cycle job imports or calls a broker order API. Upstox remains market-data only; BUY/SELL execution remains manual.
+
+Apply Flyway migration `V14` before enabling the scheduler:
+
+```bash
+npm run build
+docker compose run --rm flyway validate
+docker compose run --rm flyway migrate
+docker compose run --rm flyway info
+node scripts/verify-scheduling.cjs
+```
+
+## Daily Summary
+
+`DailySummaryModule` provides the deterministic `daily-summary-v1` evening report. It reads existing persisted state only: the latest daily pipeline and scanner runs for the requested NSE date, the stored market-regime snapshot, candidate decisions and notification state, open trades and their latest monitor fields, recorded trade-close events, the active trading profile, and the shared portfolio-risk reader/calculator. Building a summary does not refresh a provider, rerun the scanner or AI, mutate candidates or trades, or place a broker order.
+
+The WhatsApp-friendly message includes pipeline health, regime and confidence, scan counts, final `QUALIFIED`/`WAIT`/`REJECTED` counts, a configurable number of globally ranked qualified candidates, portfolio totals, open-trade details, and known warnings. A successful scan with no qualified candidates says so explicitly. A failed or unavailable scan is reported as unavailable instead of being presented as a zero-opportunity day. A `PARTIAL` pipeline still produces a report with the available state and its persisted failure counters.
+
+Portfolio values come from persisted monitor observations. Aggregate position value and unrealized P&L are omitted when any open trade lacks a reliable stored price. Old observations are labeled `STALE`, include their last IST observation time in the trade detail, and add a warning. Realized P&L uses actual recorded exit price and quantity for all trade-close events on the requested IST date, including multiple or partial exit records. Open risk and its maximum reuse the RiskModule portfolio calculation.
+
+Delivery metadata and the exact generated snapshot/message are stored in `daily_summaries`. The unique `(market_date, version)` identity prevents accidental duplicate delivery. A `SENT` result is returned without another provider call; a `FAILED` delivery can retry the preserved message without rerunning the trading pipeline. Delivery goes through `MessagingProvider`, using the configured allowed WhatsApp recipient.
+
+```env
+DAILY_SUMMARY_MAX_CANDIDATES=5
+DAILY_SUMMARY_MAX_TRADES=8
+DAILY_SUMMARY_PRICE_STALE_MINUTES=360
+DAILY_SUMMARY_MAX_MESSAGE_LENGTH=4000
+DAILY_SUMMARY_SEND_LEASE_MINUTES=15
+```
+
+Previewing is read-only. Manual sending uses the same service and idempotency path as the evening BullMQ job:
+
+```http
+GET /api/daily-summary/:marketDate
+POST /api/daily-summary/:marketDate/send
+```
+
+Apply Flyway migration `V15` and verify the behavior:
+
+```bash
+npm run build
+docker compose run --rm flyway validate
+docker compose run --rm flyway migrate
+docker compose run --rm flyway info
+node scripts/verify-daily-summary.cjs
 ```

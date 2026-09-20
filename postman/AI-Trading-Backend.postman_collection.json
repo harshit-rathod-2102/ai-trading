@@ -78,6 +78,12 @@
       "type": "string"
     },
     {
+      "key": "summaryMarketDate",
+      "value": "2026-09-19",
+      "type": "string",
+      "description": "Explicit NSE market date in YYYY-MM-DD format."
+    },
+    {
       "key": "newsFrom",
       "value": "2026-09-01T00:00:00.000Z",
       "type": "string"
@@ -886,6 +892,87 @@
             "method": "GET",
             "header": [],
             "url": "{{baseUrl}}/trades/{{tradeId}}/events"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Trade Monitor",
+      "description": "Manual price/risk monitoring. Observes tracked trades and never places broker orders.",
+      "item": [
+        {
+          "name": "Monitor All Open Trades",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/trade-monitor/run",
+            "description": "Fetches provider-neutral current prices for every OPEN trade, persists monitoring metrics/events, and isolates per-trade failures."
+          }
+        },
+        {
+          "name": "Monitor One Trade",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/trade-monitor/trades/{{tradeId}}",
+            "description": "Monitors one OPEN trade. Stop/target observations never close the trade or change its stop/quantity."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Operating Cycle",
+      "description": "Manual BullMQ triggers use the same orchestration as scheduled jobs.",
+      "item": [
+        {
+          "name": "Enqueue Scheduled Trade Monitor Logic",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/jobs/trade-monitor/run",
+            "description": "Queues one guarded trade-monitor pass. Outside NSE market hours it completes with SKIPPED_OUTSIDE_MARKET_HOURS."
+          }
+        },
+        {
+          "name": "Enqueue Post-Market Pipeline",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/jobs/post-market/run",
+            "description": "Queues today's idempotent daily-pipeline-v1 run and returns HTTP 202."
+          }
+        },
+        {
+          "name": "Enqueue Evening Summary",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/jobs/evening/run",
+            "description": "Queues notification retry housekeeping followed by the idempotent daily-summary-v1 delivery."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Daily Summary",
+      "description": "Deterministic reporting from persisted pipeline, candidate, trade, and risk state.",
+      "item": [
+        {
+          "name": "Preview Daily Summary",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/daily-summary/{{summaryMarketDate}}",
+            "description": "Builds the structured summary and WhatsApp-ready text without sending or changing trading state."
+          }
+        },
+        {
+          "name": "Send Daily Summary",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/daily-summary/{{summaryMarketDate}}/send",
+            "description": "Sends via MessagingProvider. A SENT market-date/version record is reused; FAILED delivery retries the preserved snapshot."
           }
         }
       ]

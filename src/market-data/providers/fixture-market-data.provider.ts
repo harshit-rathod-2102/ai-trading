@@ -8,11 +8,13 @@ import { AdjustmentBasis, CandleInterval } from '../../providers/market-data/mod
 import {
   GetInstrumentsRequest,
   HistoricalCandlesRequest,
+  LatestPriceRequest,
   TradingCalendar,
   TradingCalendarRequest,
 } from '../../providers/market-data/models/market-data-request';
 import { ProviderCandle } from '../../providers/market-data/models/provider-candle';
 import { ProviderInstrument } from '../../providers/market-data/models/provider-instrument';
+import { ProviderLatestPrice } from '../../providers/market-data/models/provider-latest-price';
 
 const DATES = ['2026-09-07', '2026-09-08', '2026-09-09', '2026-09-10', '2026-09-11'];
 const CATALOG: readonly ProviderInstrument[] = [
@@ -126,6 +128,23 @@ export class FixtureMarketDataProvider implements MarketDataProvider {
         adjustedClose: null,
       }),
     ).filter(bar => bar.sessionDate >= request.from && bar.sessionDate <= request.to);
+  }
+
+  async getLatestPrice(
+    request: LatestPriceRequest,
+    context: ProviderRequestContext = {},
+  ): Promise<ProviderLatestPrice | null> {
+    context.signal?.throwIfAborted();
+    const match = CATALOG.find(item =>
+      item.symbol === request.instrument.symbol &&
+      item.exchange === request.instrument.exchange &&
+      item.instrumentType === request.instrument.instrumentType &&
+      (request.instrument.providerInstrumentId === undefined ||
+        item.providerInstrumentId === request.instrument.providerInstrumentId));
+    if (!match) throw this.rejected('Instrument is not supported by fixture-v1');
+    const latest = ROWS[match.symbol].at(-1);
+    if (!latest) return null;
+    return { price: latest[3], observedAt: DATES.at(-1) + 'T10:00:00.000Z' };
   }
 
   private rejected(message: string): ProviderError {

@@ -55,6 +55,36 @@ export class Trade {
   @Column({ name: 'current_price', type: 'numeric', precision: 18, scale: 4, nullable: true })
   currentPrice!: string | null;
 
+  @Column({ name: 'unrealized_pnl', type: 'numeric', precision: 28, scale: 4, nullable: true })
+  unrealizedPnl!: string | null;
+
+  @Column({ name: 'unrealized_pnl_percent', type: 'numeric', precision: 18, scale: 4, nullable: true })
+  unrealizedPnlPercent!: string | null;
+
+  @Column({ name: 'current_r', type: 'numeric', precision: 18, scale: 4, nullable: true })
+  currentR!: string | null;
+
+  @Column({ name: 'max_favorable_price', type: 'numeric', precision: 18, scale: 4, nullable: true })
+  maxFavorablePrice!: string | null;
+
+  @Column({ name: 'max_favorable_r', type: 'numeric', precision: 18, scale: 4, nullable: true })
+  maxFavorableR!: string | null;
+
+  @Column({ name: 'max_adverse_price', type: 'numeric', precision: 18, scale: 4, nullable: true })
+  maxAdversePrice!: string | null;
+
+  @Column({ name: 'max_adverse_r', type: 'numeric', precision: 18, scale: 4, nullable: true })
+  maxAdverseR!: string | null;
+
+  @Column({ name: 'last_price_observed_at', type: 'timestamptz', nullable: true })
+  lastPriceObservedAt!: Date | null;
+
+  @Column({ name: 'last_monitored_at', type: 'timestamptz', nullable: true })
+  lastMonitoredAt!: Date | null;
+
+  @Column({ name: 'monitoring_version', type: 'varchar', length: 64, nullable: true })
+  monitoringVersion!: string | null;
+
   @Column({ name: 'realized_pnl', type: 'numeric', precision: 28, scale: 4 })
   realizedPnl!: string;
 
