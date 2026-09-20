@@ -8,13 +8,26 @@ export class DatabaseLifecycleService implements OnModuleInit, OnApplicationShut
   constructor(private readonly dataSource: DataSource) {}
 
   onModuleInit(): void {
-    this.logger.log({ event: 'database.ready', module: DatabaseLifecycleService.name,
-      operation: 'connect', status: this.dataSource.isInitialized ? 'ready' : 'unavailable' },
-    'PostgreSQL connection is ready');
+    this.logger.log(
+      {
+        event: 'database.ready',
+        module: DatabaseLifecycleService.name,
+        operation: 'connect',
+        status: this.dataSource.isInitialized ? 'ready' : 'unavailable',
+      },
+      'PostgreSQL connection is ready',
+    );
   }
 
   onApplicationShutdown(): void {
-    this.logger.log({ event: 'database.connection.closing', module: DatabaseLifecycleService.name,
-      operation: 'shutdown', status: 'closing' }, 'PostgreSQL connection closing');
+    this.logger.log(
+      {
+        event: 'database.connection.closing',
+        module: DatabaseLifecycleService.name,
+        operation: 'shutdown',
+        status: 'closing',
+      },
+      'PostgreSQL connection closing',
+    );
   }
 }

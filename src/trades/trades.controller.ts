@@ -7,11 +7,17 @@ export class TradesController {
   constructor(private readonly trades: TradesService) {}
 
   @Get()
-  list(@Query() filters: ListTradesDto) { return this.trades.list(filters); }
+  list(@Query() filters: ListTradesDto) {
+    return this.trades.list(filters);
+  }
 
   @Get(':id')
-  get(@Param('id', ParseUUIDPipe) id: string) { return this.trades.get(id); }
+  get(@Param('id', ParseUUIDPipe) id: string) {
+    return this.trades.get(id);
+  }
 
   @Get(':id/events')
-  events(@Param('id', ParseUUIDPipe) id: string) { return this.trades.events(id); }
+  events(@Param('id', ParseUUIDPipe) id: string) {
+    return this.trades.events(id);
+  }
 }

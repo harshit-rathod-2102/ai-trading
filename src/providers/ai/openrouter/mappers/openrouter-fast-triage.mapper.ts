@@ -13,9 +13,18 @@ import {
 } from '../dto/openrouter-response.dto';
 
 const RESULT_FIELDS = new Set([
-  'tier', 'eventRisk', 'uncertainty', 'confidence', 'newsSummary',
-  'bullishFactors', 'bearishFactors', 'contradictions', 'missingEvidence',
-  'redFlags', 'requiresDeepReviewSuggested', 'summary',
+  'tier',
+  'eventRisk',
+  'uncertainty',
+  'confidence',
+  'newsSummary',
+  'bullishFactors',
+  'bearishFactors',
+  'contradictions',
+  'missingEvidence',
+  'redFlags',
+  'requiresDeepReviewSuggested',
+  'summary',
 ]);
 
 export interface FastTriageMapperContext {
@@ -33,9 +42,14 @@ export function mapOpenRouterFastTriage(
   const id = optionalString(responseRecord.id, 'response id');
   const resolvedModel = requiredString(responseRecord.model, 'resolved model', 200);
   const choices = responseRecord.choices;
-  if (!Array.isArray(choices) || choices.length === 0) throw invalid('OpenRouter response has no choices');
+  if (!Array.isArray(choices) || choices.length === 0)
+    throw invalid('OpenRouter response has no choices');
   const choice = record(choices[0] as OpenRouterChoiceDto, 'first choice');
-  if (choice.finish_reason !== undefined && choice.finish_reason !== null && choice.finish_reason !== 'stop') {
+  if (
+    choice.finish_reason !== undefined &&
+    choice.finish_reason !== null &&
+    choice.finish_reason !== 'stop'
+  ) {
     throw invalid(`OpenRouter completion did not finish normally: ${String(choice.finish_reason)}`);
   }
   const message = record(choice.message as OpenRouterMessageDto, 'assistant message');
@@ -51,7 +65,7 @@ export function mapOpenRouterFastTriage(
     throw invalid('OpenRouter FAST triage content is not valid JSON');
   }
   const value = record(parsed, 'FAST triage');
-  const extraField = Object.keys(value).find(key => !RESULT_FIELDS.has(key));
+  const extraField = Object.keys(value).find((key) => !RESULT_FIELDS.has(key));
   if (extraField) throw invalid(`OpenRouter FAST triage has unexpected field: ${extraField}`);
 
   if (value.tier !== AiAnalysisTier.FAST) throw invalid('OpenRouter FAST triage tier is invalid');
@@ -135,7 +149,8 @@ function optionalUsage(value: unknown): JsonObject | undefined {
   const usage = record(value as OpenRouterUsageDto, 'usage');
   const result: Record<string, number> = {};
   for (const [key, raw] of Object.entries(usage)) {
-    if (!Number.isInteger(raw) || Number(raw) < 0) throw invalid(`OpenRouter usage.${key} is invalid`);
+    if (!Number.isInteger(raw) || Number(raw) < 0)
+      throw invalid(`OpenRouter usage.${key} is invalid`);
     result[key] = Number(raw);
   }
   return result;

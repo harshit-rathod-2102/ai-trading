@@ -1,14 +1,5 @@
 import { Type } from 'class-transformer';
-import {
-  IsEnum,
-  IsISO8601,
-  IsInt,
-  IsString,
-  Length,
-  Max,
-  Min,
-  ValidateIf,
-} from 'class-validator';
+import { IsEnum, IsISO8601, IsInt, IsString, Length, Max, Min, ValidateIf } from 'class-validator';
 import { NewsSortOrder } from '../../providers/news/models/news-query';
 
 export class NewsSearchDto {
@@ -23,15 +14,20 @@ export class NewsSearchDto {
   to?: string;
 
   @ValidateIf((_object, value: unknown) => value !== undefined)
-  @IsString() @Length(2, 2)
+  @IsString()
+  @Length(2, 2)
   language?: string;
 
   @ValidateIf((_object, value: unknown) => value !== undefined)
-  @IsString() @Length(2, 2)
+  @IsString()
+  @Length(2, 2)
   country?: string;
 
   @ValidateIf((_object, value: unknown) => value !== undefined)
-  @Type(() => Number) @IsInt() @Min(1) @Max(100)
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
   limit?: number;
 
   @ValidateIf((_object, value: unknown) => value !== undefined)
@@ -39,6 +35,9 @@ export class NewsSearchDto {
   sortBy?: NewsSortOrder;
 
   @ValidateIf((_object, value: unknown) => value !== undefined)
-  @Type(() => Number) @IsInt() @Min(1) @Max(100)
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
   page?: number;
 }

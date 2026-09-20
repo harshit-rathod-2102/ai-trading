@@ -4,4 +4,3 @@ export interface StructuredError {
   readonly errorCode?: string | number;
   readonly stack?: string;
 }
-

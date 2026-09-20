@@ -17,9 +17,10 @@ export class TradingDayService {
     if (this.isWeekend(marketDate)) return false;
     const existing = this.cache.get(marketDate);
     if (existing) return existing;
-    const check = this.marketData.tradingCalendar(Exchange.NSE, marketDate, marketDate)
-      .then(calendar => calendar.sessions.some(session => session.date === marketDate))
-      .catch(error => {
+    const check = this.marketData
+      .tradingCalendar(Exchange.NSE, marketDate, marketDate)
+      .then((calendar) => calendar.sessions.some((session) => session.date === marketDate))
+      .catch((error) => {
         this.cache.delete(marketDate);
         throw error;
       });

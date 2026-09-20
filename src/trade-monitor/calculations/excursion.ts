@@ -18,13 +18,17 @@ export function calculateExcursion(
   const current = positiveMonitorDecimal(currentPrice, 'currentPrice');
   const entry = positiveMonitorDecimal(actualEntry, 'actualEntry');
   const previousHigh = previousFavorablePrice
-    ? positiveMonitorDecimal(previousFavorablePrice, 'maxFavorablePrice') : entry;
+    ? positiveMonitorDecimal(previousFavorablePrice, 'maxFavorablePrice')
+    : entry;
   const previousLow = previousAdversePrice
-    ? positiveMonitorDecimal(previousAdversePrice, 'maxAdversePrice') : entry;
+    ? positiveMonitorDecimal(previousAdversePrice, 'maxAdversePrice')
+    : entry;
   const favorable = [entry, current, previousHigh].reduce((left, right) =>
-    right.gt(left) ? right : left);
+    right.gt(left) ? right : left,
+  );
   const adverse = [entry, current, previousLow].reduce((left, right) =>
-    right.lt(left) ? right : left);
+    right.lt(left) ? right : left,
+  );
   const risk = initialRiskPerShare(actualEntry, initialStop);
   return {
     maxFavorablePrice: fixed(favorable),

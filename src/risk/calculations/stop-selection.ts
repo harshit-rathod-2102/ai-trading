@@ -18,10 +18,15 @@ export interface TradeGeometry {
 }
 
 export function selectTradeGeometry(setup: RiskSetup): TradeGeometry {
-  if (!setup.strategyResult.qualified || setup.strategyResult.strategy !== setup.strategy ||
-      setup.strategyResult.strategyVersion !== setup.strategyVersion) {
-    throw new RiskInputError(RiskRejectionCode.MISSING_REQUIRED_SETUP_CONTEXT,
-      'Risk planning requires a matching qualified strategy result');
+  if (
+    !setup.strategyResult.qualified ||
+    setup.strategyResult.strategy !== setup.strategy ||
+    setup.strategyResult.strategyVersion !== setup.strategyVersion
+  ) {
+    throw new RiskInputError(
+      RiskRejectionCode.MISSING_REQUIRED_SETUP_CONTEXT,
+      'Risk planning requires a matching qualified strategy result',
+    );
   }
   let close: Decimal;
   let atr: Decimal;
@@ -43,8 +48,9 @@ export function selectTradeGeometry(setup: RiskSetup): TradeGeometry {
   try {
     if (setup.strategy === StrategyName.MOMENTUM_BREAKOUT) {
       const breakout = contextPrice(context.breakoutLevel, 'breakoutLevel');
-      const buffered = breakout.times(decimal(RISK_V1_CONFIG.momentumEntryBufferPercent, 'entry buffer')
-        .div(100).plus(1));
+      const buffered = breakout.times(
+        decimal(RISK_V1_CONFIG.momentumEntryBufferPercent, 'entry buffer').div(100).plus(1),
+      );
       entry = close.gte(buffered) ? close : buffered;
       stop = contextPrice(context.recentBaseLow, 'recentBaseLow');
       entryReference = breakout;
@@ -60,8 +66,10 @@ export function selectTradeGeometry(setup: RiskSetup): TradeGeometry {
       target = optionalTarget(context.recentHigh, entry);
       targetType = target ? 'RECENT_HIGH' : null;
     } else {
-      throw new RiskInputError(RiskRejectionCode.MISSING_REQUIRED_SETUP_CONTEXT,
-        `Unsupported strategy ${setup.strategy}`);
+      throw new RiskInputError(
+        RiskRejectionCode.MISSING_REQUIRED_SETUP_CONTEXT,
+        `Unsupported strategy ${setup.strategy}`,
+      );
     }
   } catch (error: unknown) {
     if (error instanceof RiskInputError) throw error;
@@ -69,11 +77,21 @@ export function selectTradeGeometry(setup: RiskSetup): TradeGeometry {
   }
 
   if (stop.gte(entry)) {
-    throw new RiskInputError(RiskRejectionCode.INVALID_STOP,
-      `Structural stop ${stop.toString()} must be below proposed entry ${entry.toString()}`);
+    throw new RiskInputError(
+      RiskRejectionCode.INVALID_STOP,
+      `Structural stop ${stop.toString()} must be below proposed entry ${entry.toString()}`,
+    );
   }
-  return { entry, stop, atr, entryReference, entryReferenceType, stopReferenceType,
-    technicalTarget: target, technicalTargetType: targetType };
+  return {
+    entry,
+    stop,
+    atr,
+    entryReference,
+    entryReferenceType,
+    stopReferenceType,
+    technicalTarget: target,
+    technicalTargetType: targetType,
+  };
 }
 
 function contextPrice(value: unknown, label: string): Decimal {

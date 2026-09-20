@@ -69,12 +69,19 @@ export class TradeMonitorService {
   async monitorOpenTrades(): Promise<TradeMonitorBatchResult> {
     const startedAt = new Date();
     const startedPerformance = performance.now();
-    this.logger.log({ event: 'trade_monitor.batch.started', module: TradeMonitorService.name,
-      operation: 'monitorOpenTrades', monitorVersion: TRADE_MONITOR_VERSION },
-    'Trade-monitor batch started');
+    this.logger.log(
+      {
+        event: 'trade_monitor.batch.started',
+        module: TradeMonitorService.name,
+        operation: 'monitorOpenTrades',
+        monitorVersion: TRADE_MONITOR_VERSION,
+      },
+      'Trade-monitor batch started',
+    );
     try {
       const trades = await this.trades.find({
-        where: { status: TradeStatus.OPEN }, order: { createdAt: 'ASC', id: 'ASC' },
+        where: { status: TradeStatus.OPEN },
+        order: { createdAt: 'ASC', id: 'ASC' },
       });
       const results: TradeMonitorResult[] = [];
       const failures: TradeMonitorFailure[] = [];
@@ -95,27 +102,46 @@ export class TradeMonitorService {
         totalOpenTrades: trades.length,
         monitored: results.length,
         failed: failures.length,
-        alertsGenerated: results.flatMap(item => item.alerts).filter(alert => alert.isNew).length,
-        alertsSent: results.flatMap(item => item.alerts)
-          .filter(alert => alert.deliveryStatus === TradeAlertDeliveryStatus.SENT).length,
-        alertDeliveryFailures: results.flatMap(item => item.alerts)
-          .filter(alert => alert.deliveryStatus === TradeAlertDeliveryStatus.FAILED).length,
+        alertsGenerated: results.flatMap((item) => item.alerts).filter((alert) => alert.isNew)
+          .length,
+        alertsSent: results
+          .flatMap((item) => item.alerts)
+          .filter((alert) => alert.deliveryStatus === TradeAlertDeliveryStatus.SENT).length,
+        alertDeliveryFailures: results
+          .flatMap((item) => item.alerts)
+          .filter((alert) => alert.deliveryStatus === TradeAlertDeliveryStatus.FAILED).length,
         failures,
         startedAt: startedAt.toISOString(),
         completedAt: completedAt.toISOString(),
         durationMs: elapsedMilliseconds(startedPerformance),
       };
-      this.logger.log({ event: 'trade_monitor.batch.completed', module: TradeMonitorService.name,
-        operation: 'monitorOpenTrades', monitorVersion: TRADE_MONITOR_VERSION,
-        totalOpenTrades: result.totalOpenTrades, monitored: result.monitored, failed: result.failed,
-        alertsGenerated: result.alertsGenerated, durationMs: result.durationMs },
-      'Trade-monitor batch completed');
+      this.logger.log(
+        {
+          event: 'trade_monitor.batch.completed',
+          module: TradeMonitorService.name,
+          operation: 'monitorOpenTrades',
+          monitorVersion: TRADE_MONITOR_VERSION,
+          totalOpenTrades: result.totalOpenTrades,
+          monitored: result.monitored,
+          failed: result.failed,
+          alertsGenerated: result.alertsGenerated,
+          durationMs: result.durationMs,
+        },
+        'Trade-monitor batch completed',
+      );
       return result;
     } catch (error: unknown) {
-      this.logger.error({ event: 'trade_monitor.batch.failed', module: TradeMonitorService.name,
-        operation: 'monitorOpenTrades', monitorVersion: TRADE_MONITOR_VERSION,
-        durationMs: elapsedMilliseconds(startedPerformance), ...structuredError(error) },
-      'Trade-monitor batch failed');
+      this.logger.error(
+        {
+          event: 'trade_monitor.batch.failed',
+          module: TradeMonitorService.name,
+          operation: 'monitorOpenTrades',
+          monitorVersion: TRADE_MONITOR_VERSION,
+          durationMs: elapsedMilliseconds(startedPerformance),
+          ...structuredError(error),
+        },
+        'Trade-monitor batch failed',
+      );
       throw error;
     }
   }
@@ -123,12 +149,20 @@ export class TradeMonitorService {
   private async executeTrade(tradeId: string): Promise<TradeMonitorResult> {
     const startedAt = performance.now();
     let symbol: string | undefined;
-    this.logger.log({ event: 'trade_monitor.trade.started', module: TradeMonitorService.name,
-      operation: 'monitorTrade', monitorVersion: TRADE_MONITOR_VERSION, tradeId },
-    'Trade monitoring started');
+    this.logger.log(
+      {
+        event: 'trade_monitor.trade.started',
+        module: TradeMonitorService.name,
+        operation: 'monitorTrade',
+        monitorVersion: TRADE_MONITOR_VERSION,
+        tradeId,
+      },
+      'Trade monitoring started',
+    );
     try {
       const initial = await this.trades.findOne({
-        where: { id: tradeId }, relations: { candidate: true },
+        where: { id: tradeId },
+        relations: { candidate: true },
       });
       if (!initial) throw new NotFoundException({ code: 'TRADE_NOT_FOUND', tradeId });
       symbol = initial.symbol;
@@ -147,10 +181,11 @@ export class TradeMonitorService {
       const monitoredAt = new Date();
       this.assertFreshPrice(price, monitoredAt);
 
-      const persisted = await this.dataSource.transaction(async manager => {
+      const persisted = await this.dataSource.transaction(async (manager) => {
         const repository = manager.getRepository(Trade);
         const locked = await repository.findOne({
-          where: { id: tradeId }, lock: { mode: 'pessimistic_write' },
+          where: { id: tradeId },
+          lock: { mode: 'pessimistic_write' },
         });
         if (!locked) throw new NotFoundException({ code: 'TRADE_NOT_FOUND', tradeId });
         this.assertOpen(locked);
@@ -159,17 +194,26 @@ export class TradeMonitorService {
         const existingEvents = await manager.getRepository(TradeEvent).find({
           where: { tradeId, eventType: In([...MONITOR_EVENT_TYPES]) },
         });
-        const existingKeys = new Set(existingEvents.map(event =>
-          isRecord(event.data) && typeof event.data.monitorKey === 'string'
-            ? event.data.monitorKey : '').filter(Boolean));
-        const detected = detectTradeAlerts({
-          currentPrice: price.price,
-          currentStop: locked.currentStop,
-          currentR: state.currentR,
-          stopDistanceR: state.stopDistanceR,
-          target1: locked.target1,
-          target2: locked.target2,
-        }, tradeMonitorV1Config).filter(alert => !existingKeys.has(alert.type));
+        const existingKeys = new Set(
+          existingEvents
+            .map((event) =>
+              isRecord(event.data) && typeof event.data.monitorKey === 'string'
+                ? event.data.monitorKey
+                : '',
+            )
+            .filter(Boolean),
+        );
+        const detected = detectTradeAlerts(
+          {
+            currentPrice: price.price,
+            currentStop: locked.currentStop,
+            currentR: state.currentR,
+            stopDistanceR: state.stopDistanceR,
+            target1: locked.target1,
+            target2: locked.target2,
+          },
+          tradeMonitorV1Config,
+        ).filter((alert) => !existingKeys.has(alert.type));
 
         applyMonitoringState(locked, price, state, monitoredAt);
         const saved = await repository.save(locked);
@@ -182,22 +226,44 @@ export class TradeMonitorService {
 
       const alerts = await this.alerts.deliverPendingForTrade(
         persisted.trade,
-        new Set(persisted.newEvents.map(event => event.id)),
+        new Set(persisted.newEvents.map((event) => event.id)),
       );
-      const result = toResult(persisted.trade, price, persisted.previousPrice,
-        persisted.state, alerts, monitoredAt);
-      this.logger.log({ event: 'trade_monitor.trade.completed', module: TradeMonitorService.name,
-        operation: 'monitorTrade', monitorVersion: TRADE_MONITOR_VERSION,
-        tradeId, symbol: persisted.trade.symbol, provider: price.provider,
-        currentPrice: price.price, currentR: persisted.state.currentR,
-        alertsGenerated: persisted.newEvents.length, durationMs: elapsedMilliseconds(startedAt) },
-      'Trade monitoring completed');
+      const result = toResult(
+        persisted.trade,
+        price,
+        persisted.previousPrice,
+        persisted.state,
+        alerts,
+        monitoredAt,
+      );
+      this.logger.log(
+        {
+          event: 'trade_monitor.trade.completed',
+          module: TradeMonitorService.name,
+          operation: 'monitorTrade',
+          monitorVersion: TRADE_MONITOR_VERSION,
+          tradeId,
+          symbol: persisted.trade.symbol,
+          provider: price.provider,
+          currentPrice: price.price,
+          currentR: persisted.state.currentR,
+          alertsGenerated: persisted.newEvents.length,
+          durationMs: elapsedMilliseconds(startedAt),
+        },
+        'Trade monitoring completed',
+      );
       return result;
     } catch (error: unknown) {
-      const fields = { event: 'trade_monitor.trade.failed', module: TradeMonitorService.name,
-        operation: 'monitorTrade', monitorVersion: TRADE_MONITOR_VERSION, tradeId,
-        ...(symbol ? { symbol } : {}), durationMs: elapsedMilliseconds(startedAt),
-        ...structuredError(error) };
+      const fields = {
+        event: 'trade_monitor.trade.failed',
+        module: TradeMonitorService.name,
+        operation: 'monitorTrade',
+        monitorVersion: TRADE_MONITOR_VERSION,
+        tradeId,
+        ...(symbol ? { symbol } : {}),
+        durationMs: elapsedMilliseconds(startedAt),
+        ...structuredError(error),
+      };
       if (['STALE_MARKET_PRICE', 'INVALID_MARKET_PRICE'].includes(errorCode(error))) {
         this.logger.warn(fields, 'Trade monitoring skipped unsafe market price');
       } else {
@@ -210,7 +276,8 @@ export class TradeMonitorService {
   private assertOpen(trade: Trade): void {
     if (trade.status !== TradeStatus.OPEN) {
       throw new ConflictException({
-        code: 'TRADE_NOT_OPEN', tradeId: trade.id,
+        code: 'TRADE_NOT_OPEN',
+        tradeId: trade.id,
         message: `Trade in ${trade.status} status cannot be monitored`,
       });
     }
@@ -220,11 +287,15 @@ export class TradeMonitorService {
     const observedAt = new Date(price.observedAt);
     if (Number.isNaN(observedAt.getTime())) {
       throw new ServiceUnavailableException({
-        code: 'INVALID_MARKET_PRICE', message: 'Provider price timestamp is invalid',
+        code: 'INVALID_MARKET_PRICE',
+        message: 'Provider price timestamp is invalid',
       });
     }
     const age = now.getTime() - observedAt.getTime();
-    if (age > tradeMonitorV1Config.maxPriceAgeMs || age < -tradeMonitorV1Config.maxFuturePriceSkewMs) {
+    if (
+      age > tradeMonitorV1Config.maxPriceAgeMs ||
+      age < -tradeMonitorV1Config.maxFuturePriceSkewMs
+    ) {
       throw new ServiceUnavailableException({
         code: 'STALE_MARKET_PRICE',
         message: 'Provider price is outside the accepted freshness window',
@@ -271,15 +342,24 @@ function calculateState(trade: Trade, price: string, monitoredAt: Date): TradeMo
     ...calculateTradePnl(price, trade.actualEntry, trade.quantity),
     currentR: calculateRMultiple(price, trade.actualEntry, trade.initialStop),
     ...calculateExcursion(
-      price, trade.actualEntry, trade.initialStop,
-      trade.maxFavorablePrice, trade.maxAdversePrice,
+      price,
+      trade.actualEntry,
+      trade.initialStop,
+      trade.maxFavorablePrice,
+      trade.maxAdversePrice,
     ),
     ...calculateTradeDistances(
-      price, trade.currentStop, trade.actualEntry, trade.initialStop,
-      trade.target1, trade.target2,
+      price,
+      trade.currentStop,
+      trade.actualEntry,
+      trade.initialStop,
+      trade.target1,
+      trade.target2,
     ),
-    holdingDurationSeconds: Math.max(0,
-      Math.floor((monitoredAt.getTime() - trade.entryDecisionAt.getTime()) / 1000)),
+    holdingDurationSeconds: Math.max(
+      0,
+      Math.floor((monitoredAt.getTime() - trade.entryDecisionAt.getTime()) / 1000),
+    ),
   };
 }
 

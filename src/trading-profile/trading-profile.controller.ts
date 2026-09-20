@@ -6,7 +6,9 @@ import { UpsertTradingProfileDto } from './dto/upsert-trading-profile.dto';
 export class TradingProfileController {
   constructor(private readonly profiles: TradingProfileService) {}
   @Get()
-  getActiveProfile() { return this.profiles.getActiveProfile(); }
+  getActiveProfile() {
+    return this.profiles.getActiveProfile();
+  }
   @Put()
   upsertActiveProfile(@Body() input: UpsertTradingProfileDto) {
     return this.profiles.upsertActiveProfile(input);

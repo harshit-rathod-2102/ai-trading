@@ -13,8 +13,14 @@ import { ScannerEvaluationService } from './scanner-evaluation.service';
 import { ScannerService } from './scanner.service';
 
 @Module({
-  imports: [IndicatorsModule, InstrumentsModule, MarketDataModule, MarketRegimeModule, StrategyModule,
-    TypeOrmModule.forFeature([ScanRun, ScanResultRecord])],
+  imports: [
+    IndicatorsModule,
+    InstrumentsModule,
+    MarketDataModule,
+    MarketRegimeModule,
+    StrategyModule,
+    TypeOrmModule.forFeature([ScanRun, ScanResultRecord]),
+  ],
   controllers: [ScannerController],
   providers: [ScannerService, ScannerEvaluationService, CrossSectionalRanking],
   exports: [ScannerService, ScannerEvaluationService, CrossSectionalRanking],

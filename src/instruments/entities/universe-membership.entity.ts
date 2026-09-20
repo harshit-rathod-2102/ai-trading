@@ -7,8 +7,10 @@ export class UniverseMembership {
   @PrimaryColumn({ name: 'universe_code', type: 'varchar', length: 32 }) universeCode!: string;
   @PrimaryColumn({ name: 'instrument_id', type: 'uuid' }) instrumentId!: string;
   @ManyToOne(() => Universe, { onDelete: 'RESTRICT' })
-  @JoinColumn({ name: 'universe_code' }) universe!: Universe;
+  @JoinColumn({ name: 'universe_code' })
+  universe!: Universe;
   @ManyToOne(() => Instrument, { onDelete: 'RESTRICT' })
-  @JoinColumn({ name: 'instrument_id' }) instrument!: Instrument;
+  @JoinColumn({ name: 'instrument_id' })
+  instrument!: Instrument;
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' }) createdAt!: Date;
 }

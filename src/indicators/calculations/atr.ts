@@ -11,16 +11,27 @@ export function calculateAtr(candles: readonly IndicatorCandle[], period = 14): 
     if (high.lt(low)) throw new RangeError(`candles[${index}] high must be at least low`);
     if (index === 0) return high.minus(low);
     const previousClose = positiveDecimal(candles[index - 1].close, `candles[${index - 1}].close`);
-    return DecimalMax(high.minus(low), high.minus(previousClose).abs(), low.minus(previousClose).abs());
+    return DecimalMax(
+      high.minus(low),
+      high.minus(previousClose).abs(),
+      low.minus(previousClose).abs(),
+    );
   });
   if (ranges.length < period) return null;
   let atr = mean(ranges.slice(0, period));
-  for (const range of ranges.slice(period)) atr = atr.times(period - 1).plus(range).div(period);
+  for (const range of ranges.slice(period))
+    atr = atr
+      .times(period - 1)
+      .plus(range)
+      .div(period);
   return formatIndicator(atr);
 }
 
 function DecimalMax(...values: Decimal[]): Decimal {
-  return values.reduce((maximum, value) => value.gt(maximum) ? value : maximum, new IndicatorDecimal(0));
+  return values.reduce(
+    (maximum, value) => (value.gt(maximum) ? value : maximum),
+    new IndicatorDecimal(0),
+  );
 }
 
 export function calculateNormalizedAtr(atr: string | null, close: string): string | null {

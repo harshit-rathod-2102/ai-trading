@@ -12,9 +12,19 @@ import { OpenRouterConfig } from '../openrouter.config';
 import { CANDIDATE_ANALYSIS_PROMPT_VERSION } from '../prompts/candidate-analysis.prompt';
 
 const RESULT_FIELDS = new Set([
-  'overallRisk', 'eventRisk', 'confidence', 'bullishFactors', 'bearishFactors',
-  'contradictions', 'marketContextSummary', 'sectorContextSummary', 'newsSummary',
-  'thesis', 'invalidationConcerns', 'recommendation', 'summary',
+  'overallRisk',
+  'eventRisk',
+  'confidence',
+  'bullishFactors',
+  'bearishFactors',
+  'contradictions',
+  'marketContextSummary',
+  'sectorContextSummary',
+  'newsSummary',
+  'thesis',
+  'invalidationConcerns',
+  'recommendation',
+  'summary',
 ]);
 
 export function mapOpenRouterAnalysis(
@@ -26,9 +36,14 @@ export function mapOpenRouterAnalysis(
   const id = optionalString(responseRecord.id, 'response id');
   const resolvedModel = requiredString(responseRecord.model, 'resolved model');
   const choices = responseRecord.choices;
-  if (!Array.isArray(choices) || choices.length === 0) throw invalid('OpenRouter response has no choices');
+  if (!Array.isArray(choices) || choices.length === 0)
+    throw invalid('OpenRouter response has no choices');
   const choice = record(choices[0] as OpenRouterChoiceDto, 'first choice');
-  if (choice.finish_reason !== undefined && choice.finish_reason !== null && choice.finish_reason !== 'stop') {
+  if (
+    choice.finish_reason !== undefined &&
+    choice.finish_reason !== null &&
+    choice.finish_reason !== 'stop'
+  ) {
     throw invalid(`OpenRouter completion did not finish normally: ${String(choice.finish_reason)}`);
   }
   const message = record(choice.message as OpenRouterMessageDto, 'assistant message');
@@ -44,8 +59,9 @@ export function mapOpenRouterAnalysis(
     throw invalid('OpenRouter assistant content is not valid JSON');
   }
   const value = record(parsed, 'candidate analysis');
-  const extraFields = Object.keys(value).filter(key => !RESULT_FIELDS.has(key));
-  if (extraFields.length) throw invalid(`OpenRouter candidate analysis has unexpected field: ${extraFields[0]}`);
+  const extraFields = Object.keys(value).filter((key) => !RESULT_FIELDS.has(key));
+  if (extraFields.length)
+    throw invalid(`OpenRouter candidate analysis has unexpected field: ${extraFields[0]}`);
   const usage = optionalUsage(responseRecord.usage);
 
   return {
@@ -101,7 +117,8 @@ function stringList(value: unknown, field: string): readonly string[] {
 }
 
 function risk(value: unknown, field: string): RiskLevel {
-  if (!Object.values(RiskLevel).includes(value as RiskLevel)) throw invalid(`OpenRouter ${field} is invalid`);
+  if (!Object.values(RiskLevel).includes(value as RiskLevel))
+    throw invalid(`OpenRouter ${field} is invalid`);
   return value as RiskLevel;
 }
 
@@ -119,7 +136,9 @@ function confidence(value: unknown): number {
   return value;
 }
 
-function optionalUsage(value: unknown): { inputTokens?: number; outputTokens?: number } | undefined {
+function optionalUsage(
+  value: unknown,
+): { inputTokens?: number; outputTokens?: number } | undefined {
   if (value === undefined || value === null) return undefined;
   const usage = record(value as OpenRouterUsageDto, 'usage');
   const inputTokens = optionalTokenCount(usage.prompt_tokens, 'prompt_tokens');
@@ -131,7 +150,8 @@ function optionalUsage(value: unknown): { inputTokens?: number; outputTokens?: n
 
 function optionalTokenCount(value: unknown, field: string): number | undefined {
   if (value === undefined || value === null) return undefined;
-  if (!Number.isInteger(value) || (value as number) < 0) throw invalid(`OpenRouter ${field} is invalid`);
+  if (!Number.isInteger(value) || (value as number) < 0)
+    throw invalid(`OpenRouter ${field} is invalid`);
   return value as number;
 }
 

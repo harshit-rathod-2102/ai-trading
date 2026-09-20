@@ -1,4 +1,12 @@
-import { Column, CreateDateColumn, Entity, PrimaryColumn, UpdateDateColumn, JoinColumn, OneToOne } from 'typeorm';
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  PrimaryColumn,
+  UpdateDateColumn,
+  JoinColumn,
+  OneToOne,
+} from 'typeorm';
 import { TradeStatus } from '../../common/enums/trade-status.enum';
 import { TradeCandidate } from '../../candidates/entities/trade-candidate.entity';
 
@@ -58,7 +66,13 @@ export class Trade {
   @Column({ name: 'unrealized_pnl', type: 'numeric', precision: 28, scale: 4, nullable: true })
   unrealizedPnl!: string | null;
 
-  @Column({ name: 'unrealized_pnl_percent', type: 'numeric', precision: 18, scale: 4, nullable: true })
+  @Column({
+    name: 'unrealized_pnl_percent',
+    type: 'numeric',
+    precision: 18,
+    scale: 4,
+    nullable: true,
+  })
   unrealizedPnlPercent!: string | null;
 
   @Column({ name: 'current_r', type: 'numeric', precision: 18, scale: 4, nullable: true })

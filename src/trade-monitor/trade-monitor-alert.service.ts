@@ -58,12 +58,20 @@ export class TradeMonitorAlertService {
       if (!claimed) continue;
       const isNew = newEventIds.has(event.id);
       if (isNew) {
-        this.logger.log({ event: 'trade_monitor.alert.generated', module: TradeMonitorAlertService.name,
-          operation: 'deliverPendingForTrade', tradeId: trade.id, symbol: trade.symbol,
-          alertType: claimed.type, currentPrice: claimed.data.price,
-          currentR: claimed.data.currentR,
-          provider: this.config.get<string>('providers.messaging') },
-        'Trade-monitor alert generated');
+        this.logger.log(
+          {
+            event: 'trade_monitor.alert.generated',
+            module: TradeMonitorAlertService.name,
+            operation: 'deliverPendingForTrade',
+            tradeId: trade.id,
+            symbol: trade.symbol,
+            alertType: claimed.type,
+            currentPrice: claimed.data.price,
+            currentR: claimed.data.currentR,
+            provider: this.config.get<string>('providers.messaging'),
+          },
+          'Trade-monitor alert generated',
+        );
       }
       results.push(await this.send(trade, claimed, isNew));
     }
@@ -71,10 +79,11 @@ export class TradeMonitorAlertService {
   }
 
   private async claim(eventId: string): Promise<ClaimedAlert | null> {
-    return this.dataSource.transaction(async manager => {
+    return this.dataSource.transaction(async (manager) => {
       const repository = manager.getRepository(TradeEvent);
       const event = await repository.findOne({
-        where: { id: eventId }, lock: { mode: 'pessimistic_write' },
+        where: { id: eventId },
+        lock: { mode: 'pessimistic_write' },
       });
       if (!event || !isRecord(event.data)) return null;
       const type = alertType(event.data.alertType);
@@ -84,7 +93,10 @@ export class TradeMonitorAlertService {
       if (previous.status === 'SENT') return null;
       if (previous.status === 'SENDING' && typeof previous.lastAttemptAt === 'string') {
         const claimedAt = Date.parse(previous.lastAttemptAt);
-        if (Number.isFinite(claimedAt) && Date.now() - claimedAt < tradeMonitorV1Config.alertClaimTtlMs) {
+        if (
+          Number.isFinite(claimedAt) &&
+          Date.now() - claimedAt < tradeMonitorV1Config.alertClaimTtlMs
+        ) {
           return null;
         }
       }
@@ -118,33 +130,61 @@ export class TradeMonitorAlertService {
         throw new ServiceUnavailableException('Messaging provider reported failed delivery');
       }
       await this.finish(alert.eventId, {
-        status: 'SENT', attempts: alert.attempts, lastAttemptAt: new Date().toISOString(),
+        status: 'SENT',
+        attempts: alert.attempts,
+        lastAttemptAt: new Date().toISOString(),
         providerMessageId: delivery.providerMessageId,
         providerStatus: delivery.status,
         providerSentAt: delivery.sentAt,
       });
-      this.logger.log({ event: 'trade_monitor.alert.sent', module: TradeMonitorAlertService.name,
-        operation: 'send', tradeId: trade.id, symbol: trade.symbol, alertType: alert.type,
-        provider: this.config.get<string>('providers.messaging'),
-        providerMessageId: delivery.providerMessageId,
-        durationMs: elapsedMilliseconds(startedAt) }, 'Trade-monitor alert sent');
+      this.logger.log(
+        {
+          event: 'trade_monitor.alert.sent',
+          module: TradeMonitorAlertService.name,
+          operation: 'send',
+          tradeId: trade.id,
+          symbol: trade.symbol,
+          alertType: alert.type,
+          provider: this.config.get<string>('providers.messaging'),
+          providerMessageId: delivery.providerMessageId,
+          durationMs: elapsedMilliseconds(startedAt),
+        },
+        'Trade-monitor alert sent',
+      );
       return {
-        eventId: alert.eventId, type: alert.type, severity: alert.severity, isNew,
+        eventId: alert.eventId,
+        type: alert.type,
+        severity: alert.severity,
+        isNew,
         deliveryStatus: TradeAlertDeliveryStatus.SENT,
         providerMessageId: delivery.providerMessageId,
       };
     } catch (error: unknown) {
       await this.finish(alert.eventId, {
-        status: 'FAILED', attempts: alert.attempts, lastAttemptAt: new Date().toISOString(),
+        status: 'FAILED',
+        attempts: alert.attempts,
+        lastAttemptAt: new Date().toISOString(),
         error: error instanceof Error ? error.name : 'UnknownError',
       });
-      this.logger.error({ event: 'trade_monitor.alert.failed', module: TradeMonitorAlertService.name,
-        operation: 'send', tradeId: trade.id, symbol: trade.symbol, alertType: alert.type,
-        provider: this.config.get<string>('providers.messaging'),
-        durationMs: elapsedMilliseconds(startedAt), ...structuredError(error) },
-      'Trade-monitor alert delivery failed');
+      this.logger.error(
+        {
+          event: 'trade_monitor.alert.failed',
+          module: TradeMonitorAlertService.name,
+          operation: 'send',
+          tradeId: trade.id,
+          symbol: trade.symbol,
+          alertType: alert.type,
+          provider: this.config.get<string>('providers.messaging'),
+          durationMs: elapsedMilliseconds(startedAt),
+          ...structuredError(error),
+        },
+        'Trade-monitor alert delivery failed',
+      );
       return {
-        eventId: alert.eventId, type: alert.type, severity: alert.severity, isNew,
+        eventId: alert.eventId,
+        type: alert.type,
+        severity: alert.severity,
+        isNew,
         deliveryStatus: TradeAlertDeliveryStatus.FAILED,
         providerMessageId: null,
       };
@@ -152,10 +192,11 @@ export class TradeMonitorAlertService {
   }
 
   private async finish(eventId: string, delivery: Record<string, unknown>): Promise<void> {
-    await this.dataSource.transaction(async manager => {
+    await this.dataSource.transaction(async (manager) => {
       const repository = manager.getRepository(TradeEvent);
       const event = await repository.findOne({
-        where: { id: eventId }, lock: { mode: 'pessimistic_write' },
+        where: { id: eventId },
+        lock: { mode: 'pessimistic_write' },
       });
       if (!event || !isRecord(event.data)) return;
       event.data = { ...event.data, alertDelivery: delivery };
@@ -194,13 +235,17 @@ function buildAlertMessage(trade: Trade, alert: ClaimedAlert): string {
 }
 
 function alertType(value: unknown): TradeAlertType | null {
-  return typeof value === 'string' && Object.values(TradeAlertType).includes(value as TradeAlertType)
-    ? value as TradeAlertType : null;
+  return typeof value === 'string' &&
+    Object.values(TradeAlertType).includes(value as TradeAlertType)
+    ? (value as TradeAlertType)
+    : null;
 }
 
 function alertSeverity(value: unknown): TradeAlertSeverity | null {
-  return typeof value === 'string' && Object.values(TradeAlertSeverity).includes(value as TradeAlertSeverity)
-    ? value as TradeAlertSeverity : null;
+  return typeof value === 'string' &&
+    Object.values(TradeAlertSeverity).includes(value as TradeAlertSeverity)
+    ? (value as TradeAlertSeverity)
+    : null;
 }
 
 function signedR(value: string | undefined): string {

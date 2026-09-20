@@ -23,7 +23,8 @@ export function mapMetaOutboundMessage(
   }
   if (message.messageType === MessageType.TEMPLATE) {
     const name = requiredText(message.templateId, 'Template ID');
-    if (!/^[a-z0-9_]+$/.test(name)) throw rejected('Template ID must use lowercase letters, digits, and underscores');
+    if (!/^[a-z0-9_]+$/.test(name))
+      throw rejected('Template ID must use lowercase letters, digits, and underscores');
     const variables = Object.entries(message.templateVariables ?? {}).map(([key, value]) => {
       if (value === null) throw rejected(`Template variable ${key} cannot be null`);
       return { type: 'text' as const, text: String(value) };

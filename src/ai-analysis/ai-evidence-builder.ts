@@ -77,28 +77,52 @@ export function buildDeepReviewInput(
 }
 
 export function validNewsSnapshot(value: unknown): value is Record<string, unknown> {
-  if (!isRecord(value) || typeof value.version !== 'string' || !value.version.trim() ||
-      typeof value.provider !== 'string' || !value.provider.trim() ||
-      typeof value.fetchedAt !== 'string' || Number.isNaN(Date.parse(value.fetchedAt)) ||
-      !Array.isArray(value.queries) || !Array.isArray(value.articles) ||
-      !Array.isArray(value.warnings) || !Number.isInteger(value.articleCount) ||
-      value.articleCount !== value.articles.length || !isRecord(value.providerMetadata)) return false;
-  return value.articles.every(article => isRecord(article) &&
-    typeof article.title === 'string' && typeof article.url === 'string');
+  if (
+    !isRecord(value) ||
+    typeof value.version !== 'string' ||
+    !value.version.trim() ||
+    typeof value.provider !== 'string' ||
+    !value.provider.trim() ||
+    typeof value.fetchedAt !== 'string' ||
+    Number.isNaN(Date.parse(value.fetchedAt)) ||
+    !Array.isArray(value.queries) ||
+    !Array.isArray(value.articles) ||
+    !Array.isArray(value.warnings) ||
+    !Number.isInteger(value.articleCount) ||
+    value.articleCount !== value.articles.length ||
+    !isRecord(value.providerMetadata)
+  )
+    return false;
+  return value.articles.every(
+    (article) =>
+      isRecord(article) && typeof article.title === 'string' && typeof article.url === 'string',
+  );
 }
 
 function validateEvidence(evidence: PersistedCandidateEvidence, companyName: string): void {
-  if (!evidence.symbol?.trim() || !companyName?.trim() || !evidence.strategy?.trim() ||
-      !evidence.strategyVersion?.trim()) {
+  if (
+    !evidence.symbol?.trim() ||
+    !companyName?.trim() ||
+    !evidence.strategy?.trim() ||
+    !evidence.strategyVersion?.trim()
+  ) {
     throw new AiEvidenceValidationError('Candidate identity and strategy evidence are required');
   }
-  if (!isScore(evidence.strategyScore) || !isScore(evidence.rankingScore) ||
-      !isPositiveRank(evidence.strategyRank) || !isPositiveRank(evidence.globalRank)) {
+  if (
+    !isScore(evidence.strategyScore) ||
+    !isScore(evidence.rankingScore) ||
+    !isPositiveRank(evidence.strategyRank) ||
+    !isPositiveRank(evidence.globalRank)
+  ) {
     throw new AiEvidenceValidationError('Candidate score and rank evidence is invalid');
   }
-  if (!isNonEmptyRecord(evidence.technicalSnapshot) || !isNonEmptyRecord(evidence.riskSnapshot) ||
-      !isNonEmptyRecord(evidence.marketRegimeSnapshot) || !isNonEmptyRecord(evidence.strategySnapshot) ||
-      !isNonEmptyRecord(evidence.rankingSnapshot)) {
+  if (
+    !isNonEmptyRecord(evidence.technicalSnapshot) ||
+    !isNonEmptyRecord(evidence.riskSnapshot) ||
+    !isNonEmptyRecord(evidence.marketRegimeSnapshot) ||
+    !isNonEmptyRecord(evidence.strategySnapshot) ||
+    !isNonEmptyRecord(evidence.rankingSnapshot)
+  ) {
     throw new AiEvidenceValidationError('Candidate deterministic evidence is incomplete');
   }
   if (!validNewsSnapshot(evidence.newsSnapshot)) {

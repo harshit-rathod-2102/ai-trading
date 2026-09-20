@@ -16,7 +16,8 @@ export class ScanRun {
   @Column({ name: 'excluded_inactive', type: 'integer', default: 0 }) excludedInactive!: number;
   @Column({ name: 'excluded_insufficient_history', type: 'integer', default: 0 })
   excludedInsufficientHistory!: number;
-  @Column({ name: 'excluded_invalid_data', type: 'integer', default: 0 }) excludedInvalidData!: number;
+  @Column({ name: 'excluded_invalid_data', type: 'integer', default: 0 })
+  excludedInvalidData!: number;
   @Column({ name: 'evaluated_symbols', type: 'integer', default: 0 }) evaluatedSymbols!: number;
   @Column({ name: 'qualified_setups', type: 'integer', default: 0 }) qualifiedSetups!: number;
   @Column({ name: 'shortlisted_setups', type: 'integer', default: 0 }) shortlistedSetups!: number;

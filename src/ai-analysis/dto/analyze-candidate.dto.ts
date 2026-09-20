@@ -1,13 +1,5 @@
 import { Type } from 'class-transformer';
-import {
-  IsArray,
-  IsNumber,
-  IsObject,
-  IsOptional,
-  IsString,
-  Max,
-  Min,
-} from 'class-validator';
+import { IsArray, IsNumber, IsObject, IsOptional, IsString, Max, Min } from 'class-validator';
 import { JsonObject } from '../../common/types/json-value';
 import { NewsArticle } from '../../providers/news/models/news-article';
 

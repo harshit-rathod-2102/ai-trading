@@ -114,7 +114,12 @@ export class TradeCandidate {
   @Column({ name: 'notified_at', type: 'timestamptz', nullable: true })
   notifiedAt!: Date | null;
 
-  @Column({ name: 'notification_provider_message_id', type: 'varchar', length: 255, nullable: true })
+  @Column({
+    name: 'notification_provider_message_id',
+    type: 'varchar',
+    length: 255,
+    nullable: true,
+  })
   notificationProviderMessageId!: string | null;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })

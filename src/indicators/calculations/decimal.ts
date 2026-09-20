@@ -7,7 +7,8 @@ export function positiveDecimal(value: string, label = 'value'): Decimal {
     throw new RangeError(`${label} must be a plain non-negative decimal string`);
   }
   const parsed = new IndicatorDecimal(value);
-  if (!parsed.isFinite() || parsed.lte(0)) throw new RangeError(`${label} must be greater than zero`);
+  if (!parsed.isFinite() || parsed.lte(0))
+    throw new RangeError(`${label} must be greater than zero`);
   return parsed;
 }
 
@@ -25,7 +26,8 @@ export function parsePositiveSeries(values: readonly string[]): Decimal[] {
 }
 
 export function periodIsValid(period: number): void {
-  if (!Number.isInteger(period) || period <= 0) throw new RangeError('period must be a positive integer');
+  if (!Number.isInteger(period) || period <= 0)
+    throw new RangeError('period must be a positive integer');
 }
 
 export function formatIndicator(value: Decimal): string {
@@ -33,7 +35,9 @@ export function formatIndicator(value: Decimal): string {
 }
 
 export function mean(values: readonly Decimal[]): Decimal {
-  return values.reduce((total, value) => total.plus(value), new IndicatorDecimal(0)).div(values.length);
+  return values
+    .reduce((total, value) => total.plus(value), new IndicatorDecimal(0))
+    .div(values.length);
 }
 
 export function percentageDistance(value: string, baseline: string | null): string | null {

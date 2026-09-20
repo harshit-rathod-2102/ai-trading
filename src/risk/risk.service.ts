@@ -19,7 +19,10 @@ export class RiskService {
     private readonly calculator: RiskCalculatorService,
   ) {}
 
-  async evaluateScannerResult(scanResultId: string, evaluatedAt = new Date()): Promise<RiskPlanResult> {
+  async evaluateScannerResult(
+    scanResultId: string,
+    evaluatedAt = new Date(),
+  ): Promise<RiskPlanResult> {
     const record = await this.scanner.getResult(scanResultId);
     return this.buildRiskPlan(this.toRiskSetup(record), evaluatedAt);
   }
@@ -29,19 +32,42 @@ export class RiskService {
     try {
       const profile = await this.activeProfileOrNull();
       const openTrades = profile ? await this.portfolio.loadOpenTrades() : [];
-      const result = this.calculator.calculate({ setup, tradingProfile: profile, openTrades, evaluatedAt });
-      const fields = { event: 'risk.evaluated', module: RiskService.name, operation: 'buildRiskPlan',
-        scanResultId: setup.scanResultId, symbol: setup.symbol, strategy: setup.strategy,
-        accepted: result.accepted, status: result.accepted ? 'accepted' : 'rejected',
-        recommendedQuantity: result.recommendedQuantity, rejectionCodes: result.rejectionCodes,
-        durationMs: elapsedMilliseconds(startedAt) };
+      const result = this.calculator.calculate({
+        setup,
+        tradingProfile: profile,
+        openTrades,
+        evaluatedAt,
+      });
+      const fields = {
+        event: 'risk.evaluated',
+        module: RiskService.name,
+        operation: 'buildRiskPlan',
+        scanResultId: setup.scanResultId,
+        symbol: setup.symbol,
+        strategy: setup.strategy,
+        accepted: result.accepted,
+        status: result.accepted ? 'accepted' : 'rejected',
+        recommendedQuantity: result.recommendedQuantity,
+        rejectionCodes: result.rejectionCodes,
+        durationMs: elapsedMilliseconds(startedAt),
+      };
       if (result.accepted) this.logger.log(fields, 'Risk plan accepted');
       else this.logger.debug(fields, 'Risk plan rejected');
       return result;
     } catch (error: unknown) {
-      this.logger.error({ event: 'risk.failed', module: RiskService.name, operation: 'buildRiskPlan',
-        scanResultId: setup.scanResultId, symbol: setup.symbol, strategy: setup.strategy,
-        durationMs: elapsedMilliseconds(startedAt), ...structuredError(error) }, 'Risk evaluation failed');
+      this.logger.error(
+        {
+          event: 'risk.failed',
+          module: RiskService.name,
+          operation: 'buildRiskPlan',
+          scanResultId: setup.scanResultId,
+          symbol: setup.symbol,
+          strategy: setup.strategy,
+          durationMs: elapsedMilliseconds(startedAt),
+          ...structuredError(error),
+        },
+        'Risk evaluation failed',
+      );
       throw error;
     }
   }
@@ -57,11 +83,19 @@ export class RiskService {
 
   private toRiskSetup(record: ScanResultRecord): RiskSetup {
     return {
-      scanResultId: record.id, instrumentId: record.instrumentId, symbol: record.symbol,
-      exchange: record.exchange, sector: record.sector, strategy: record.strategy,
-      strategyVersion: record.strategyVersion, strategyScore: record.strategyScore,
-      rankingScore: record.rankingScore, strategyRank: record.strategyRank, globalRank: record.globalRank,
-      technicalSnapshot: record.technicalSnapshot, strategyResult: record.strategyResult,
+      scanResultId: record.id,
+      instrumentId: record.instrumentId,
+      symbol: record.symbol,
+      exchange: record.exchange,
+      sector: record.sector,
+      strategy: record.strategy,
+      strategyVersion: record.strategyVersion,
+      strategyScore: record.strategyScore,
+      rankingScore: record.rankingScore,
+      strategyRank: record.strategyRank,
+      globalRank: record.globalRank,
+      technicalSnapshot: record.technicalSnapshot,
+      strategyResult: record.strategyResult,
     };
   }
 }

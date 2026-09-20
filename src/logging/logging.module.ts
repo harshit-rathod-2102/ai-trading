@@ -5,11 +5,7 @@ import { ConfigService } from '@nestjs/config';
 import { IncomingMessage, ServerResponse } from 'node:http';
 import { LoggerModule } from 'nestjs-pino';
 import { AppConfigModule } from '../config/config.module';
-import {
-  LOG_REDACTION_CENSOR,
-  LOG_REDACTION_PATHS,
-  REQUEST_ID_HEADER,
-} from './logging.constants';
+import { LOG_REDACTION_CENSOR, LOG_REDACTION_PATHS, REQUEST_ID_HEADER } from './logging.constants';
 import { RequestLoggingInterceptor } from './request-logging.interceptor';
 import { ApplicationLifecycleService } from './application-lifecycle.service';
 
@@ -88,9 +84,10 @@ import { ApplicationLifecycleService } from './application-lifecycle.service';
           }),
           genReqId: (request: IncomingMessage, response: ServerResponse) => {
             const supplied = request.headers[REQUEST_ID_HEADER];
-            const requestId = typeof supplied === 'string' && /^[A-Za-z0-9._:-]{1,128}$/.test(supplied)
-              ? supplied
-              : randomUUID();
+            const requestId =
+              typeof supplied === 'string' && /^[A-Za-z0-9._:-]{1,128}$/.test(supplied)
+                ? supplied
+                : randomUUID();
             response.setHeader('X-Request-Id', requestId);
             return requestId;
           },

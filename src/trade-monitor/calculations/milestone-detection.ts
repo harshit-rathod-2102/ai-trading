@@ -34,26 +34,30 @@ export function detectTradeAlerts(
   const stopDistanceR = monitorDecimal(input.stopDistanceR, 'stopDistanceR');
   const alerts: DetectedTradeAlert[] = [];
 
-  if (currentR.gte(thresholds.plusOneR)) alerts.push({
-    type: TradeAlertType.PLUS_1R,
-    severity: TradeAlertSeverity.INFO,
-    eventType: TradeEventType.PRICE_MILESTONE_REACHED,
-  });
-  if (currentR.gte(thresholds.plusTwoR)) alerts.push({
-    type: TradeAlertType.PLUS_2R,
-    severity: TradeAlertSeverity.INFO,
-    eventType: TradeEventType.PRICE_MILESTONE_REACHED,
-  });
-  if (input.target1 && price.gte(positiveMonitorDecimal(input.target1, 'target1'))) alerts.push({
-    type: TradeAlertType.TARGET1_REACHED,
-    severity: TradeAlertSeverity.INFO,
-    eventType: TradeEventType.TARGET1_REACHED,
-  });
-  if (input.target2 && price.gte(positiveMonitorDecimal(input.target2, 'target2'))) alerts.push({
-    type: TradeAlertType.TARGET2_REACHED,
-    severity: TradeAlertSeverity.INFO,
-    eventType: TradeEventType.TARGET2_REACHED,
-  });
+  if (currentR.gte(thresholds.plusOneR))
+    alerts.push({
+      type: TradeAlertType.PLUS_1R,
+      severity: TradeAlertSeverity.INFO,
+      eventType: TradeEventType.PRICE_MILESTONE_REACHED,
+    });
+  if (currentR.gte(thresholds.plusTwoR))
+    alerts.push({
+      type: TradeAlertType.PLUS_2R,
+      severity: TradeAlertSeverity.INFO,
+      eventType: TradeEventType.PRICE_MILESTONE_REACHED,
+    });
+  if (input.target1 && price.gte(positiveMonitorDecimal(input.target1, 'target1')))
+    alerts.push({
+      type: TradeAlertType.TARGET1_REACHED,
+      severity: TradeAlertSeverity.INFO,
+      eventType: TradeEventType.TARGET1_REACHED,
+    });
+  if (input.target2 && price.gte(positiveMonitorDecimal(input.target2, 'target2')))
+    alerts.push({
+      type: TradeAlertType.TARGET2_REACHED,
+      severity: TradeAlertSeverity.INFO,
+      eventType: TradeEventType.TARGET2_REACHED,
+    });
 
   if (price.lte(stop)) {
     alerts.push({

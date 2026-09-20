@@ -31,9 +31,12 @@ export function calculateVolatilityScore(
     if (close.lte(0)) throw new RangeError('India VIX close must be positive');
     scores.push(vixScore(close, config));
   }
-  return { score: formatScore(average(scores)), evidence: {
-    niftyNormalizedAtr14: niftyIndicators.normalizedAtr14,
-    indiaVixClose: vixIndicators?.close ?? null,
-    vixAvailable: vixIndicators?.close !== null && vixIndicators?.close !== undefined,
-  } };
+  return {
+    score: formatScore(average(scores)),
+    evidence: {
+      niftyNormalizedAtr14: niftyIndicators.normalizedAtr14,
+      indiaVixClose: vixIndicators?.close ?? null,
+      vixAvailable: vixIndicators?.close !== null && vixIndicators?.close !== undefined,
+    },
+  };
 }

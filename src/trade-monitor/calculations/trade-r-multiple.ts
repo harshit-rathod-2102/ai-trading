@@ -8,7 +8,11 @@ export function initialRiskPerShare(actualEntry: string, initialStop: string) {
   return risk;
 }
 
-export function calculateRMultiple(currentPrice: string, actualEntry: string, initialStop: string): string {
+export function calculateRMultiple(
+  currentPrice: string,
+  actualEntry: string,
+  initialStop: string,
+): string {
   const current = positiveMonitorDecimal(currentPrice, 'currentPrice');
   const entry = positiveMonitorDecimal(actualEntry, 'actualEntry');
   return fixed(current.minus(entry).div(initialRiskPerShare(actualEntry, initialStop)));

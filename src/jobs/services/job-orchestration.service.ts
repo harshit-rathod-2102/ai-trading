@@ -23,8 +23,12 @@ export class JobOrchestrationService {
     const slot = `${String(clock.hour).padStart(2, '0')}${String(slotMinute).padStart(2, '0')}`;
     const data = { triggerSource, requestedAt: now.toISOString() };
     const job = await this.monitoringQueue.add(TRADE_MONITOR_RUN, data, {
-      jobId: `trade-monitor-${clock.marketDate}-${slot}`, attempts: 2,
-      backoff: { type: 'fixed', delay: 30_000 }, removeOnComplete: { count: 1000 }, removeOnFail: false });
+      jobId: `trade-monitor-${clock.marketDate}-${slot}`,
+      attempts: 2,
+      backoff: { type: 'fixed', delay: 30_000 },
+      removeOnComplete: { count: 1000 },
+      removeOnFail: false,
+    });
     return this.jobResponse(job, data, triggerSource);
   }
 
@@ -33,12 +37,17 @@ export class JobOrchestrationService {
     marketDate?: string,
     now = new Date(),
   ) {
-    const date = marketDate ?? marketClock(now,
-      this.config.getOrThrow<string>('scheduler.timezone')).marketDate;
+    const date =
+      marketDate ??
+      marketClock(now, this.config.getOrThrow<string>('scheduler.timezone')).marketDate;
     const data = { triggerSource, marketDate: date, requestedAt: now.toISOString() };
     const job = await this.postMarketQueue.add(POST_MARKET_PIPELINE, data, {
-      jobId: `post-market-${date}`, attempts: 3,
-      backoff: { type: 'exponential', delay: 60_000 }, removeOnComplete: { count: 400 }, removeOnFail: false });
+      jobId: `post-market-${date}`,
+      attempts: 3,
+      backoff: { type: 'exponential', delay: 60_000 },
+      removeOnComplete: { count: 400 },
+      removeOnFail: false,
+    });
     return this.jobResponse(job, data, triggerSource);
   }
 
@@ -46,13 +55,19 @@ export class JobOrchestrationService {
     const date = marketClock(now, this.config.getOrThrow<string>('scheduler.timezone')).marketDate;
     const data = { triggerSource, requestedAt: now.toISOString() };
     const job = await this.eveningQueue.add(EVENING_SUMMARY, data, {
-      jobId: `evening-${date}`, attempts: 2,
-      backoff: { type: 'fixed', delay: 60_000 }, removeOnComplete: { count: 400 }, removeOnFail: false });
+      jobId: `evening-${date}`,
+      attempts: 2,
+      backoff: { type: 'fixed', delay: 60_000 },
+      removeOnComplete: { count: 400 },
+      removeOnFail: false,
+    });
     return this.jobResponse(job, data, triggerSource);
   }
 
   private async jobResponse<T extends MarketJobData>(
-    job: Job<T>, data: T, triggerSource: JobTriggerSource,
+    job: Job<T>,
+    data: T,
+    triggerSource: JobTriggerSource,
   ) {
     let state = await job.getState();
     if (state === 'failed') {
@@ -60,7 +75,12 @@ export class JobOrchestrationService {
       await job.retry();
       state = 'waiting';
     }
-    return { jobId: job.id, jobName: job.name, triggerSource, status: state,
-      reused: state === 'completed' || state === 'active' || state === 'delayed' };
+    return {
+      jobId: job.id,
+      jobName: job.name,
+      triggerSource,
+      status: state,
+      reused: state === 'completed' || state === 'active' || state === 'delayed',
+    };
   }
 }

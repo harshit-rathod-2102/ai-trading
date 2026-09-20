@@ -27,13 +27,16 @@ export class RequestLoggingInterceptor implements NestInterceptor {
       catchError((error: unknown) => {
         const statusCode = error instanceof HttpException ? error.getStatus() : 500;
         if (!(error instanceof HttpException)) {
-          this.logger.error({
-            event: 'http.exception.unexpected',
-            module: 'http',
-            operation: `${request.method ?? 'UNKNOWN'} ${request.originalUrl.split('?')[0]}`,
-            statusCode,
-            ...structuredError(error),
-          }, 'Unexpected HTTP exception');
+          this.logger.error(
+            {
+              event: 'http.exception.unexpected',
+              module: 'http',
+              operation: `${request.method ?? 'UNKNOWN'} ${request.originalUrl.split('?')[0]}`,
+              statusCode,
+              ...structuredError(error),
+            },
+            'Unexpected HTTP exception',
+          );
         }
         return throwError(() => error);
       }),

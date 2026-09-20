@@ -31,7 +31,11 @@ import { WhatsAppCommandService } from './whatsapp-command.service';
   ],
   controllers: [MessagingController, WhatsAppWebhookController, CandidateNotificationController],
   providers: [
-    { provide: META_WHATSAPP_CONFIG, inject: [ConfigService], useFactory: createMetaWhatsAppConfig },
+    {
+      provide: META_WHATSAPP_CONFIG,
+      inject: [ConfigService],
+      useFactory: createMetaWhatsAppConfig,
+    },
     MetaWhatsAppClient,
     MetaWhatsAppProvider,
     MetaWhatsAppWebhookService,

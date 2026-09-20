@@ -10,7 +10,12 @@ import { RiskController } from './risk.controller';
 import { RiskService } from './risk.service';
 
 @Module({
-  imports: [TradingProfileModule, ScannerModule, InstrumentsModule, TypeOrmModule.forFeature([Trade])],
+  imports: [
+    TradingProfileModule,
+    ScannerModule,
+    InstrumentsModule,
+    TypeOrmModule.forFeature([Trade]),
+  ],
   controllers: [RiskController],
   providers: [RiskService, RiskCalculatorService, PortfolioRiskReaderService],
   exports: [RiskService, RiskCalculatorService, PortfolioRiskReaderService],

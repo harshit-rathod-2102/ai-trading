@@ -48,7 +48,7 @@ export class AiEvaluationRunnerService {
 
   listFixtures(): readonly AiEvaluationFixtureMetadata[] {
     this.ensureEnabled();
-    return AI_EVALUATION_FIXTURES.map(fixture => ({
+    return AI_EVALUATION_FIXTURES.map((fixture) => ({
       id: fixture.id,
       name: fixture.name,
       description: fixture.description,
@@ -77,18 +77,25 @@ export class AiEvaluationRunnerService {
     const normalized = this.normalizeOptions(options);
     const fixtures = this.selectFixtures(normalized);
     const startedAt = new Date();
-    this.logger.log({
-      event: 'ai.evaluation.started',
-      evaluationVersion: EVALUATION_VERSION,
-      mode: normalized.mode,
-      runsPerFixture: normalized.runsPerFixture,
-      fixtureCount: fixtures.length,
-    }, 'AI evaluation started');
+    this.logger.log(
+      {
+        event: 'ai.evaluation.started',
+        evaluationVersion: EVALUATION_VERSION,
+        mode: normalized.mode,
+        runsPerFixture: normalized.runsPerFixture,
+        fixtureCount: fixtures.length,
+      },
+      'AI evaluation started',
+    );
 
     try {
       const results: AiFixtureEvaluationResult[] = [];
       for (const fixture of fixtures) {
-        const result = await this.evaluateFixture(fixture, normalized.mode, normalized.runsPerFixture);
+        const result = await this.evaluateFixture(
+          fixture,
+          normalized.mode,
+          normalized.runsPerFixture,
+        );
         results.push(result);
       }
 
@@ -100,16 +107,26 @@ export class AiEvaluationRunnerService {
         results,
         summary: summarize(results),
       };
-      this.logger.log({
-        event: 'ai.evaluation.completed', evaluationVersion: EVALUATION_VERSION,
-        mode: normalized.mode, ...report.summary,
-      }, 'AI evaluation completed');
+      this.logger.log(
+        {
+          event: 'ai.evaluation.completed',
+          evaluationVersion: EVALUATION_VERSION,
+          mode: normalized.mode,
+          ...report.summary,
+        },
+        'AI evaluation completed',
+      );
       return report;
     } catch (error: unknown) {
-      this.logger.error({
-        event: 'ai.evaluation.failed', evaluationVersion: EVALUATION_VERSION,
-        mode: normalized.mode, error: safeError(error),
-      }, 'AI evaluation failed');
+      this.logger.error(
+        {
+          event: 'ai.evaluation.failed',
+          evaluationVersion: EVALUATION_VERSION,
+          mode: normalized.mode,
+          error: safeError(error),
+        },
+        'AI evaluation failed',
+      );
       throw error;
     }
   }
@@ -122,12 +139,18 @@ export class AiEvaluationRunnerService {
     const runs: AiFixtureRunResult[] = [];
     for (let runNumber = 1; runNumber <= runsPerFixture; runNumber += 1) {
       const started = performance.now();
-      this.logger.log({
-        event: 'ai.evaluation.fixture.started', fixtureId: fixture.id,
-        category: fixture.category, mode, runNumber,
-        fastRequestedModel: this.config.get<string>('openrouter.fastModel'),
-        deepRequestedModel: this.config.get<string>('openrouter.deepModel'),
-      }, 'AI evaluation fixture run started');
+      this.logger.log(
+        {
+          event: 'ai.evaluation.fixture.started',
+          fixtureId: fixture.id,
+          category: fixture.category,
+          mode,
+          runNumber,
+          fastRequestedModel: this.config.get<string>('openrouter.fastModel'),
+          deepRequestedModel: this.config.get<string>('openrouter.deepModel'),
+        },
+        'AI evaluation fixture run started',
+      );
       const run = await this.evaluateRun(fixture, mode, runNumber);
       runs.push(run);
       const logFields = {
@@ -143,12 +166,19 @@ export class AiEvaluationRunnerService {
         deepResolvedModel: run.deep.output?.modelMetadata.resolvedModel,
       };
       if (run.passedOverall) {
-        this.logger.log({ event: 'ai.evaluation.fixture.completed', ...logFields },
-          'AI evaluation fixture run completed');
+        this.logger.log(
+          { event: 'ai.evaluation.fixture.completed', ...logFields },
+          'AI evaluation fixture run completed',
+        );
       } else {
-        this.logger.warn({
-          event: 'ai.evaluation.fixture.failed', ...logFields, failedChecks: run.checks.failed,
-        }, 'AI evaluation fixture run failed checks');
+        this.logger.warn(
+          {
+            event: 'ai.evaluation.fixture.failed',
+            ...logFields,
+            failedChecks: run.checks.failed,
+          },
+          'AI evaluation fixture run failed checks',
+        );
       }
     }
     const consistency = evaluateConsistency(runs);
@@ -164,7 +194,7 @@ export class AiEvaluationRunnerService {
       },
       runs,
       consistency,
-      passedOverall: runs.every(run => run.passedOverall),
+      passedOverall: runs.every((run) => run.passedOverall),
       allowedFacts: fixture.allowedFacts,
       manualReviewNotes: fixture.manualReviewNotes,
     };
@@ -182,7 +212,10 @@ export class AiEvaluationRunnerService {
     let fastDurationMs: number | undefined;
     let fastProviderCalled = false;
     try {
-      const input = buildFastTriageInput(fixture.candidateEvidence, fixture.candidateEvidence.companyName);
+      const input = buildFastTriageInput(
+        fixture.candidateEvidence,
+        fixture.candidateEvidence.companyName,
+      );
       const started = performance.now();
       fastProviderCalled = true;
       fast = await this.triage.analyzeEvidence(input, true);
@@ -193,24 +226,28 @@ export class AiEvaluationRunnerService {
       fastError = safeError(error);
     }
 
-    const routing = fast ? this.routing.decide(fast, {
-      strategyRank: fixture.candidateEvidence.strategyRank as number,
-      globalRank: fixture.candidateEvidence.globalRank as number,
-    }) : undefined;
+    const routing = fast
+      ? this.routing.decide(fast, {
+          strategyRank: fixture.candidateEvidence.strategyRank as number,
+          globalRank: fixture.candidateEvidence.globalRank as number,
+        })
+      : undefined;
 
-    const deepExpectedToRun = Boolean(fast && (
-      mode === AiEvaluationMode.FORCE_DEEP ||
-      (mode === AiEvaluationMode.FULL && routing?.escalate)
-    ));
+    const deepExpectedToRun = Boolean(
+      fast &&
+      (mode === AiEvaluationMode.FORCE_DEEP ||
+        (mode === AiEvaluationMode.FULL && routing?.escalate)),
+    );
     let deep: DeepReviewResult | undefined;
     let deepError: string | undefined;
     let deepSchemaFailure = false;
     let deepDurationMs: number | undefined;
     let deepProviderCalled = false;
     if (fast && routing && deepExpectedToRun) {
-      const routingForInput = mode === AiEvaluationMode.FORCE_DEEP && !routing.escalate
-        ? forceDeepRouting(routing)
-        : routing;
+      const routingForInput =
+        mode === AiEvaluationMode.FORCE_DEEP && !routing.escalate
+          ? forceDeepRouting(routing)
+          : routing;
       try {
         const input = buildDeepReviewInput(
           fixture.candidateEvidence,
@@ -229,13 +266,25 @@ export class AiEvaluationRunnerService {
     }
 
     const checks = scoreEvaluationRun({
-      fixture, mode, evidenceEligible, fast, fastError, fastSchemaFailure,
-      routing, deep, deepExpectedToRun, deepError, deepSchemaFailure,
+      fixture,
+      mode,
+      evidenceEligible,
+      fast,
+      fastError,
+      fastSchemaFailure,
+      routing,
+      deep,
+      deepExpectedToRun,
+      deepError,
+      deepSchemaFailure,
     });
     const expectedRouting = fixture.expectations.routing;
-    const missingExpectedReasons = expectedRouting && routing
-      ? (expectedRouting.mustIncludeReasons ?? []).filter(reason => !routing.reasons.includes(reason))
-      : [];
+    const missingExpectedReasons =
+      expectedRouting && routing
+        ? (expectedRouting.mustIncludeReasons ?? []).filter(
+            (reason) => !routing.reasons.includes(reason),
+          )
+        : [];
     return {
       runNumber,
       fast: {
@@ -248,24 +297,30 @@ export class AiEvaluationRunnerService {
         ...(fastDurationMs === undefined ? {} : { durationMs: fastDurationMs }),
         ...(fastError ? { error: fastError } : {}),
       },
-      ...(routing ? {
-        routing: {
-          actual: routing,
-          expectedMatch: !checks.failed.some(check => check.startsWith('ROUTING_')),
-          missingExpectedReasons,
-        },
-      } : {}),
+      ...(routing
+        ? {
+            routing: {
+              actual: routing,
+              expectedMatch: !checks.failed.some((check) => check.startsWith('ROUTING_')),
+              missingExpectedReasons,
+            },
+          }
+        : {}),
       deep: {
         executed: deepProviderCalled,
-        ...(deepProviderCalled ? {
-          success: Boolean(deep),
-          parsedSuccessfully: Boolean(deep),
-          schemaValid: deep ? checks.passed.includes('DEEP_SCHEMA_VALID') : false,
-          requiredFieldsPresent: deep ? checks.passed.includes('DEEP_SCHEMA_VALID') : false,
-        } : {}),
-        ...(deep ? {
-          output: deep,
-        } : {}),
+        ...(deepProviderCalled
+          ? {
+              success: Boolean(deep),
+              parsedSuccessfully: Boolean(deep),
+              schemaValid: deep ? checks.passed.includes('DEEP_SCHEMA_VALID') : false,
+              requiredFieldsPresent: deep ? checks.passed.includes('DEEP_SCHEMA_VALID') : false,
+            }
+          : {}),
+        ...(deep
+          ? {
+              output: deep,
+            }
+          : {}),
         ...(deepDurationMs === undefined ? {} : { durationMs: deepDurationMs }),
         ...(deepError ? { error: deepError } : {}),
       },
@@ -288,10 +343,16 @@ export class AiEvaluationRunnerService {
     if (!Object.values(AiEvaluationMode).includes(mode)) {
       throw new BadRequestException(`Unsupported evaluation mode: ${String(mode)}`);
     }
-    const runsPerFixture = options.runsPerFixture ??
-      this.config.get<number>('aiEvaluation.runsPerFixture', 1);
-    if (!Number.isInteger(runsPerFixture) || runsPerFixture < 1 || runsPerFixture > MAX_RUNS_PER_FIXTURE) {
-      throw new BadRequestException(`runsPerFixture must be an integer from 1 through ${MAX_RUNS_PER_FIXTURE}`);
+    const runsPerFixture =
+      options.runsPerFixture ?? this.config.get<number>('aiEvaluation.runsPerFixture', 1);
+    if (
+      !Number.isInteger(runsPerFixture) ||
+      runsPerFixture < 1 ||
+      runsPerFixture > MAX_RUNS_PER_FIXTURE
+    ) {
+      throw new BadRequestException(
+        `runsPerFixture must be an integer from 1 through ${MAX_RUNS_PER_FIXTURE}`,
+      );
     }
     return {
       mode,
@@ -306,20 +367,27 @@ export class AiEvaluationRunnerService {
     readonly fixtureIds?: readonly string[];
   }): readonly AiEvaluationFixture[] {
     if (options.fixtureIds) {
-      const unknown = options.fixtureIds.filter(id => !AI_EVALUATION_FIXTURES.some(fixture => fixture.id === id));
-      if (unknown.length) throw new NotFoundException(`Unknown AI evaluation fixture(s): ${unknown.join(', ')}`);
+      const unknown = options.fixtureIds.filter(
+        (id) => !AI_EVALUATION_FIXTURES.some((fixture) => fixture.id === id),
+      );
+      if (unknown.length)
+        throw new NotFoundException(`Unknown AI evaluation fixture(s): ${unknown.join(', ')}`);
     }
-    const selected = AI_EVALUATION_FIXTURES.filter(fixture =>
-      (!options.category || fixture.category === options.category) &&
-      (!options.fixtureIds || options.fixtureIds.includes(fixture.id)),
+    const selected = AI_EVALUATION_FIXTURES.filter(
+      (fixture) =>
+        (!options.category || fixture.category === options.category) &&
+        (!options.fixtureIds || options.fixtureIds.includes(fixture.id)),
     );
-    if (!selected.length) throw new NotFoundException('No AI evaluation fixtures matched the requested subset');
+    if (!selected.length)
+      throw new NotFoundException('No AI evaluation fixtures matched the requested subset');
     return selected;
   }
 
   private ensureEnabled(): void {
-    if (this.config.get<string>('app.nodeEnv') === 'production' ||
-        !this.config.get<boolean>('aiEvaluation.enabled', false)) {
+    if (
+      this.config.get<string>('app.nodeEnv') === 'production' ||
+      !this.config.get<boolean>('aiEvaluation.enabled', false)
+    ) {
       throw new ForbiddenException(
         'AI evaluation is disabled; it requires AI_EVALUATION_ENABLED=true outside production',
       );
@@ -344,30 +412,35 @@ function evaluateConsistency(runs: readonly AiFixtureRunResult[]): {
 } {
   if (runs.length < 2) return { consistent: true, changedFields: [] };
   const fields: Array<[string, (run: AiFixtureRunResult) => unknown]> = [
-    ['fast.eventRisk', run => run.fast.output?.eventRisk],
-    ['fast.uncertainty', run => run.fast.output?.uncertainty],
-    ['fast.requiresDeepReviewSuggested', run => run.fast.output?.requiresDeepReviewSuggested],
-    ['routing.escalate', run => run.routing?.actual.escalate],
-    ['routing.reasons', run => run.routing?.actual.reasons.join('|')],
-    ['deep.recommendation', run => run.deep.output?.recommendation],
-    ['deep.eventRisk', run => run.deep.output?.eventRisk],
+    ['fast.eventRisk', (run) => run.fast.output?.eventRisk],
+    ['fast.uncertainty', (run) => run.fast.output?.uncertainty],
+    ['fast.requiresDeepReviewSuggested', (run) => run.fast.output?.requiresDeepReviewSuggested],
+    ['routing.escalate', (run) => run.routing?.actual.escalate],
+    ['routing.reasons', (run) => run.routing?.actual.reasons.join('|')],
+    ['deep.recommendation', (run) => run.deep.output?.recommendation],
+    ['deep.eventRisk', (run) => run.deep.output?.eventRisk],
   ];
   const changedFields = fields
-    .filter(([, getter]) => runs.slice(1).some(run => getter(run) !== getter(runs[0])))
+    .filter(([, getter]) => runs.slice(1).some((run) => getter(run) !== getter(runs[0])))
     .map(([name]) => name);
   return { consistent: changedFields.length === 0, changedFields };
 }
 
 function summarize(results: readonly AiFixtureEvaluationResult[]): AiEvaluationSummary {
-  const runs = results.flatMap(result => result.runs);
-  const allFailures = runs.flatMap(run => run.checks.failed);
-  const fastLatencies = runs.flatMap(run => run.fast.durationMs === undefined ? [] : [run.fast.durationMs]);
-  const deepLatencies = runs.flatMap(run => run.deep.durationMs === undefined ? [] : [run.deep.durationMs]);
+  const runs = results.flatMap((result) => result.runs);
+  const allFailures = runs.flatMap((run) => run.checks.failed);
+  const fastLatencies = runs.flatMap((run) =>
+    run.fast.durationMs === undefined ? [] : [run.fast.durationMs],
+  );
+  const deepLatencies = runs.flatMap((run) =>
+    run.deep.durationMs === undefined ? [] : [run.deep.durationMs],
+  );
   let missedEscalations = 0;
   let unnecessaryEscalations = 0;
   let trueEscalations = 0;
   for (const result of results) {
-    const expected = AI_EVALUATION_FIXTURES.find(fixture => fixture.id === result.fixtureId)?.expectations.routing;
+    const expected = AI_EVALUATION_FIXTURES.find((fixture) => fixture.id === result.fixtureId)
+      ?.expectations.routing;
     if (!expected) continue;
     for (const run of result.runs) {
       if (expected.escalate && run.routing?.actual.escalate) trueEscalations += 1;
@@ -377,19 +450,25 @@ function summarize(results: readonly AiFixtureEvaluationResult[]): AiEvaluationS
   }
   return {
     fixturesRun: results.length,
-    fixturesPassed: results.filter(result => result.passedOverall).length,
-    fixturesFailed: results.filter(result => !result.passedOverall).length,
-    fastSchemaFailures: allFailures.filter(check => check === 'FAST_SCHEMA_VALID').length,
-    deepSchemaFailures: allFailures.filter(check => check === 'DEEP_SCHEMA_VALID').length,
-    routingMismatches: allFailures.filter(check => check === 'ROUTING_ESCALATION_EXPECTED').length,
+    fixturesPassed: results.filter((result) => result.passedOverall).length,
+    fixturesFailed: results.filter((result) => !result.passedOverall).length,
+    fastSchemaFailures: allFailures.filter((check) => check === 'FAST_SCHEMA_VALID').length,
+    deepSchemaFailures: allFailures.filter((check) => check === 'DEEP_SCHEMA_VALID').length,
+    routingMismatches: allFailures.filter((check) => check === 'ROUTING_ESCALATION_EXPECTED')
+      .length,
     trueEscalations,
     missedEscalations,
     unnecessaryEscalations,
-    forbiddenClaimViolations: allFailures.filter(check => check.startsWith('FORBIDDEN_CLAIM:')).length,
-    promptInjectionFailures: allFailures.filter(check => check === 'PROMPT_INJECTION_IGNORED').length,
+    forbiddenClaimViolations: allFailures.filter((check) => check.startsWith('FORBIDDEN_CLAIM:'))
+      .length,
+    promptInjectionFailures: allFailures.filter((check) => check === 'PROMPT_INJECTION_IGNORED')
+      .length,
     averageFastLatencyMs: average(fastLatencies),
     averageDeepLatencyMs: average(deepLatencies),
-    totalProviderCalls: runs.reduce((total, run) => total + Number(run.fast.executed) + Number(run.deep.executed), 0),
+    totalProviderCalls: runs.reduce(
+      (total, run) => total + Number(run.fast.executed) + Number(run.deep.executed),
+      0,
+    ),
   };
 }
 

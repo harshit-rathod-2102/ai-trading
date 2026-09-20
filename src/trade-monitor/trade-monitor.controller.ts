@@ -7,7 +7,9 @@ export class TradeMonitorController {
 
   @Post('run')
   @HttpCode(HttpStatus.OK)
-  run() { return this.monitor.monitorOpenTrades(); }
+  run() {
+    return this.monitor.monitorOpenTrades();
+  }
 
   @Post('trades/:tradeId')
   @HttpCode(HttpStatus.OK)

@@ -12,7 +12,10 @@ export interface RewardRiskResult {
   readonly target1Reference: string | null;
 }
 
-export function calculateRewardRisk(geometry: TradeGeometry, riskPerShare: Decimal): RewardRiskResult {
+export function calculateRewardRisk(
+  geometry: TradeGeometry,
+  riskPerShare: Decimal,
+): RewardRiskResult {
   const plannedTarget1 = geometry.entry.plus(riskPerShare.times(RISK_V1_CONFIG.target1R));
   const target1 = geometry.technicalTarget ?? plannedTarget1;
   const plannedTarget2 = geometry.entry.plus(riskPerShare.times(RISK_V1_CONFIG.target2R));

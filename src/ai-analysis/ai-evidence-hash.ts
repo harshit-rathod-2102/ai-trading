@@ -30,7 +30,10 @@ export function deepEvidenceHash(
   });
 }
 
-function candidateEvidence(candidate: TradeCandidate, companyName: string): Record<string, unknown> {
+function candidateEvidence(
+  candidate: TradeCandidate,
+  companyName: string,
+): Record<string, unknown> {
   return {
     symbol: candidate.symbol,
     companyName,
@@ -56,8 +59,10 @@ function sha256(value: unknown): string {
 export function stableStringify(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
   if (isRecord(value)) {
-    return `{${Object.keys(value).sort()
-      .map(key => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(',')}}`;
+    return `{${Object.keys(value)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`)
+      .join(',')}}`;
   }
   return JSON.stringify(value) ?? 'undefined';
 }

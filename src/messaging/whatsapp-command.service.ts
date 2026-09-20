@@ -47,11 +47,16 @@ export class WhatsAppCommandService {
 
   async handle(message: InboundMessage): Promise<WhatsAppCommandResult> {
     const startedAt = performance.now();
-    this.logger.log({
-      event: 'whatsapp.command.received', module: WhatsAppCommandService.name,
-      operation: 'handle', providerMessageId: message.providerMessageId,
-      hasReplyContext: Boolean(message.replyToProviderMessageId),
-    }, 'WhatsApp command received');
+    this.logger.log(
+      {
+        event: 'whatsapp.command.received',
+        module: WhatsAppCommandService.name,
+        operation: 'handle',
+        providerMessageId: message.providerMessageId,
+        hasReplyContext: Boolean(message.replyToProviderMessageId),
+      },
+      'WhatsApp command received',
+    );
 
     if (!this.authorized(message.sender)) {
       const result: WhatsAppCommandResult = {
@@ -59,11 +64,17 @@ export class WhatsAppCommandService {
         errorCode: WhatsAppCommandErrorCode.UNAUTHORIZED_SENDER,
         responseText: '',
       };
-      this.logger.warn({
-        event: 'whatsapp.command.failed', module: WhatsAppCommandService.name,
-        operation: 'handle', providerMessageId: message.providerMessageId,
-        errorCode: result.errorCode, durationMs: elapsedMilliseconds(startedAt),
-      }, 'Unauthorized WhatsApp command rejected');
+      this.logger.warn(
+        {
+          event: 'whatsapp.command.failed',
+          module: WhatsAppCommandService.name,
+          operation: 'handle',
+          providerMessageId: message.providerMessageId,
+          errorCode: result.errorCode,
+          durationMs: elapsedMilliseconds(startedAt),
+        },
+        'Unauthorized WhatsApp command rejected',
+      );
       return result;
     }
 
@@ -74,18 +85,34 @@ export class WhatsAppCommandService {
         errorCode: parsed.errorCode,
         responseText: parsed.message,
       };
-      this.logger.warn({ event: 'whatsapp.command.parsed', module: WhatsAppCommandService.name,
-        operation: 'handle', providerMessageId: message.providerMessageId,
-        parsed: false, errorCode: parsed.errorCode }, 'WhatsApp command parsing rejected input');
+      this.logger.warn(
+        {
+          event: 'whatsapp.command.parsed',
+          module: WhatsAppCommandService.name,
+          operation: 'handle',
+          providerMessageId: message.providerMessageId,
+          parsed: false,
+          errorCode: parsed.errorCode,
+        },
+        'WhatsApp command parsing rejected input',
+      );
       await this.sendResponse(message, result.responseText);
       this.logCompleted(message, result, startedAt);
       return result;
     }
 
     const command = parsed.command;
-    this.logger.log({ event: 'whatsapp.command.parsed', module: WhatsAppCommandService.name,
-      operation: 'handle', providerMessageId: message.providerMessageId,
-      commandType: command.type, parsed: true }, 'WhatsApp command parsed');
+    this.logger.log(
+      {
+        event: 'whatsapp.command.parsed',
+        module: WhatsAppCommandService.name,
+        operation: 'handle',
+        providerMessageId: message.providerMessageId,
+        commandType: command.type,
+        parsed: true,
+      },
+      'WhatsApp command parsed',
+    );
     try {
       const result = await this.execute(command, message);
       await this.sendResponse(message, result.responseText);
@@ -98,12 +125,18 @@ export class WhatsAppCommandService {
         this.logCompleted(message, known, startedAt);
         return known;
       }
-      this.logger.error({
-        event: 'whatsapp.command.failed', module: WhatsAppCommandService.name,
-        operation: 'handle', providerMessageId: message.providerMessageId,
-        commandType: command.type, durationMs: elapsedMilliseconds(startedAt),
-        ...structuredError(error),
-      }, 'WhatsApp command failed');
+      this.logger.error(
+        {
+          event: 'whatsapp.command.failed',
+          module: WhatsAppCommandService.name,
+          operation: 'handle',
+          providerMessageId: message.providerMessageId,
+          commandType: command.type,
+          durationMs: elapsedMilliseconds(startedAt),
+          ...structuredError(error),
+        },
+        'WhatsApp command failed',
+      );
       throw error;
     }
   }
@@ -114,12 +147,13 @@ export class WhatsAppCommandService {
   ): Promise<WhatsAppCommandResult> {
     if (command.type === WhatsAppCommandType.STATUS) return this.status();
     const resolved = await this.resolveCandidate(command.symbol, message.replyToProviderMessageId);
-    if (!resolved.success) return {
-      success: false,
-      commandType: command.type,
-      errorCode: resolved.errorCode,
-      responseText: resolved.message,
-    };
+    if (!resolved.success)
+      return {
+        success: false,
+        commandType: command.type,
+        errorCode: resolved.errorCode,
+        responseText: resolved.message,
+      };
     return command.type === WhatsAppCommandType.BUY
       ? this.buy(resolved.candidate, command)
       : this.skip(resolved.candidate, command);
@@ -130,8 +164,12 @@ export class WhatsAppCommandService {
     command: BuyWhatsAppCommand,
   ): Promise<WhatsAppCommandResult> {
     if (candidate.status === CandidateStatus.ACCEPTED) {
-      return failure(WhatsAppCommandType.BUY, WhatsAppCommandErrorCode.DUPLICATE_BUY,
-        `${candidate.symbol} already has a recorded BUY decision.`, candidate.id);
+      return failure(
+        WhatsAppCommandType.BUY,
+        WhatsAppCommandErrorCode.DUPLICATE_BUY,
+        `${candidate.symbol} already has a recorded BUY decision.`,
+        candidate.id,
+      );
     }
     if (!isActionable(candidate.status)) {
       return notActionable(WhatsAppCommandType.BUY, candidate);
@@ -145,10 +183,14 @@ export class WhatsAppCommandService {
         candidate.id,
       );
     }
-    const trade = await this.candidateService.buy(candidate.id, {
-      actualEntry: command.actualEntry,
-      quantity: command.quantity,
-    }, EventSource.WHATSAPP);
+    const trade = await this.candidateService.buy(
+      candidate.id,
+      {
+        actualEntry: command.actualEntry,
+        quantity: command.quantity,
+      },
+      EventSource.WHATSAPP,
+    );
     return {
       success: true,
       commandType: WhatsAppCommandType.BUY,
@@ -216,12 +258,20 @@ export class WhatsAppCommandService {
       'Current status',
       '',
       `Qualified candidates awaiting decision: ${candidates.length}`,
-      ...(candidates.length ? candidates.map(candidate =>
-        `• ${candidate.symbol} ${candidate.status} — entry ₹${candidate.proposedEntry}, qty ${candidate.suggestedQuantity}`) : []),
+      ...(candidates.length
+        ? candidates.map(
+            (candidate) =>
+              `• ${candidate.symbol} ${candidate.status} — entry ₹${candidate.proposedEntry}, qty ${candidate.suggestedQuantity}`,
+          )
+        : []),
       '',
       `Open tracked trades: ${trades.length}`,
-      ...(trades.length ? trades.map(trade =>
-        `• ${trade.symbol} ${trade.status} — entry ₹${trade.actualEntry}, qty ${trade.quantity}`) : []),
+      ...(trades.length
+        ? trades.map(
+            (trade) =>
+              `• ${trade.symbol} ${trade.status} — entry ₹${trade.actualEntry}, qty ${trade.quantity}`,
+          )
+        : []),
     ];
     return {
       success: true,
@@ -242,15 +292,20 @@ export class WhatsAppCommandService {
     }
     if (symbol) {
       const matches = await this.candidates.find({
-        where: { symbol }, order: { createdAt: 'DESC' }, take: 20,
+        where: { symbol },
+        order: { createdAt: 'DESC' },
+        take: 20,
       });
-      const actionable = matches.filter(candidate => isActionable(candidate.status));
+      const actionable = matches.filter((candidate) => isActionable(candidate.status));
       if (actionable.length === 1) return { success: true, candidate: actionable[0] };
       if (actionable.length > 1) return ambiguous();
       if (matches.length === 1) return { success: true, candidate: matches[0] };
       if (matches.length > 1) {
-        const latestTerminal = matches.find(candidate =>
-          candidate.status === CandidateStatus.SKIPPED || candidate.status === CandidateStatus.ACCEPTED);
+        const latestTerminal = matches.find(
+          (candidate) =>
+            candidate.status === CandidateStatus.SKIPPED ||
+            candidate.status === CandidateStatus.ACCEPTED,
+        );
         if (latestTerminal) return { success: true, candidate: latestTerminal };
       }
       return missing(symbol);
@@ -287,25 +342,38 @@ export class WhatsAppCommandService {
     result: WhatsAppCommandResult,
     startedAt: number,
   ): void {
-    this.logger.log({
-      event: 'whatsapp.command.completed', module: WhatsAppCommandService.name,
-      operation: 'handle', providerMessageId: message.providerMessageId,
-      commandType: result.commandType, candidateId: result.candidateId,
-      tradeId: result.tradeId, success: result.success, errorCode: result.errorCode,
-      durationMs: elapsedMilliseconds(startedAt),
-    }, 'WhatsApp command completed');
+    this.logger.log(
+      {
+        event: 'whatsapp.command.completed',
+        module: WhatsAppCommandService.name,
+        operation: 'handle',
+        providerMessageId: message.providerMessageId,
+        commandType: result.commandType,
+        candidateId: result.candidateId,
+        tradeId: result.tradeId,
+        success: result.success,
+        errorCode: result.errorCode,
+        durationMs: elapsedMilliseconds(startedAt),
+      },
+      'WhatsApp command completed',
+    );
   }
 }
 
 type ResolutionResult =
   | { readonly success: true; readonly candidate: TradeCandidate }
-  | { readonly success: false; readonly errorCode: WhatsAppCommandErrorCode; readonly message: string };
+  | {
+      readonly success: false;
+      readonly errorCode: WhatsAppCommandErrorCode;
+      readonly message: string;
+    };
 
 function ambiguous(): ResolutionResult {
   return {
     success: false,
     errorCode: WhatsAppCommandErrorCode.AMBIGUOUS_CANDIDATE,
-    message: 'Multiple candidates are awaiting a decision. Reply to a candidate alert or specify the symbol.',
+    message:
+      'Multiple candidates are awaiting a decision. Reply to a candidate alert or specify the symbol.',
   };
 }
 
@@ -319,7 +387,10 @@ function missing(symbol?: string): ResolutionResult {
   };
 }
 
-function notActionable(commandType: WhatsAppCommandType, candidate: TradeCandidate): WhatsAppCommandResult {
+function notActionable(
+  commandType: WhatsAppCommandType,
+  candidate: TradeCandidate,
+): WhatsAppCommandResult {
   return failure(
     commandType,
     WhatsAppCommandErrorCode.CANDIDATE_NOT_ACTIONABLE,
@@ -345,20 +416,29 @@ function failure(
 
 function knownFailure(command: WhatsAppCommand, error: unknown): WhatsAppCommandResult | null {
   if (error instanceof BadRequestException) {
-    return failure(command.type, WhatsAppCommandErrorCode.INVALID_BUY_PRICE,
-      'BUY price must remain above the candidate stop and use a valid decimal format.');
+    return failure(
+      command.type,
+      WhatsAppCommandErrorCode.INVALID_BUY_PRICE,
+      'BUY price must remain above the candidate stop and use a valid decimal format.',
+    );
   }
   if (error instanceof NotFoundException) {
-    return failure(command.type, WhatsAppCommandErrorCode.CANDIDATE_NOT_FOUND,
-      'The candidate no longer exists.');
+    return failure(
+      command.type,
+      WhatsAppCommandErrorCode.CANDIDATE_NOT_FOUND,
+      'The candidate no longer exists.',
+    );
   }
   if (error instanceof ConflictException) {
     const message = httpMessage(error);
     const duplicate = /already has a trade/i.test(message);
-    return failure(command.type, duplicate
-      ? WhatsAppCommandErrorCode.DUPLICATE_BUY
-      : WhatsAppCommandErrorCode.CANDIDATE_NOT_ACTIONABLE,
-    duplicate ? 'This BUY was already recorded.' : 'The candidate is no longer actionable.');
+    return failure(
+      command.type,
+      duplicate
+        ? WhatsAppCommandErrorCode.DUPLICATE_BUY
+        : WhatsAppCommandErrorCode.CANDIDATE_NOT_ACTIONABLE,
+      duplicate ? 'This BUY was already recorded.' : 'The candidate is no longer actionable.',
+    );
   }
   return null;
 }
@@ -367,7 +447,8 @@ function httpMessage(error: HttpException): string {
   const response = error.getResponse();
   if (typeof response === 'string') return response;
   return typeof response === 'object' && response !== null && 'message' in response
-    ? String(response.message) : error.message;
+    ? String(response.message)
+    : error.message;
 }
 
 function isActionable(status: CandidateStatus): boolean {

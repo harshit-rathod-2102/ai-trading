@@ -17,7 +17,8 @@ function tradingDate(timestamp: Date): string {
 
 // Daily candles are aligned by UTC calendar date, never by array position.
 export function alignCandleSeries(
-  stockCandles: readonly IndicatorCandle[], benchmarkCandles: readonly IndicatorCandle[],
+  stockCandles: readonly IndicatorCandle[],
+  benchmarkCandles: readonly IndicatorCandle[],
 ): AlignedClose[] {
   assertChronological(stockCandles, 'stock');
   assertChronological(benchmarkCandles, 'benchmark');
@@ -36,7 +37,8 @@ export function alignCandleSeries(
     seen.add(date);
     positiveDecimal(candle.close, `stock close on ${date}`);
     const benchmarkClose = benchmark.get(date);
-    if (benchmarkClose !== undefined) aligned.push({ date, stockClose: candle.close, benchmarkClose });
+    if (benchmarkClose !== undefined)
+      aligned.push({ date, stockClose: candle.close, benchmarkClose });
   }
   return aligned;
 }
@@ -54,7 +56,8 @@ function assertChronological(candles: readonly IndicatorCandle[], label: string)
 }
 
 export function calculateRelativeStrength(
-  aligned: readonly AlignedClose[], period: number,
+  aligned: readonly AlignedClose[],
+  period: number,
 ): RelativeStrengthResult | null {
   periodIsValid(period);
   let priorDate = '';

@@ -5,6 +5,8 @@ export class BuyCandidateDto {
   @IsPrice()
   actualEntry!: string;
 
-  @IsInt() @Min(1) @Max(2147483647)
+  @IsInt()
+  @Min(1)
+  @Max(2147483647)
   quantity!: number;
 }

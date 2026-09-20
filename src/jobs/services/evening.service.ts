@@ -17,7 +17,7 @@ export class EveningService {
 
   async run(marketDate: string) {
     const failed = await this.candidateQueue.getFailed(0, 99);
-    const notifications = failed.filter(job => job.data.failureStage === 'NOTIFICATION');
+    const notifications = failed.filter((job) => job.data.failureStage === 'NOTIFICATION');
     let retried = 0;
     for (const job of notifications) {
       try {
@@ -28,10 +28,23 @@ export class EveningService {
       }
     }
     const summary = await this.dailySummary.sendSummary(marketDate);
-    this.logger.log({ event: 'evening.summary.completed', operation: 'run', marketDate,
-      summaryId: summary.summaryId, summaryStatus: summary.status,
-      notificationRetries: retried, status: 'completed' }, 'Evening summary completed');
-    return { summaryId: summary.summaryId, summaryStatus: summary.status,
-      summaryReused: summary.reusedExistingDelivery, notificationRetries: retried };
+    this.logger.log(
+      {
+        event: 'evening.summary.completed',
+        operation: 'run',
+        marketDate,
+        summaryId: summary.summaryId,
+        summaryStatus: summary.status,
+        notificationRetries: retried,
+        status: 'completed',
+      },
+      'Evening summary completed',
+    );
+    return {
+      summaryId: summary.summaryId,
+      summaryStatus: summary.status,
+      summaryReused: summary.reusedExistingDelivery,
+      notificationRetries: retried,
+    };
   }
 }

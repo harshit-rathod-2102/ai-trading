@@ -77,4 +77,6 @@ export interface DailySummary {
   readonly generatedAt: Date;
 }
 
-export type DailySummarySnapshot = Omit<DailySummary, 'generatedAt'> & { readonly generatedAt: string };
+export type DailySummarySnapshot = Omit<DailySummary, 'generatedAt'> & {
+  readonly generatedAt: string;
+};

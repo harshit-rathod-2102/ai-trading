@@ -98,18 +98,30 @@ export class DeepAiReviewService {
         context.requestedModel,
       );
       if (reused) {
-        this.logger.log({ event: 'ai.deep.reused', ...fields,
-          resolvedModel: reused.modelMetadata.resolvedModel,
-          recommendation: reused.recommendation,
-          overallRisk: reused.overallRisk, eventRisk: reused.eventRisk,
-          durationMs: elapsedMilliseconds(startedAt), status: 'reused' },
-        'Existing candidate DEEP AI review reused');
+        this.logger.log(
+          {
+            event: 'ai.deep.reused',
+            ...fields,
+            resolvedModel: reused.modelMetadata.resolvedModel,
+            recommendation: reused.recommendation,
+            overallRisk: reused.overallRisk,
+            eventRisk: reused.eventRisk,
+            durationMs: elapsedMilliseconds(startedAt),
+            status: 'reused',
+          },
+          'Existing candidate DEEP AI review reused',
+        );
         return this.success(context, reused, true);
       }
 
       if (!this.provider) {
-        return this.failure(context, startedAt, DeepReviewErrorCode.PROVIDER_NOT_CONFIGURED, false,
-          'No AI provider is configured; set AI_PROVIDER before retrying.');
+        return this.failure(
+          context,
+          startedAt,
+          DeepReviewErrorCode.PROVIDER_NOT_CONFIGURED,
+          false,
+          'No AI provider is configured; set AI_PROVIDER before retrying.',
+        );
       }
 
       let analysis: DeepReviewResult;
@@ -129,25 +141,51 @@ export class DeepAiReviewService {
 
       const persisted = await this.persist(context, analysis);
       if (!persisted) {
-        return this.failure(context, startedAt, DeepReviewErrorCode.EVIDENCE_CHANGED, true,
-          'Candidate evidence changed during DEEP review; rerun FAST triage before retrying.');
+        return this.failure(
+          context,
+          startedAt,
+          DeepReviewErrorCode.EVIDENCE_CHANGED,
+          true,
+          'Candidate evidence changed during DEEP review; rerun FAST triage before retrying.',
+        );
       }
-      this.logger.log({ event: 'ai.deep.completed', ...fields,
-        resolvedModel: analysis.modelMetadata.resolvedModel,
-        recommendation: analysis.recommendation,
-        overallRisk: analysis.overallRisk, eventRisk: analysis.eventRisk,
-        durationMs: elapsedMilliseconds(startedAt), status: 'completed' },
-      'Candidate DEEP AI review completed');
+      this.logger.log(
+        {
+          event: 'ai.deep.completed',
+          ...fields,
+          resolvedModel: analysis.modelMetadata.resolvedModel,
+          recommendation: analysis.recommendation,
+          overallRisk: analysis.overallRisk,
+          eventRisk: analysis.eventRisk,
+          durationMs: elapsedMilliseconds(startedAt),
+          status: 'completed',
+        },
+        'Candidate DEEP AI review completed',
+      );
       return this.success(context, analysis, false);
     } catch (error: unknown) {
-      this.logger.error({ event: 'ai.deep.failed', module: DeepAiReviewService.name,
-        operation: 'reviewCandidate', candidateId,
-        ...(context ? { symbol: context.candidate.symbol, strategy: context.candidate.strategy,
-          routingReasons: context.routingDecision.reasons, requestedModel: context.requestedModel,
-          evidenceHash: context.evidenceHash } : {}),
-        promptVersion: CANDIDATE_DEEP_REVIEW_PROMPT_VERSION,
-        durationMs: elapsedMilliseconds(startedAt), status: 'failed', ...structuredError(error) },
-      'Candidate DEEP AI review failed');
+      this.logger.error(
+        {
+          event: 'ai.deep.failed',
+          module: DeepAiReviewService.name,
+          operation: 'reviewCandidate',
+          candidateId,
+          ...(context
+            ? {
+                symbol: context.candidate.symbol,
+                strategy: context.candidate.strategy,
+                routingReasons: context.routingDecision.reasons,
+                requestedModel: context.requestedModel,
+                evidenceHash: context.evidenceHash,
+              }
+            : {}),
+          promptVersion: CANDIDATE_DEEP_REVIEW_PROMPT_VERSION,
+          durationMs: elapsedMilliseconds(startedAt),
+          status: 'failed',
+          ...structuredError(error),
+        },
+        'Candidate DEEP AI review failed',
+      );
       throw error;
     }
   }
@@ -167,22 +205,36 @@ export class DeepAiReviewService {
       exchange: candidate.exchange,
     });
     if (!instrument?.name?.trim()) {
-      this.ineligible(candidate, DeepReviewEligibilityCode.MISSING_DEEP_REVIEW_EVIDENCE,
-        'Candidate instrument company metadata is required for DEEP review');
+      this.ineligible(
+        candidate,
+        DeepReviewEligibilityCode.MISSING_DEEP_REVIEW_EVIDENCE,
+        'Candidate instrument company metadata is required for DEEP review',
+      );
     }
     const persisted = persistedFastAndRouting(candidate.aiAnalysis);
     if (!persisted) {
-      this.ineligible(candidate, DeepReviewEligibilityCode.MISSING_DEEP_REVIEW_EVIDENCE,
-        'Completed FAST analysis and routing evidence are required before DEEP review');
+      this.ineligible(
+        candidate,
+        DeepReviewEligibilityCode.MISSING_DEEP_REVIEW_EVIDENCE,
+        'Completed FAST analysis and routing evidence are required before DEEP review',
+      );
     }
-    if (!persisted.routingDecision.escalate ||
-        persisted.routingDecision.tierSelected !== AiAnalysisTier.DEEP) {
-      this.ineligible(candidate, DeepReviewEligibilityCode.DEEP_REVIEW_NOT_ESCALATED,
-        'DEEP review is allowed only when deterministic routing selected DEEP');
+    if (
+      !persisted.routingDecision.escalate ||
+      persisted.routingDecision.tierSelected !== AiAnalysisTier.DEEP
+    ) {
+      this.ineligible(
+        candidate,
+        DeepReviewEligibilityCode.DEEP_REVIEW_NOT_ESCALATED,
+        'DEEP review is allowed only when deterministic routing selected DEEP',
+      );
     }
     if (persisted.routingDecision.reasons.length === 0) {
-      this.ineligible(candidate, DeepReviewEligibilityCode.MISSING_DEEP_REVIEW_EVIDENCE,
-        'Escalated routing must retain at least one typed escalation reason');
+      this.ineligible(
+        candidate,
+        DeepReviewEligibilityCode.MISSING_DEEP_REVIEW_EVIDENCE,
+        'Escalated routing must retain at least one typed escalation reason',
+      );
     }
     const currentFastHash = fastEvidenceHash(
       candidate,
@@ -190,8 +242,11 @@ export class DeepAiReviewService {
       CANDIDATE_FAST_TRIAGE_PROMPT_VERSION,
     );
     if (persisted.fastEvidenceHash !== currentFastHash) {
-      this.ineligible(candidate, DeepReviewEligibilityCode.MISSING_DEEP_REVIEW_EVIDENCE,
-        'Candidate evidence changed after FAST routing; rerun FAST triage before DEEP review');
+      this.ineligible(
+        candidate,
+        DeepReviewEligibilityCode.MISSING_DEEP_REVIEW_EVIDENCE,
+        'Candidate evidence changed after FAST routing; rerun FAST triage before DEEP review',
+      );
     }
     const requestedModel = this.config.getOrThrow<string>('openrouter.deepModel');
     const input = buildDeepReviewInput(
@@ -219,23 +274,38 @@ export class DeepAiReviewService {
 
   private ensureBaseEvidence(candidate: TradeCandidate): void {
     if (candidate.status !== CandidateStatus.NEW) {
-      this.ineligible(candidate, DeepReviewEligibilityCode.CANDIDATE_NOT_PRE_FINAL,
-        'DEEP review requires a candidate in NEW status');
+      this.ineligible(
+        candidate,
+        DeepReviewEligibilityCode.CANDIDATE_NOT_PRE_FINAL,
+        'DEEP review requires a candidate in NEW status',
+      );
     }
-    if (!candidate.scanResultId || !candidate.strategy?.trim() || !candidate.strategyVersion?.trim() ||
-        !isScore(candidate.strategyScore) || !isScore(candidate.rankingScore) ||
-        !isPositiveRank(candidate.strategyRank) || !isPositiveRank(candidate.globalRank) ||
-        !isNonEmptyRecord(candidate.technicalSnapshot) || !isNonEmptyRecord(candidate.riskSnapshot) ||
-        !isNonEmptyRecord(candidate.marketRegimeSnapshot) || !isNonEmptyRecord(candidate.strategySnapshot) ||
-        !isNonEmptyRecord(candidate.rankingSnapshot) || !candidate.newsEnrichedAt ||
-        !validNewsSnapshot(candidate.newsSnapshot)) {
-      this.ineligible(candidate, DeepReviewEligibilityCode.MISSING_DEEP_REVIEW_EVIDENCE,
-        'Candidate is missing persisted technical, regime, strategy, ranking, risk, or news evidence');
+    if (
+      !candidate.scanResultId ||
+      !candidate.strategy?.trim() ||
+      !candidate.strategyVersion?.trim() ||
+      !isScore(candidate.strategyScore) ||
+      !isScore(candidate.rankingScore) ||
+      !isPositiveRank(candidate.strategyRank) ||
+      !isPositiveRank(candidate.globalRank) ||
+      !isNonEmptyRecord(candidate.technicalSnapshot) ||
+      !isNonEmptyRecord(candidate.riskSnapshot) ||
+      !isNonEmptyRecord(candidate.marketRegimeSnapshot) ||
+      !isNonEmptyRecord(candidate.strategySnapshot) ||
+      !isNonEmptyRecord(candidate.rankingSnapshot) ||
+      !candidate.newsEnrichedAt ||
+      !validNewsSnapshot(candidate.newsSnapshot)
+    ) {
+      this.ineligible(
+        candidate,
+        DeepReviewEligibilityCode.MISSING_DEEP_REVIEW_EVIDENCE,
+        'Candidate is missing persisted technical, regime, strategy, ranking, risk, or news evidence',
+      );
     }
   }
 
   private async persist(context: DeepReviewContext, analysis: DeepReviewResult): Promise<boolean> {
-    return this.dataSource.transaction(async manager => {
+    return this.dataSource.transaction(async (manager) => {
       const repository = manager.getRepository(TradeCandidate);
       const candidate = await repository.findOne({
         where: { id: context.candidate.id },
@@ -249,13 +319,14 @@ export class DeepAiReviewService {
       });
       if (!instrument) return false;
       const persisted = persistedFastAndRouting(candidate.aiAnalysis);
-      if (!persisted || !persisted.routingDecision.escalate ||
-          persisted.routingDecision.tierSelected !== AiAnalysisTier.DEEP ||
-          persisted.fastEvidenceHash !== fastEvidenceHash(
-            candidate,
-            instrument.name,
-            CANDIDATE_FAST_TRIAGE_PROMPT_VERSION,
-          )) return false;
+      if (
+        !persisted ||
+        !persisted.routingDecision.escalate ||
+        persisted.routingDecision.tierSelected !== AiAnalysisTier.DEEP ||
+        persisted.fastEvidenceHash !==
+          fastEvidenceHash(candidate, instrument.name, CANDIDATE_FAST_TRIAGE_PROMPT_VERSION)
+      )
+        return false;
       const currentHash = deepEvidenceHash(
         candidate,
         instrument.name,
@@ -264,7 +335,11 @@ export class DeepAiReviewService {
         CANDIDATE_DEEP_REVIEW_PROMPT_VERSION,
       );
       if (currentHash !== context.evidenceHash) return false;
-      const alreadyStored = storedDeepReview(candidate.aiAnalysis, currentHash, context.requestedModel);
+      const alreadyStored = storedDeepReview(
+        candidate.aiAnalysis,
+        currentHash,
+        context.requestedModel,
+      );
       if (alreadyStored) return true;
 
       const existing = isRecord(candidate.aiAnalysis) ? candidate.aiAnalysis : {};
@@ -300,9 +375,18 @@ export class DeepAiReviewService {
     warning: string,
     error?: unknown,
   ): DeepReviewExecutionResult {
-    this.logger.error({ event: 'ai.deep.failed', ...this.logContext(context), errorCode, retryable,
-      durationMs: elapsedMilliseconds(startedAt), status: 'failed',
-      ...(error ? structuredError(error) : {}) }, 'Candidate DEEP AI review failed');
+    this.logger.error(
+      {
+        event: 'ai.deep.failed',
+        ...this.logContext(context),
+        errorCode,
+        retryable,
+        durationMs: elapsedMilliseconds(startedAt),
+        status: 'failed',
+        ...(error ? structuredError(error) : {}),
+      },
+      'Candidate DEEP AI review failed',
+    );
     return {
       candidateId: context.candidate.id,
       success: false,
@@ -342,18 +426,29 @@ function persistedFastAndRouting(value: Record<string, unknown> | null): {
   readonly fastEvidenceHash: string;
   readonly routingDecision: AiRoutingDecision;
 } | null {
-  if (!isRecord(value) || !isRecord(value.fast) || !isRecord(value.routing) ||
-      value.fast.tier !== AiAnalysisTier.FAST || typeof value.fast.evidenceHash !== 'string' ||
-      !isRecord(value.fast.modelMetadata) || !Array.isArray(value.fast.bullishFactors) ||
-      !Array.isArray(value.fast.bearishFactors) || !Array.isArray(value.fast.contradictions) ||
-      !Array.isArray(value.fast.missingEvidence) || !Array.isArray(value.fast.redFlags) ||
-      typeof value.fast.requiresDeepReviewSuggested !== 'boolean' ||
-      value.fast.modelMetadata.promptVersion !== CANDIDATE_FAST_TRIAGE_PROMPT_VERSION ||
-      value.fast.modelMetadata.routingVersion !== AI_ROUTING_V1_CONFIG.version ||
-      value.routing.version !== AI_ROUTING_V1_CONFIG.version ||
-      typeof value.routing.escalate !== 'boolean' ||
-      !Array.isArray(value.routing.reasons) || typeof value.routing.tierSelected !== 'string') return null;
-  if (!value.routing.reasons.every(reason => typeof reason === 'string' && reason.trim())) return null;
+  if (
+    !isRecord(value) ||
+    !isRecord(value.fast) ||
+    !isRecord(value.routing) ||
+    value.fast.tier !== AiAnalysisTier.FAST ||
+    typeof value.fast.evidenceHash !== 'string' ||
+    !isRecord(value.fast.modelMetadata) ||
+    !Array.isArray(value.fast.bullishFactors) ||
+    !Array.isArray(value.fast.bearishFactors) ||
+    !Array.isArray(value.fast.contradictions) ||
+    !Array.isArray(value.fast.missingEvidence) ||
+    !Array.isArray(value.fast.redFlags) ||
+    typeof value.fast.requiresDeepReviewSuggested !== 'boolean' ||
+    value.fast.modelMetadata.promptVersion !== CANDIDATE_FAST_TRIAGE_PROMPT_VERSION ||
+    value.fast.modelMetadata.routingVersion !== AI_ROUTING_V1_CONFIG.version ||
+    value.routing.version !== AI_ROUTING_V1_CONFIG.version ||
+    typeof value.routing.escalate !== 'boolean' ||
+    !Array.isArray(value.routing.reasons) ||
+    typeof value.routing.tierSelected !== 'string'
+  )
+    return null;
+  if (!value.routing.reasons.every((reason) => typeof reason === 'string' && reason.trim()))
+    return null;
   const { evidenceHash, ...fast } = value.fast;
   return {
     fastAnalysis: fast as unknown as FastTriageResult,
@@ -367,15 +462,23 @@ function storedDeepReview(
   hash: string,
   requestedModel: string,
 ): DeepReviewResult | null {
-  if (!isRecord(value) || !isRecord(value.deep) || value.deep.tier !== AiAnalysisTier.DEEP ||
-      value.deep.evidenceHash !== hash || !isRecord(value.deep.modelMetadata) ||
-      value.deep.modelMetadata.requestedModel !== requestedModel ||
-      value.deep.modelMetadata.promptVersion !== CANDIDATE_DEEP_REVIEW_PROMPT_VERSION ||
-      value.deep.modelMetadata.routingVersion !== AI_ROUTING_V1_CONFIG.version ||
-      !Array.isArray(value.deep.bullishFactors) || !Array.isArray(value.deep.bearishFactors) ||
-      !Array.isArray(value.deep.contradictions) || !Array.isArray(value.deep.missingEvidence) ||
-      !Array.isArray(value.deep.invalidationConcerns) ||
-      !Array.isArray(value.deep.recommendationReasons)) return null;
+  if (
+    !isRecord(value) ||
+    !isRecord(value.deep) ||
+    value.deep.tier !== AiAnalysisTier.DEEP ||
+    value.deep.evidenceHash !== hash ||
+    !isRecord(value.deep.modelMetadata) ||
+    value.deep.modelMetadata.requestedModel !== requestedModel ||
+    value.deep.modelMetadata.promptVersion !== CANDIDATE_DEEP_REVIEW_PROMPT_VERSION ||
+    value.deep.modelMetadata.routingVersion !== AI_ROUTING_V1_CONFIG.version ||
+    !Array.isArray(value.deep.bullishFactors) ||
+    !Array.isArray(value.deep.bearishFactors) ||
+    !Array.isArray(value.deep.contradictions) ||
+    !Array.isArray(value.deep.missingEvidence) ||
+    !Array.isArray(value.deep.invalidationConcerns) ||
+    !Array.isArray(value.deep.recommendationReasons)
+  )
+    return null;
   const { evidenceHash: _evidenceHash, ...deep } = value.deep;
   return deep as unknown as DeepReviewResult;
 }
@@ -386,32 +489,53 @@ function providerFailure(error: unknown): {
   readonly warning: string;
 } {
   if (!(error instanceof ProviderError)) {
-    return { code: DeepReviewErrorCode.PROVIDER_UNAVAILABLE, retryable: true,
-      warning: 'The AI provider failed unexpectedly; DEEP review remains retryable.' };
+    return {
+      code: DeepReviewErrorCode.PROVIDER_UNAVAILABLE,
+      retryable: true,
+      warning: 'The AI provider failed unexpectedly; DEEP review remains retryable.',
+    };
   }
   switch (error.code) {
     case ProviderErrorCode.AUTHENTICATION:
-      return { code: DeepReviewErrorCode.PROVIDER_AUTH, retryable: false,
-        warning: 'AI-provider authentication failed; configuration must be corrected.' };
+      return {
+        code: DeepReviewErrorCode.PROVIDER_AUTH,
+        retryable: false,
+        warning: 'AI-provider authentication failed; configuration must be corrected.',
+      };
     case ProviderErrorCode.RATE_LIMIT:
-      return { code: /quota|credit/i.test(error.message)
-        ? DeepReviewErrorCode.PROVIDER_QUOTA : DeepReviewErrorCode.PROVIDER_RATE_LIMIT,
-      retryable: true,
-      warning: /quota|credit/i.test(error.message)
-        ? 'The AI-provider quota is exhausted; retry after it resets.'
-        : 'The AI-provider rate limit was reached; retry later.' };
+      return {
+        code: /quota|credit/i.test(error.message)
+          ? DeepReviewErrorCode.PROVIDER_QUOTA
+          : DeepReviewErrorCode.PROVIDER_RATE_LIMIT,
+        retryable: true,
+        warning: /quota|credit/i.test(error.message)
+          ? 'The AI-provider quota is exhausted; retry after it resets.'
+          : 'The AI-provider rate limit was reached; retry later.',
+      };
     case ProviderErrorCode.TIMEOUT:
-      return { code: DeepReviewErrorCode.PROVIDER_TIMEOUT, retryable: true,
-        warning: 'The AI-provider request timed out; DEEP review remains retryable.' };
+      return {
+        code: DeepReviewErrorCode.PROVIDER_TIMEOUT,
+        retryable: true,
+        warning: 'The AI-provider request timed out; DEEP review remains retryable.',
+      };
     case ProviderErrorCode.INVALID_RESPONSE:
-      return { code: DeepReviewErrorCode.OUTPUT_INVALID, retryable: true,
-        warning: 'The AI provider returned malformed DEEP output; no review was stored.' };
+      return {
+        code: DeepReviewErrorCode.OUTPUT_INVALID,
+        retryable: true,
+        warning: 'The AI provider returned malformed DEEP output; no review was stored.',
+      };
     case ProviderErrorCode.REQUEST_REJECTED:
-      return { code: DeepReviewErrorCode.REQUEST_REJECTED, retryable: false,
-        warning: 'The AI provider rejected the DEEP review request.' };
+      return {
+        code: DeepReviewErrorCode.REQUEST_REJECTED,
+        retryable: false,
+        warning: 'The AI provider rejected the DEEP review request.',
+      };
     default:
-      return { code: DeepReviewErrorCode.PROVIDER_UNAVAILABLE, retryable: true,
-        warning: 'The configured DEEP model is temporarily unavailable; review remains retryable.' };
+      return {
+        code: DeepReviewErrorCode.PROVIDER_UNAVAILABLE,
+        retryable: true,
+        warning: 'The configured DEEP model is temporarily unavailable; review remains retryable.',
+      };
   }
 }
 

@@ -11,15 +11,26 @@ export interface ZonedMarketClock {
 export function marketClock(now = new Date(), timezone = NSE_TIMEZONE): ZonedMarketClock {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: timezone,
-    year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', hourCycle: 'h23', weekday: 'short',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+    weekday: 'short',
   }).formatToParts(now);
   const value = (type: Intl.DateTimeFormatPartTypes) =>
-    parts.find(part => part.type === type)?.value ?? '';
+    parts.find((part) => part.type === type)?.value ?? '';
   const hour = Number(value('hour'));
   const minute = Number(value('minute'));
   const weekdays: Record<string, number> = {
-    Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6,
+    Sun: 0,
+    Mon: 1,
+    Tue: 2,
+    Wed: 3,
+    Thu: 4,
+    Fri: 5,
+    Sat: 6,
   };
   return {
     marketDate: `${value('year')}-${value('month')}-${value('day')}`,

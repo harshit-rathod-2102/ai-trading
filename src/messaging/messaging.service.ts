@@ -8,7 +8,8 @@ export class MessagingService {
   constructor(@Inject(MESSAGING_PROVIDER) private readonly provider: MessagingProvider | null) {}
 
   sendMessage(message: OutboundMessage) {
-    if (!this.provider) throw new ServiceUnavailableException('No messaging provider is configured');
+    if (!this.provider)
+      throw new ServiceUnavailableException('No messaging provider is configured');
     return this.provider.sendMessage(message);
   }
 }

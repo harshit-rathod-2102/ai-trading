@@ -34,9 +34,15 @@ export function calculateSectorParticipationSnapshot(
   }
   const eligibleSectors = groups.size;
   return {
-    totalClassifiedInstruments: included, totalExcludedInstruments: observations.length - included,
-    eligibleSectors, positiveSectors, negativeSectors, neutralSectors,
-    positiveSectorPercent: eligibleSectors ? new RegimeDecimal(positiveSectors).div(eligibleSectors).times(100).toFixed(4) : null,
+    totalClassifiedInstruments: included,
+    totalExcludedInstruments: observations.length - included,
+    eligibleSectors,
+    positiveSectors,
+    negativeSectors,
+    neutralSectors,
+    positiveSectorPercent: eligibleSectors
+      ? new RegimeDecimal(positiveSectors).div(eligibleSectors).times(100).toFixed(4)
+      : null,
   };
 }
 
@@ -45,7 +51,8 @@ export function calculateSectorParticipationScore(
 ): MarketRegimeComponent | null {
   if (!snapshot.eligibleSectors || snapshot.positiveSectorPercent === null) return null;
   const percentage = decimal(snapshot.positiveSectorPercent, 'positive sector percentage');
-  if (percentage.lt(0) || percentage.gt(100)) throw new RangeError('positive sector percentage must be between 0 and 100');
+  if (percentage.lt(0) || percentage.gt(100))
+    throw new RangeError('positive sector percentage must be between 0 and 100');
   const score = percentage.times(2).minus(100);
   return { score: formatScore(score), evidence: { ...snapshot } };
 }

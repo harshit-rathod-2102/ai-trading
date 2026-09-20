@@ -22,14 +22,17 @@ async function bootstrap(): Promise<void> {
   const port = configService.getOrThrow<number>('app.port');
   await app.listen(port);
   const logger = new NestLogger('Bootstrap');
-  logger.log({
-    event: 'app.started',
-    module: 'bootstrap',
-    operation: 'start',
-    environment: configService.getOrThrow<string>('app.nodeEnv'),
-    port,
-    nodeVersion: process.version,
-  }, 'Application started');
+  logger.log(
+    {
+      event: 'app.started',
+      module: 'bootstrap',
+      operation: 'start',
+      environment: configService.getOrThrow<string>('app.nodeEnv'),
+      port,
+      nodeVersion: process.version,
+    },
+    'Application started',
+  );
 }
 
 void bootstrap();

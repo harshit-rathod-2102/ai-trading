@@ -33,30 +33,59 @@ export class MetaWhatsAppClient {
         const details = await errorDetails(response);
         const error = mapHttpError(response, details);
         if (!shouldRetry(response.status) || attempt === this.config.maxRetries) {
-          this.logger.error({ event: 'provider.request.failed', module: MetaWhatsAppClient.name,
-            provider: 'meta-whatsapp', operation: 'sendMessage', endpoint: '/messages',
-            statusCode: response.status, providerErrorCode: error.code,
-            providerResponseCode: details.code, retryable: error.retryable,
-            attempt: attempt + 1, maxAttempts: this.config.maxRetries + 1 },
-          'Meta WhatsApp request failed');
+          this.logger.error(
+            {
+              event: 'provider.request.failed',
+              module: MetaWhatsAppClient.name,
+              provider: 'meta-whatsapp',
+              operation: 'sendMessage',
+              endpoint: '/messages',
+              statusCode: response.status,
+              providerErrorCode: error.code,
+              providerResponseCode: details.code,
+              retryable: error.retryable,
+              attempt: attempt + 1,
+              maxAttempts: this.config.maxRetries + 1,
+            },
+            'Meta WhatsApp request failed',
+          );
           throw error;
         }
         const delayMs = retryDelay(attempt, this.config.retryBaseDelayMs, response);
-        this.logger.warn({ event: 'provider.request.retrying', module: MetaWhatsAppClient.name,
-          provider: 'meta-whatsapp', operation: 'sendMessage', endpoint: '/messages',
-          statusCode: response.status, attempt: attempt + 1,
-          maxAttempts: this.config.maxRetries + 1, delayMs,
-          reason: error.code }, 'Meta WhatsApp request will be retried');
+        this.logger.warn(
+          {
+            event: 'provider.request.retrying',
+            module: MetaWhatsAppClient.name,
+            provider: 'meta-whatsapp',
+            operation: 'sendMessage',
+            endpoint: '/messages',
+            statusCode: response.status,
+            attempt: attempt + 1,
+            maxAttempts: this.config.maxRetries + 1,
+            delayMs,
+            reason: error.code,
+          },
+          'Meta WhatsApp request will be retried',
+        );
         await delay(delayMs, context?.signal);
       } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
         if (context?.signal?.aborted) throw cancelled();
         if (attempt === this.config.maxRetries) {
-          this.logger.error({ event: 'provider.request.failed', module: MetaWhatsAppClient.name,
-            provider: 'meta-whatsapp', operation: 'sendMessage', endpoint: '/messages',
-            providerErrorCode: ProviderErrorCode.UNAVAILABLE, retryable: true,
-            attempt: attempt + 1, maxAttempts: this.config.maxRetries + 1 },
-          'Meta WhatsApp request failed after retries');
+          this.logger.error(
+            {
+              event: 'provider.request.failed',
+              module: MetaWhatsAppClient.name,
+              provider: 'meta-whatsapp',
+              operation: 'sendMessage',
+              endpoint: '/messages',
+              providerErrorCode: ProviderErrorCode.UNAVAILABLE,
+              retryable: true,
+              attempt: attempt + 1,
+              maxAttempts: this.config.maxRetries + 1,
+            },
+            'Meta WhatsApp request failed after retries',
+          );
           throw new ProviderUnavailableError(
             'meta-whatsapp',
             'Meta WhatsApp request failed after bounded retries',
@@ -64,10 +93,20 @@ export class MetaWhatsAppClient {
           );
         }
         const delayMs = retryDelay(attempt, this.config.retryBaseDelayMs);
-        this.logger.warn({ event: 'provider.request.retrying', module: MetaWhatsAppClient.name,
-          provider: 'meta-whatsapp', operation: 'sendMessage', endpoint: '/messages',
-          attempt: attempt + 1, maxAttempts: this.config.maxRetries + 1,
-          delayMs, reason: 'network_failure' }, 'Meta WhatsApp request will be retried');
+        this.logger.warn(
+          {
+            event: 'provider.request.retrying',
+            module: MetaWhatsAppClient.name,
+            provider: 'meta-whatsapp',
+            operation: 'sendMessage',
+            endpoint: '/messages',
+            attempt: attempt + 1,
+            maxAttempts: this.config.maxRetries + 1,
+            delayMs,
+            reason: 'network_failure',
+          },
+          'Meta WhatsApp request will be retried',
+        );
         await delay(delayMs, context?.signal);
       }
     }
@@ -107,12 +146,17 @@ async function parseResponse(response: Response): Promise<MetaSendMessageRespons
     return JSON.parse(await response.text()) as MetaSendMessageResponseDto;
   } catch {
     throw new ProviderError('Meta WhatsApp returned malformed JSON', {
-      provider: 'meta-whatsapp', code: ProviderErrorCode.INVALID_RESPONSE, retryable: false,
+      provider: 'meta-whatsapp',
+      code: ProviderErrorCode.INVALID_RESPONSE,
+      retryable: false,
     });
   }
 }
 
-interface ErrorDetails { readonly code?: number; readonly subcode?: number }
+interface ErrorDetails {
+  readonly code?: number;
+  readonly subcode?: number;
+}
 
 async function errorDetails(response: Response): Promise<ErrorDetails> {
   const text = (await response.text()).slice(0, 2000);
@@ -120,7 +164,8 @@ async function errorDetails(response: Response): Promise<ErrorDetails> {
     const parsed = JSON.parse(text) as { error?: { code?: unknown; error_subcode?: unknown } };
     return {
       code: typeof parsed.error?.code === 'number' ? parsed.error.code : undefined,
-      subcode: typeof parsed.error?.error_subcode === 'number' ? parsed.error.error_subcode : undefined,
+      subcode:
+        typeof parsed.error?.error_subcode === 'number' ? parsed.error.error_subcode : undefined,
     };
   } catch {
     return {};
@@ -130,15 +175,27 @@ async function errorDetails(response: Response): Promise<ErrorDetails> {
 function mapHttpError(response: Response, details: ErrorDetails): ProviderError {
   const retryAfter = parseRetryAfter(response.headers.get('retry-after'));
   if (response.status === 401 || details.code === 190) {
-    return new ProviderAuthenticationError('meta-whatsapp', 'Meta WhatsApp access token is invalid or expired');
+    return new ProviderAuthenticationError(
+      'meta-whatsapp',
+      'Meta WhatsApp access token is invalid or expired',
+    );
   }
   if (response.status === 429 || details.code === 4 || details.code === 613) {
-    return new ProviderRateLimitError('meta-whatsapp', 'Meta WhatsApp rate limit was exceeded', retryAfter);
+    return new ProviderRateLimitError(
+      'meta-whatsapp',
+      'Meta WhatsApp rate limit was exceeded',
+      retryAfter,
+    );
   }
   if (response.status >= 500) {
-    return new ProviderUnavailableError('meta-whatsapp', `Meta WhatsApp is unavailable (HTTP ${response.status})`);
+    return new ProviderUnavailableError(
+      'meta-whatsapp',
+      `Meta WhatsApp is unavailable (HTTP ${response.status})`,
+    );
   }
-  const providerCodes = [details.code, details.subcode].filter(value => value !== undefined).join('/');
+  const providerCodes = [details.code, details.subcode]
+    .filter((value) => value !== undefined)
+    .join('/');
   return new ProviderError(
     `Meta WhatsApp rejected the message (HTTP ${response.status}${providerCodes ? `, code ${providerCodes}` : ''})`,
     { provider: 'meta-whatsapp', code: ProviderErrorCode.REQUEST_REJECTED, retryable: false },
@@ -150,24 +207,26 @@ function shouldRetry(status: number): boolean {
 }
 
 function accessToken(value: string | null): string {
-  if (!value) throw new ProviderAuthenticationError(
-    'meta-whatsapp',
-    'META_WHATSAPP_ACCESS_TOKEN is required when MESSAGING_PROVIDER=meta-whatsapp',
-  );
+  if (!value)
+    throw new ProviderAuthenticationError(
+      'meta-whatsapp',
+      'META_WHATSAPP_ACCESS_TOKEN is required when MESSAGING_PROVIDER=meta-whatsapp',
+    );
   return value;
 }
 
 function phoneNumberIdValue(value: string | null): string {
-  if (!value) throw new ProviderError(
-    'META_WHATSAPP_PHONE_NUMBER_ID is required when MESSAGING_PROVIDER=meta-whatsapp',
-    { provider: 'meta-whatsapp', code: ProviderErrorCode.REQUEST_REJECTED, retryable: false },
-  );
+  if (!value)
+    throw new ProviderError(
+      'META_WHATSAPP_PHONE_NUMBER_ID is required when MESSAGING_PROVIDER=meta-whatsapp',
+      { provider: 'meta-whatsapp', code: ProviderErrorCode.REQUEST_REJECTED, retryable: false },
+    );
   return value;
 }
 
 function retryDelay(attempt: number, baseMs: number, response?: Response): number {
   const retryAfter = response ? parseRetryAfter(response.headers.get('retry-after')) : undefined;
-  return Math.min(retryAfter === undefined ? baseMs * (2 ** attempt) : retryAfter * 1000, 30_000);
+  return Math.min(retryAfter === undefined ? baseMs * 2 ** attempt : retryAfter * 1000, 30_000);
 }
 
 function parseRetryAfter(value: string | null): number | undefined {
@@ -175,7 +234,9 @@ function parseRetryAfter(value: string | null): number | undefined {
   const seconds = Number(value);
   if (Number.isFinite(seconds) && seconds >= 0) return seconds;
   const timestamp = Date.parse(value);
-  return Number.isNaN(timestamp) ? undefined : Math.max(0, Math.ceil((timestamp - Date.now()) / 1000));
+  return Number.isNaN(timestamp)
+    ? undefined
+    : Math.max(0, Math.ceil((timestamp - Date.now()) / 1000));
 }
 
 function delay(milliseconds: number, signal?: AbortSignal): Promise<void> {
@@ -196,6 +257,8 @@ function delay(milliseconds: number, signal?: AbortSignal): Promise<void> {
 
 function cancelled(): ProviderError {
   return new ProviderError('Meta WhatsApp request was cancelled', {
-    provider: 'meta-whatsapp', code: ProviderErrorCode.REQUEST_REJECTED, retryable: false,
+    provider: 'meta-whatsapp',
+    code: ProviderErrorCode.REQUEST_REJECTED,
+    retryable: false,
   });
 }

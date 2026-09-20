@@ -1,21 +1,41 @@
 import Decimal from 'decimal.js';
-import { Equals, IsInt, IsString, Matches, Max, MaxLength, Min, ValidateIf, registerDecorator } from 'class-validator';
+import {
+  Equals,
+  IsInt,
+  IsString,
+  Matches,
+  Max,
+  MaxLength,
+  Min,
+  ValidateIf,
+  registerDecorator,
+} from 'class-validator';
 
 function IsProfileDecimal(integerDigits: number, maximum: string): PropertyDecorator {
-  return (target, propertyKey) => registerDecorator({
-    name: 'isProfileDecimal',
-    target: target.constructor,
-    propertyName: String(propertyKey),
-    validator: {
-      validate(value: unknown): boolean {
-        if (typeof value !== 'string'
-          || !new RegExp('^(0|[1-9][0-9]{0,' + (integerDigits - 1) + '})(\\.[0-9]{1,4})?$').test(value)) return false;
-        const decimal = new Decimal(value);
-        return decimal.gt(0) && decimal.lte(maximum);
+  return (target, propertyKey) =>
+    registerDecorator({
+      name: 'isProfileDecimal',
+      target: target.constructor,
+      propertyName: String(propertyKey),
+      validator: {
+        validate(value: unknown): boolean {
+          if (
+            typeof value !== 'string' ||
+            !new RegExp('^(0|[1-9][0-9]{0,' + (integerDigits - 1) + '})(\\.[0-9]{1,4})?$').test(
+              value,
+            )
+          )
+            return false;
+          const decimal = new Decimal(value);
+          return decimal.gt(0) && decimal.lte(maximum);
+        },
+        defaultMessage: () =>
+          String(propertyKey) +
+          ' must be a positive decimal string, at most ' +
+          maximum +
+          ', with at most four fractional digits',
       },
-      defaultMessage: () => String(propertyKey) + ' must be a positive decimal string, at most ' + maximum + ', with at most four fractional digits',
-    },
-  });
+    });
 }
 
 export class UpsertTradingProfileDto {

@@ -21,15 +21,24 @@ function rocScore(value: Decimal, strongMagnitude: string): Decimal {
 }
 
 export function calculateMomentumScore(
-  indicators: TechnicalIndicatorSnapshot, config: MarketRegimeConfig,
+  indicators: TechnicalIndicatorSnapshot,
+  config: MarketRegimeConfig,
 ): MarketRegimeComponent {
   const rsi14 = decimal(indicators.rsi14!, 'NIFTY RSI14');
   const roc20 = decimal(indicators.roc20!, 'NIFTY ROC20');
   const roc50 = decimal(indicators.roc50!, 'NIFTY ROC50');
   if (rsi14.lt(0) || rsi14.gt(100)) throw new RangeError('NIFTY RSI14 must be between 0 and 100');
-  const scores = [rsiScore(rsi14, config), rocScore(roc20, config.momentum.roc20StrongMagnitude),
-    rocScore(roc50, config.momentum.roc50StrongMagnitude)];
-  return { score: formatScore(average(scores)), evidence: {
-    rsi14: indicators.rsi14, roc20: indicators.roc20, roc50: indicators.roc50,
-  } };
+  const scores = [
+    rsiScore(rsi14, config),
+    rocScore(roc20, config.momentum.roc20StrongMagnitude),
+    rocScore(roc50, config.momentum.roc50StrongMagnitude),
+  ];
+  return {
+    score: formatScore(average(scores)),
+    evidence: {
+      rsi14: indicators.rsi14,
+      roc20: indicators.roc20,
+      roc50: indicators.roc50,
+    },
+  };
 }

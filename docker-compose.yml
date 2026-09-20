@@ -6,14 +6,14 @@ services:
       POSTGRES_USER: ${DATABASE_USER:-swing_trading}
       POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-change_me}
     ports:
-      - "${DATABASE_PORT:-5432}:5432"
+      - '${DATABASE_PORT:-5432}:5432'
     volumes:
       - postgres_data:/var/lib/postgresql
     healthcheck:
       test:
         [
-          "CMD-SHELL",
-          "pg_isready -U ${DATABASE_USER:-swing_trading} -d ${DATABASE_NAME:-swing_trading}",
+          'CMD-SHELL',
+          'pg_isready -U ${DATABASE_USER:-swing_trading} -d ${DATABASE_NAME:-swing_trading}',
         ]
       interval: 5s
       timeout: 5s
@@ -24,11 +24,11 @@ services:
   redis:
     image: redis:8-alpine
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      - '${REDIS_PORT:-6379}:6379'
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ['CMD', 'redis-cli', 'ping']
       interval: 5s
       timeout: 3s
       retries: 10
@@ -62,7 +62,7 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
     ports:
-      - "${APP_PORT:-3000}:3000"
+      - '${APP_PORT:-3000}:3000'
     depends_on:
       postgres:
         condition: service_healthy

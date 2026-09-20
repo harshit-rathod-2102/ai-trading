@@ -14,10 +14,13 @@ export class DailyPipelineRun {
   marketDataStatus!: string;
   @Column({ name: 'scanner_run_id', type: 'uuid', nullable: true }) scannerRunId!: string | null;
   @Column({ name: 'candidates_created', type: 'integer', default: 0 }) candidatesCreated!: number;
-  @Column({ name: 'candidates_risk_rejected', type: 'integer', default: 0 }) candidatesRiskRejected!: number;
+  @Column({ name: 'candidates_risk_rejected', type: 'integer', default: 0 })
+  candidatesRiskRejected!: number;
   @Column({ name: 'candidates_total', type: 'integer', default: 0 }) candidatesTotal!: number;
-  @Column({ name: 'candidates_processed', type: 'integer', default: 0 }) candidatesProcessed!: number;
-  @Column({ name: 'candidate_analysis_failures', type: 'integer', default: 0 }) candidateAnalysisFailures!: number;
+  @Column({ name: 'candidates_processed', type: 'integer', default: 0 })
+  candidatesProcessed!: number;
+  @Column({ name: 'candidate_analysis_failures', type: 'integer', default: 0 })
+  candidateAnalysisFailures!: number;
   @Column({ name: 'news_enriched', type: 'integer', default: 0 }) newsEnriched!: number;
   @Column({ name: 'fast_analyzed', type: 'integer', default: 0 }) fastAnalyzed!: number;
   @Column({ name: 'deep_analyzed', type: 'integer', default: 0 }) deepAnalyzed!: number;
@@ -27,7 +30,8 @@ export class DailyPipelineRun {
   @Column({ type: 'integer', default: 0 }) notified!: number;
   @Column({ name: 'news_failures', type: 'integer', default: 0 }) newsFailures!: number;
   @Column({ name: 'ai_failures', type: 'integer', default: 0 }) aiFailures!: number;
-  @Column({ name: 'notification_failures', type: 'integer', default: 0 }) notificationFailures!: number;
+  @Column({ name: 'notification_failures', type: 'integer', default: 0 })
+  notificationFailures!: number;
   @Column({ name: 'error_message', type: 'text', nullable: true }) errorMessage!: string | null;
   @Column({ type: 'jsonb', default: () => "'{}'::jsonb" }) metadata!: Record<string, unknown>;
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' }) createdAt!: Date;

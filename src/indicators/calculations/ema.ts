@@ -1,4 +1,10 @@
-import { IndicatorDecimal, formatIndicator, mean, parsePositiveSeries, periodIsValid } from './decimal';
+import {
+  IndicatorDecimal,
+  formatIndicator,
+  mean,
+  parsePositiveSeries,
+  periodIsValid,
+} from './decimal';
 
 // Seeds the EMA with the SMA of the first `period` observations, then applies k=2/(period+1).
 export function calculateEma(values: readonly string[], period: number): string | null {

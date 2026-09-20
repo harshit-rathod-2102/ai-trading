@@ -1,9 +1,4 @@
-import {
-  Injectable,
-  Logger,
-  OnApplicationShutdown,
-  OnModuleInit,
-} from '@nestjs/common';
+import { Injectable, Logger, OnApplicationShutdown, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 import { structuredError } from '../logging/logging.utils';
@@ -22,15 +17,24 @@ export class RedisService implements OnModuleInit, OnApplicationShutdown {
     });
 
     this.client.on('error', (error: Error) => {
-      this.logger.error({ event: 'redis.connection.failed', module: RedisService.name,
-        operation: 'connection', ...structuredError(error) }, 'Redis connection failed');
+      this.logger.error(
+        {
+          event: 'redis.connection.failed',
+          module: RedisService.name,
+          operation: 'connection',
+          ...structuredError(error),
+        },
+        'Redis connection failed',
+      );
     });
   }
 
   async onModuleInit(): Promise<void> {
     await this.client.connect();
-    this.logger.log({ event: 'redis.ready', module: RedisService.name,
-      operation: 'connect', status: 'ready' }, 'Redis is ready');
+    this.logger.log(
+      { event: 'redis.ready', module: RedisService.name, operation: 'connect', status: 'ready' },
+      'Redis is ready',
+    );
   }
 
   async ping(): Promise<string> {
@@ -43,8 +47,15 @@ export class RedisService implements OnModuleInit, OnApplicationShutdown {
 
   async onApplicationShutdown(): Promise<void> {
     if (this.client.status !== 'end') {
-      this.logger.log({ event: 'redis.connection.closing', module: RedisService.name,
-        operation: 'shutdown', status: 'closing' }, 'Redis connection closing');
+      this.logger.log(
+        {
+          event: 'redis.connection.closing',
+          module: RedisService.name,
+          operation: 'shutdown',
+          status: 'closing',
+        },
+        'Redis connection closing',
+      );
       await this.client.quit();
     }
   }

@@ -42,22 +42,33 @@ export class MarketRegimeService {
       const universeCode = this.config.getOrThrow<string>('marketData.universe');
       const universe = await this.instruments.list({ universe: universeCode, active: 'true' });
       const nifty = this.findIndex(universe, MARKET_REGIME_V1_CONFIG.indexSymbols.nifty);
-      if (!nifty) throw new MarketRegimeInputError(`Configured universe ${universeCode} has no NIFTY 50 index`);
+      if (!nifty)
+        throw new MarketRegimeInputError(
+          `Configured universe ${universeCode} has no NIFTY 50 index`,
+        );
       const to = marketDate(now);
       const fromDate = new Date(to + 'T00:00:00.000Z');
       fromDate.setUTCDate(fromDate.getUTCDate() - 365);
       const from = fromDate.toISOString().slice(0, 10);
       const niftyQuality = await this.marketData.quality(nifty.id, from, to);
-      if (niftyQuality.freshness !== 'CURRENT' || niftyQuality.validity !== 'VALID' ||
-          niftyQuality.completeness !== 'COMPLETE' || !niftyQuality.latestExpectedSession) {
+      if (
+        niftyQuality.freshness !== 'CURRENT' ||
+        niftyQuality.validity !== 'VALID' ||
+        niftyQuality.completeness !== 'COMPLETE' ||
+        !niftyQuality.latestExpectedSession
+      ) {
         throw new MarketRegimeInputError(
           `NIFTY 50 data is not usable: freshness=${niftyQuality.freshness}, ` +
-          `validity=${niftyQuality.validity}, completeness=${niftyQuality.completeness}`,
+            `validity=${niftyQuality.validity}, completeness=${niftyQuality.completeness}`,
         );
       }
 
       const vix = this.findIndex(universe, MARKET_REGIME_V1_CONFIG.indexSymbols.vix);
-      const rows = await this.marketData.listMany(universe.map(instrument => instrument.id), from, to);
+      const rows = await this.marketData.listMany(
+        universe.map((instrument) => instrument.id),
+        from,
+        to,
+      );
       const byInstrument = this.groupCandles(rows);
       const niftyIndicators = this.indicators.calculateTechnicalSnapshot(
         this.toIndicatorCandles(byInstrument.get(nifty.id) ?? []),
@@ -73,7 +84,8 @@ export class MarketRegimeService {
             vixIndicators = this.indicators.calculateTechnicalSnapshot(
               this.toIndicatorCandles(byInstrument.get(vix.id) ?? []),
             );
-          } else warnings.push(`INDIA_VIX_DATA_NOT_USABLE:${quality.validity}:${quality.completeness}`);
+          } else
+            warnings.push(`INDIA_VIX_DATA_NOT_USABLE:${quality.validity}:${quality.completeness}`);
         } catch {
           vixFreshness = 'UNKNOWN';
           warnings.push('INDIA_VIX_QUALITY_UNAVAILABLE');
@@ -81,10 +93,11 @@ export class MarketRegimeService {
       }
 
       const observations: UniverseIndicatorObservation[] = [];
-      for (const instrument of universe.filter(item => item.type === InstrumentType.EQUITY)) {
+      for (const instrument of universe.filter((item) => item.type === InstrumentType.EQUITY)) {
         try {
           observations.push({
-            instrumentId: instrument.id, sector: instrument.sector,
+            instrumentId: instrument.id,
+            sector: instrument.sector,
             indicators: this.indicators.calculateTechnicalSnapshot(
               this.toIndicatorCandles(byInstrument.get(instrument.id) ?? []),
             ),
@@ -96,24 +109,54 @@ export class MarketRegimeService {
       }
       const marketDateValue = niftyQuality.latestExpectedSession as string;
       const result = this.calculateRegime({
-        marketDate: marketDateValue, calculatedAt: now, niftyFreshness: 'CURRENT', niftyIndicators,
-        vixFreshness, vixIndicators,
+        marketDate: marketDateValue,
+        calculatedAt: now,
+        niftyFreshness: 'CURRENT',
+        niftyIndicators,
+        vixFreshness,
+        vixIndicators,
         breadth: calculateBreadthSnapshot(observations),
-        sectorParticipation: calculateSectorParticipationSnapshot(observations), warnings,
+        sectorParticipation: calculateSectorParticipationSnapshot(observations),
+        warnings,
       });
       await this.persist(result);
-      this.logger.log({ event: 'market_regime.calculated', module: MarketRegimeService.name,
-        operation: 'calculateCurrentRegime', regime: result.regime, score: result.score,
-        confidence: result.confidence, version: result.version, marketDate: result.marketDate,
-        durationMs: elapsedMilliseconds(startedAt), status: 'completed' }, 'Market regime calculated');
-      this.logger.debug({ event: 'market_regime.components', module: MarketRegimeService.name,
-        marketDate: result.marketDate, version: result.version, ...result.components },
-      'Market regime components calculated');
+      this.logger.log(
+        {
+          event: 'market_regime.calculated',
+          module: MarketRegimeService.name,
+          operation: 'calculateCurrentRegime',
+          regime: result.regime,
+          score: result.score,
+          confidence: result.confidence,
+          version: result.version,
+          marketDate: result.marketDate,
+          durationMs: elapsedMilliseconds(startedAt),
+          status: 'completed',
+        },
+        'Market regime calculated',
+      );
+      this.logger.debug(
+        {
+          event: 'market_regime.components',
+          module: MarketRegimeService.name,
+          marketDate: result.marketDate,
+          version: result.version,
+          ...result.components,
+        },
+        'Market regime components calculated',
+      );
       return result;
     } catch (error: unknown) {
-      this.logger.error({ event: 'market_regime.failed', module: MarketRegimeService.name,
-        operation: 'calculateCurrentRegime', durationMs: elapsedMilliseconds(startedAt),
-        ...structuredError(error) }, 'Market regime calculation failed');
+      this.logger.error(
+        {
+          event: 'market_regime.failed',
+          module: MarketRegimeService.name,
+          operation: 'calculateCurrentRegime',
+          durationMs: elapsedMilliseconds(startedAt),
+          ...structuredError(error),
+        },
+        'Market regime calculation failed',
+      );
       if (error instanceof MarketRegimeInputError || error instanceof RangeError) {
         throw new ServiceUnavailableException(error.message);
       }
@@ -121,8 +164,14 @@ export class MarketRegimeService {
     }
   }
 
-  private findIndex(universe: readonly Instrument[], symbols: readonly string[]): Instrument | undefined {
-    return universe.find(instrument => instrument.type === InstrumentType.INDEX && symbols.includes(instrument.symbol));
+  private findIndex(
+    universe: readonly Instrument[],
+    symbols: readonly string[],
+  ): Instrument | undefined {
+    return universe.find(
+      (instrument) =>
+        instrument.type === InstrumentType.INDEX && symbols.includes(instrument.symbol),
+    );
   }
 
   private groupCandles(rows: readonly DailyCandle[]): Map<string, DailyCandle[]> {
@@ -136,22 +185,35 @@ export class MarketRegimeService {
   }
 
   private toIndicatorCandles(rows: readonly DailyCandle[]): IndicatorCandle[] {
-    return rows.map(row => ({
+    return rows.map((row) => ({
       timestamp: new Date(row.sessionDate + 'T00:00:00.000Z'),
-      open: row.open, high: row.high, low: row.low, close: row.close, volume: row.volume,
+      open: row.open,
+      high: row.high,
+      low: row.low,
+      close: row.close,
+      volume: row.volume,
     }));
   }
 
   private async persist(result: MarketRegimeResult): Promise<void> {
-    await this.dataSource.transaction(async manager => {
+    await this.dataSource.transaction(async (manager) => {
       await manager.query('LOCK TABLE market_regime_snapshots IN SHARE ROW EXCLUSIVE MODE');
       const repository = manager.getRepository(MarketRegimeSnapshot);
-      const current = await repository.findOneBy({ marketDate: result.marketDate, version: result.version });
+      const current = await repository.findOneBy({
+        marketDate: result.marketDate,
+        version: result.version,
+      });
       const snapshot = repository.create({
-        id: current?.id ?? randomUUID(), marketDate: result.marketDate,
-        regime: result.regime, score: result.score, confidence: result.confidence,
-        version: result.version, components: result.components,
-        reasons: [...result.reasons], warnings: [...result.warnings], calculatedAt: result.calculatedAt,
+        id: current?.id ?? randomUUID(),
+        marketDate: result.marketDate,
+        regime: result.regime,
+        score: result.score,
+        confidence: result.confidence,
+        version: result.version,
+        components: result.components,
+        reasons: [...result.reasons],
+        warnings: [...result.warnings],
+        calculatedAt: result.calculatedAt,
       });
       if (current) await repository.update(current.id, snapshot);
       else await repository.insert(snapshot);

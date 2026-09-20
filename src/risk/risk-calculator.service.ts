@@ -16,8 +16,11 @@ import { RiskWarningCode } from './models/risk-warning-code.enum';
 export class RiskCalculatorService {
   calculate(input: RiskPlanInput): RiskPlanResult {
     if (!input.tradingProfile) {
-      return this.failure(input, RiskRejectionCode.NO_ACTIVE_TRADING_PROFILE,
-        'No active trading profile is configured');
+      return this.failure(
+        input,
+        RiskRejectionCode.NO_ACTIVE_TRADING_PROFILE,
+        'No active trading profile is configured',
+      );
     }
     try {
       this.validateProfile(input);
@@ -25,8 +28,10 @@ export class RiskCalculatorService {
       const geometry = selectTradeGeometry(input.setup);
       const riskPerShare = geometry.entry.minus(geometry.stop);
       if (riskPerShare.lte(0)) {
-        throw new RiskInputError(RiskRejectionCode.INVALID_RISK_PER_SHARE,
-          'Risk per share must be greater than zero');
+        throw new RiskInputError(
+          RiskRejectionCode.INVALID_RISK_PER_SHARE,
+          'Risk per share must be greater than zero',
+        );
       }
       const accountCapital = positive(profile.accountCapital, 'account capital');
       const riskBudget = accountCapital.times(profile.riskPerTradePercent).div(100);
@@ -34,13 +39,20 @@ export class RiskCalculatorService {
       try {
         portfolio = calculatePortfolioConstraints(profile, input.openTrades, input.setup.sector);
       } catch (error: unknown) {
-        throw new RiskInputError(RiskRejectionCode.INVALID_PORTFOLIO_STATE,
-          error instanceof Error ? error.message : 'Open portfolio state is invalid');
+        throw new RiskInputError(
+          RiskRejectionCode.INVALID_PORTFOLIO_STATE,
+          error instanceof Error ? error.message : 'Open portfolio state is invalid',
+        );
       }
-      const sizing = calculatePositionSizing({ riskBudget, riskPerShare,
-        maxPositionValue: portfolio.maxPositionValue, availableCapital: portfolio.availableCapital,
+      const sizing = calculatePositionSizing({
+        riskBudget,
+        riskPerShare,
+        maxPositionValue: portfolio.maxPositionValue,
+        availableCapital: portfolio.availableCapital,
         remainingPortfolioRisk: portfolio.remainingPortfolioRisk,
-        remainingSectorCapacity: portfolio.remainingSectorCapacity, entry: geometry.entry });
+        remainingSectorCapacity: portfolio.remainingSectorCapacity,
+        entry: geometry.entry,
+      });
       const reward = calculateRewardRisk(geometry, riskPerShare);
       const rejectionCodes: RiskRejectionCode[] = [];
       const reasons: string[] = [];
@@ -53,41 +65,72 @@ export class RiskCalculatorService {
 
       const stopAtrMultiple = riskPerShare.div(geometry.atr);
       if (stopAtrMultiple.lt(config.minimumStopAtrMultiple)) {
-        addRejection(RiskRejectionCode.STOP_TOO_TIGHT,
-          `Stop distance is ${ratio(stopAtrMultiple)} ATR, below the ${config.minimumStopAtrMultiple} ATR minimum`);
+        addRejection(
+          RiskRejectionCode.STOP_TOO_TIGHT,
+          `Stop distance is ${ratio(stopAtrMultiple)} ATR, below the ${config.minimumStopAtrMultiple} ATR minimum`,
+        );
       }
       if (stopAtrMultiple.gt(config.maximumStopAtrMultiple)) {
-        addRejection(RiskRejectionCode.STOP_TOO_WIDE,
-          `Stop distance is ${ratio(stopAtrMultiple)} ATR, above the ${config.maximumStopAtrMultiple} ATR maximum`);
+        addRejection(
+          RiskRejectionCode.STOP_TOO_WIDE,
+          `Stop distance is ${ratio(stopAtrMultiple)} ATR, above the ${config.maximumStopAtrMultiple} ATR maximum`,
+        );
       }
-      const entryExtensionAtr = geometry.entry.minus(geometry.entryReference).abs().div(geometry.atr);
+      const entryExtensionAtr = geometry.entry
+        .minus(geometry.entryReference)
+        .abs()
+        .div(geometry.atr);
       if (entryExtensionAtr.gt(config.maximumEntryExtensionAtr)) {
-        addRejection(RiskRejectionCode.ENTRY_TOO_EXTENDED,
-          `Entry is ${ratio(entryExtensionAtr)} ATR from ${geometry.entryReferenceType}, above the configured maximum`);
+        addRejection(
+          RiskRejectionCode.ENTRY_TOO_EXTENDED,
+          `Entry is ${ratio(entryExtensionAtr)} ATR from ${geometry.entryReferenceType}, above the configured maximum`,
+        );
       }
       if (input.openTrades.length >= profile.maxOpenTrades) {
-        addRejection(RiskRejectionCode.MAX_OPEN_TRADES_REACHED,
-          `Open trade count ${input.openTrades.length} has reached the configured maximum ${profile.maxOpenTrades}`);
+        addRejection(
+          RiskRejectionCode.MAX_OPEN_TRADES_REACHED,
+          `Open trade count ${input.openTrades.length} has reached the configured maximum ${profile.maxOpenTrades}`,
+        );
       }
       if (sizing.quantityByRisk === 0) {
-        addRejection(RiskRejectionCode.ZERO_RECOMMENDED_QUANTITY, 'Per-trade risk budget cannot fund one share');
+        addRejection(
+          RiskRejectionCode.ZERO_RECOMMENDED_QUANTITY,
+          'Per-trade risk budget cannot fund one share',
+        );
       }
       if (sizing.quantityByPositionCap === 0) {
-        addRejection(RiskRejectionCode.POSITION_SIZE_LIMIT, 'Maximum position value cannot fund one share');
+        addRejection(
+          RiskRejectionCode.POSITION_SIZE_LIMIT,
+          'Maximum position value cannot fund one share',
+        );
       }
       if (sizing.quantityByAvailableCapital === 0) {
-        addRejection(RiskRejectionCode.INSUFFICIENT_CAPITAL, 'Approximated available capital cannot fund one share');
+        addRejection(
+          RiskRejectionCode.INSUFFICIENT_CAPITAL,
+          'Approximated available capital cannot fund one share',
+        );
       }
       if (sizing.quantityByPortfolioRisk === 0) {
-        addRejection(RiskRejectionCode.PORTFOLIO_RISK_LIMIT, 'No portfolio risk capacity remains for one share');
+        addRejection(
+          RiskRejectionCode.PORTFOLIO_RISK_LIMIT,
+          'No portfolio risk capacity remains for one share',
+        );
       }
       if (sizing.quantityBySectorExposure === 0) {
-        addRejection(RiskRejectionCode.SECTOR_EXPOSURE_LIMIT, 'No sector exposure capacity remains for one share');
+        addRejection(
+          RiskRejectionCode.SECTOR_EXPOSURE_LIMIT,
+          'No sector exposure capacity remains for one share',
+        );
       }
-      const minimumRewardRisk = positive(profile.minimumRiskRewardRatio, 'minimum risk/reward ratio');
+      const minimumRewardRisk = positive(
+        profile.minimumRiskRewardRatio,
+        'minimum risk/reward ratio',
+      );
       if (reward.rewardRiskToTarget1.lt(minimumRewardRisk)) {
-        addRejection(RiskRejectionCode.MINIMUM_RR_NOT_MET,
-          `Target 1 reward/risk ${ratio(reward.rewardRiskToTarget1)} is below required ${ratio(minimumRewardRisk)}`);
+        addRejection(
+          RiskRejectionCode.MINIMUM_RR_NOT_MET,
+          `Target 1 reward/risk ${ratio(reward.rewardRiskToTarget1)} is below required ${ratio(minimumRewardRisk)}`,
+        );
       }
       if (input.setup.sector === null) {
         warningCodes.push(RiskWarningCode.SECTOR_METADATA_MISSING);
@@ -95,10 +138,18 @@ export class RiskCalculatorService {
       }
       if (reward.target1Method === 'PLANNED_R_MULTIPLE') {
         warningCodes.push(RiskWarningCode.TECHNICAL_TARGET_UNAVAILABLE);
-        warnings.push('No usable technical target was available; Target 1 uses the configured planned R multiple');
+        warnings.push(
+          'No usable technical target was available; Target 1 uses the configured planned R multiple',
+        );
       }
-      if (sizing.quantityBeforeHardRejections <= 0 && !rejectionCodes.includes(RiskRejectionCode.ZERO_RECOMMENDED_QUANTITY)) {
-        addRejection(RiskRejectionCode.ZERO_RECOMMENDED_QUANTITY, 'All applicable quantity caps produce zero shares');
+      if (
+        sizing.quantityBeforeHardRejections <= 0 &&
+        !rejectionCodes.includes(RiskRejectionCode.ZERO_RECOMMENDED_QUANTITY)
+      ) {
+        addRejection(
+          RiskRejectionCode.ZERO_RECOMMENDED_QUANTITY,
+          'All applicable quantity caps produce zero shares',
+        );
       }
 
       const accepted = rejectionCodes.length === 0;
@@ -106,16 +157,25 @@ export class RiskCalculatorService {
       const capitalRequired = geometry.entry.times(recommendedQuantity);
       const plannedLossAtStop = riskPerShare.times(recommendedQuantity);
       const portfolioRiskAfter = portfolio.portfolioRiskBefore.plus(plannedLossAtStop);
-      const sectorExposureAfter = portfolio.sectorExposureBefore === null ? null :
-        portfolio.sectorExposureBefore.plus(capitalRequired);
+      const sectorExposureAfter =
+        portfolio.sectorExposureBefore === null
+          ? null
+          : portfolio.sectorExposureBefore.plus(capitalRequired);
       if (plannedLossAtStop.gt(riskBudget)) {
         throw new Error('Risk sizing invariant failed: planned loss exceeds risk budget');
       }
-      if (accepted && (capitalRequired.gt(portfolio.maxPositionValue) ||
-          capitalRequired.gt(portfolio.availableCapital) || portfolioRiskAfter.gt(portfolio.maxPortfolioRisk) ||
-          (sectorExposureAfter !== null && portfolio.maxSectorExposure !== null &&
-           sectorExposureAfter.gt(portfolio.maxSectorExposure)))) {
-        throw new Error('Risk sizing invariant failed: recommended quantity exceeds an applicable constraint');
+      if (
+        accepted &&
+        (capitalRequired.gt(portfolio.maxPositionValue) ||
+          capitalRequired.gt(portfolio.availableCapital) ||
+          portfolioRiskAfter.gt(portfolio.maxPortfolioRisk) ||
+          (sectorExposureAfter !== null &&
+            portfolio.maxSectorExposure !== null &&
+            sectorExposureAfter.gt(portfolio.maxSectorExposure)))
+      ) {
+        throw new Error(
+          'Risk sizing invariant failed: recommended quantity exceeds an applicable constraint',
+        );
       }
       if (accepted) {
         reasons.push(
@@ -125,10 +185,14 @@ export class RiskCalculatorService {
         );
       }
       const portfolioSnapshot = {
-        openTrades: input.openTrades.length, maxOpenTrades: profile.maxOpenTrades,
-        capitalAllocated: money(portfolio.capitalAllocated), availableCapital: money(portfolio.availableCapital),
-        portfolioRiskBefore: money(portfolio.portfolioRiskBefore), maxPortfolioRisk: money(portfolio.maxPortfolioRisk),
-        remainingPortfolioRisk: money(portfolio.remainingPortfolioRisk), sector: input.setup.sector,
+        openTrades: input.openTrades.length,
+        maxOpenTrades: profile.maxOpenTrades,
+        capitalAllocated: money(portfolio.capitalAllocated),
+        availableCapital: money(portfolio.availableCapital),
+        portfolioRiskBefore: money(portfolio.portfolioRiskBefore),
+        maxPortfolioRisk: money(portfolio.maxPortfolioRisk),
+        remainingPortfolioRisk: money(portfolio.remainingPortfolioRisk),
+        sector: input.setup.sector,
         sectorExposureBefore: nullableMoney(portfolio.sectorExposureBefore),
         maxSectorExposure: nullableMoney(portfolio.maxSectorExposure),
         remainingSectorCapacity: nullableMoney(portfolio.remainingSectorCapacity),
@@ -184,64 +248,118 @@ export class RiskCalculatorService {
         evaluatedAt: input.evaluatedAt,
       };
       return {
-        accepted, riskVersion: config.version,
-        proposedEntry: money(geometry.entry), structuralStop: money(geometry.stop),
-        riskPerShare: money(riskPerShare), riskBudget: money(riskBudget),
-        quantityByRisk: sizing.quantityByRisk, quantityByPositionCap: sizing.quantityByPositionCap,
+        accepted,
+        riskVersion: config.version,
+        proposedEntry: money(geometry.entry),
+        structuralStop: money(geometry.stop),
+        riskPerShare: money(riskPerShare),
+        riskBudget: money(riskBudget),
+        quantityByRisk: sizing.quantityByRisk,
+        quantityByPositionCap: sizing.quantityByPositionCap,
         quantityByAvailableCapital: sizing.quantityByAvailableCapital,
         quantityByPortfolioRisk: sizing.quantityByPortfolioRisk,
-        quantityBySectorExposure: sizing.quantityBySectorExposure, recommendedQuantity,
-        capitalRequired: money(capitalRequired), plannedLossAtStop: money(plannedLossAtStop),
-        target1: money(reward.target1), target2: money(reward.target2),
+        quantityBySectorExposure: sizing.quantityBySectorExposure,
+        recommendedQuantity,
+        capitalRequired: money(capitalRequired),
+        plannedLossAtStop: money(plannedLossAtStop),
+        target1: money(reward.target1),
+        target2: money(reward.target2),
         rewardRiskToTarget1: ratio(reward.rewardRiskToTarget1),
         rewardRiskToTarget2: ratio(reward.rewardRiskToTarget2),
-        portfolioRiskBefore: money(portfolio.portfolioRiskBefore), portfolioRiskAfter: money(portfolioRiskAfter),
+        portfolioRiskBefore: money(portfolio.portfolioRiskBefore),
+        portfolioRiskAfter: money(portfolioRiskAfter),
         sectorExposureBefore: nullableMoney(portfolio.sectorExposureBefore),
-        sectorExposureAfter: nullableMoney(sectorExposureAfter), rejectionCodes, reasons,
-        warningCodes: unique(warningCodes), warnings: unique(warnings), portfolioSnapshot, snapshot,
+        sectorExposureAfter: nullableMoney(sectorExposureAfter),
+        rejectionCodes,
+        reasons,
+        warningCodes: unique(warningCodes),
+        warnings: unique(warnings),
+        portfolioSnapshot,
+        snapshot,
         evaluatedAt: input.evaluatedAt,
       };
     } catch (error: unknown) {
       if (error instanceof RiskInputError) return this.failure(input, error.code, error.message);
-      return this.failure(input, RiskRejectionCode.INVALID_TRADING_PROFILE,
-        error instanceof Error ? error.message : 'Risk inputs are invalid');
+      return this.failure(
+        input,
+        RiskRejectionCode.INVALID_TRADING_PROFILE,
+        error instanceof Error ? error.message : 'Risk inputs are invalid',
+      );
     }
   }
 
   private validateProfile(input: RiskPlanInput): void {
     const profile = input.tradingProfile!;
-    if (!profile.isActive || !profile.id || !(profile.updatedAt instanceof Date) ||
-        !Number.isFinite(profile.updatedAt.getTime()) || !Number.isInteger(profile.maxOpenTrades) ||
-        profile.maxOpenTrades <= 0 || !(input.evaluatedAt instanceof Date) || !Number.isFinite(input.evaluatedAt.getTime())) {
+    if (
+      !profile.isActive ||
+      !profile.id ||
+      !(profile.updatedAt instanceof Date) ||
+      !Number.isFinite(profile.updatedAt.getTime()) ||
+      !Number.isInteger(profile.maxOpenTrades) ||
+      profile.maxOpenTrades <= 0 ||
+      !(input.evaluatedAt instanceof Date) ||
+      !Number.isFinite(input.evaluatedAt.getTime())
+    ) {
       throw new RangeError('Trading profile or evaluation timestamp is invalid');
     }
-    const percentages = [profile.riskPerTradePercent, profile.maxPositionPercent,
-      profile.maxOpenPortfolioRiskPercent, profile.maxSectorExposurePercent];
+    const percentages = [
+      profile.riskPerTradePercent,
+      profile.maxPositionPercent,
+      profile.maxOpenPortfolioRiskPercent,
+      profile.maxSectorExposurePercent,
+    ];
     for (const value of percentages) {
       const parsed = positive(value, 'trading profile percentage');
       if (parsed.gt(100)) throw new RangeError('Trading profile percentages must not exceed 100');
     }
     positive(profile.accountCapital, 'account capital');
     positive(profile.minimumRiskRewardRatio, 'minimum risk/reward ratio');
-    if (decimal(profile.riskPerTradePercent, 'per-trade risk').gt(profile.maxOpenPortfolioRiskPercent)) {
+    if (
+      decimal(profile.riskPerTradePercent, 'per-trade risk').gt(profile.maxOpenPortfolioRiskPercent)
+    ) {
       throw new RangeError('Per-trade risk must not exceed maximum portfolio risk');
     }
   }
 
   private failure(input: RiskPlanInput, code: RiskRejectionCode, reason: string): RiskPlanResult {
     return {
-      accepted: false, riskVersion: config.version, proposedEntry: null, structuralStop: null,
-      riskPerShare: null, riskBudget: null, quantityByRisk: 0, quantityByPositionCap: 0,
-      quantityByAvailableCapital: 0, quantityByPortfolioRisk: 0, quantityBySectorExposure: null,
-      recommendedQuantity: 0, capitalRequired: null, plannedLossAtStop: null,
-      target1: null, target2: null, rewardRiskToTarget1: null, rewardRiskToTarget2: null,
-      portfolioRiskBefore: '0.0000', portfolioRiskAfter: '0.0000',
-      sectorExposureBefore: null, sectorExposureAfter: null, rejectionCodes: [code], reasons: [reason],
-      warningCodes: [], warnings: [], portfolioSnapshot: null,
-      snapshot: { riskConfigVersion: config.version, scanResultId: input.setup.scanResultId,
-        symbol: input.setup.symbol, strategy: input.setup.strategy, rejectionCode: code,
+      accepted: false,
+      riskVersion: config.version,
+      proposedEntry: null,
+      structuralStop: null,
+      riskPerShare: null,
+      riskBudget: null,
+      quantityByRisk: 0,
+      quantityByPositionCap: 0,
+      quantityByAvailableCapital: 0,
+      quantityByPortfolioRisk: 0,
+      quantityBySectorExposure: null,
+      recommendedQuantity: 0,
+      capitalRequired: null,
+      plannedLossAtStop: null,
+      target1: null,
+      target2: null,
+      rewardRiskToTarget1: null,
+      rewardRiskToTarget2: null,
+      portfolioRiskBefore: '0.0000',
+      portfolioRiskAfter: '0.0000',
+      sectorExposureBefore: null,
+      sectorExposureAfter: null,
+      rejectionCodes: [code],
+      reasons: [reason],
+      warningCodes: [],
+      warnings: [],
+      portfolioSnapshot: null,
+      snapshot: {
+        riskConfigVersion: config.version,
+        scanResultId: input.setup.scanResultId,
+        symbol: input.setup.symbol,
+        strategy: input.setup.strategy,
+        rejectionCode: code,
         tradingProfileId: input.tradingProfile?.id ?? null,
-        tradingProfileUpdatedAt: input.tradingProfile?.updatedAt ?? null, evaluatedAt: input.evaluatedAt },
+        tradingProfileUpdatedAt: input.tradingProfile?.updatedAt ?? null,
+        evaluatedAt: input.evaluatedAt,
+      },
       evaluatedAt: input.evaluatedAt,
     };
   }

@@ -39,19 +39,31 @@ export function scoreEvaluationRun(input: EvaluationScoringInput): AiEvaluationC
   }
 
   if (!fast) {
-    failed.push(input.fastSchemaFailure
-      ? 'FAST_SCHEMA_VALID'
-      : `FAST_EXECUTION_FAILED${input.fastError ? `:${input.fastError}` : ''}`);
+    failed.push(
+      input.fastSchemaFailure
+        ? 'FAST_SCHEMA_VALID'
+        : `FAST_EXECUTION_FAILED${input.fastError ? `:${input.fastError}` : ''}`,
+    );
     return { passed, failed, warnings };
   }
 
   check(isFastShape(fast), 'FAST_SCHEMA_VALID', passed, failed);
   const fastExpectation = fixture.expectations.fast;
   if (fastExpectation?.eventRiskOneOf) {
-    check(fastExpectation.eventRiskOneOf.includes(fast.eventRisk), 'FAST_EVENT_RISK_EXPECTED', passed, failed);
+    check(
+      fastExpectation.eventRiskOneOf.includes(fast.eventRisk),
+      'FAST_EVENT_RISK_EXPECTED',
+      passed,
+      failed,
+    );
   }
   if (fastExpectation?.uncertaintyOneOf) {
-    check(fastExpectation.uncertaintyOneOf.includes(fast.uncertainty), 'FAST_UNCERTAINTY_EXPECTED', passed, failed);
+    check(
+      fastExpectation.uncertaintyOneOf.includes(fast.uncertainty),
+      'FAST_UNCERTAINTY_EXPECTED',
+      passed,
+      failed,
+    );
   }
   if (fastExpectation?.shouldSuggestDeepReview !== undefined) {
     check(
@@ -73,7 +85,12 @@ export function scoreEvaluationRun(input: EvaluationScoringInput): AiEvaluationC
     if (!routing) {
       failed.push('ROUTING_NOT_EXECUTED');
     } else {
-      check(routing.escalate === routingExpectation.escalate, 'ROUTING_ESCALATION_EXPECTED', passed, failed);
+      check(
+        routing.escalate === routingExpectation.escalate,
+        'ROUTING_ESCALATION_EXPECTED',
+        passed,
+        failed,
+      );
       for (const reason of routingExpectation.mustIncludeReasons ?? []) {
         check(routing.reasons.includes(reason), `ROUTING_REASON_${reason}`, passed, failed);
       }
@@ -82,9 +99,11 @@ export function scoreEvaluationRun(input: EvaluationScoringInput): AiEvaluationC
 
   if (input.mode !== AiEvaluationMode.FAST_ONLY && input.deepExpectedToRun) {
     if (!deep) {
-      failed.push(input.deepSchemaFailure
-        ? 'DEEP_SCHEMA_VALID'
-        : `DEEP_EXECUTION_FAILED${input.deepError ? `:${input.deepError}` : ''}`);
+      failed.push(
+        input.deepSchemaFailure
+          ? 'DEEP_SCHEMA_VALID'
+          : `DEEP_EXECUTION_FAILED${input.deepError ? `:${input.deepError}` : ''}`,
+      );
     } else {
       check(isDeepShape(deep), 'DEEP_SCHEMA_VALID', passed, failed);
       const deepExpectation = fixture.expectations.deep;
@@ -97,7 +116,12 @@ export function scoreEvaluationRun(input: EvaluationScoringInput): AiEvaluationC
         );
       }
       if (deepExpectation?.eventRiskOneOf) {
-        check(deepExpectation.eventRiskOneOf.includes(deep.eventRisk), 'DEEP_EVENT_RISK_EXPECTED', passed, failed);
+        check(
+          deepExpectation.eventRiskOneOf.includes(deep.eventRisk),
+          'DEEP_EVENT_RISK_EXPECTED',
+          passed,
+          failed,
+        );
       }
       if (deepExpectation?.mustHaveContradiction) {
         check(deep.contradictions.length > 0, 'DEEP_CONTRADICTION_REPORTED', passed, failed);
@@ -109,7 +133,7 @@ export function scoreEvaluationRun(input: EvaluationScoringInput): AiEvaluationC
   }
 
   const outputText = JSON.stringify({ fast, routing, deep }).toLocaleLowerCase('en-US');
-  const forbidden = fixture.expectations.safety.forbiddenClaims.filter(claim =>
+  const forbidden = fixture.expectations.safety.forbiddenClaims.filter((claim) =>
     outputText.includes(claim.toLocaleLowerCase('en-US')),
   );
   if (forbidden.length === 0) passed.push('NO_FORBIDDEN_CLAIMS');
@@ -124,45 +148,54 @@ export function scoreEvaluationRun(input: EvaluationScoringInput): AiEvaluationC
   return { passed, failed, warnings };
 }
 
-function check(
-  condition: boolean,
-  name: string,
-  passed: string[],
-  failed: string[],
-): void {
+function check(condition: boolean, name: string, passed: string[], failed: string[]): void {
   (condition ? passed : failed).push(name);
 }
 
 function isFastShape(value: FastTriageResult): boolean {
-  return value.tier === AiAnalysisTier.FAST &&
+  return (
+    value.tier === AiAnalysisTier.FAST &&
     Object.values(TriageRiskLevel).includes(value.eventRisk) &&
     Object.values(TriageRiskLevel).includes(value.uncertainty) &&
     decimalBetweenZeroAndOne(value.confidence) &&
     typeof value.newsSummary === 'string' &&
-    stringArray(value.bullishFactors) && stringArray(value.bearishFactors) &&
-    stringArray(value.contradictions) && stringArray(value.missingEvidence) &&
-    stringArray(value.redFlags) && typeof value.requiresDeepReviewSuggested === 'boolean' &&
-    typeof value.summary === 'string' && value.modelMetadata?.structuredOutput === true;
+    stringArray(value.bullishFactors) &&
+    stringArray(value.bearishFactors) &&
+    stringArray(value.contradictions) &&
+    stringArray(value.missingEvidence) &&
+    stringArray(value.redFlags) &&
+    typeof value.requiresDeepReviewSuggested === 'boolean' &&
+    typeof value.summary === 'string' &&
+    value.modelMetadata?.structuredOutput === true
+  );
 }
 
 function isDeepShape(value: DeepReviewResult): boolean {
-  return value.tier === AiAnalysisTier.DEEP &&
+  return (
+    value.tier === AiAnalysisTier.DEEP &&
     Object.values(TriageRiskLevel).includes(value.overallRisk) &&
     Object.values(TriageRiskLevel).includes(value.eventRisk) &&
     Object.values(TriageRiskLevel).includes(value.uncertainty) &&
     Object.values(DeepReviewRecommendation).includes(value.recommendation) &&
     decimalBetweenZeroAndOne(value.confidence) &&
-    typeof value.marketContextSummary === 'string' && typeof value.sectorContextSummary === 'string' &&
-    typeof value.newsSummary === 'string' && typeof value.thesis === 'string' &&
-    stringArray(value.bullishFactors) && stringArray(value.bearishFactors) &&
-    stringArray(value.contradictions) && stringArray(value.redFlags) &&
-    stringArray(value.missingEvidence) && stringArray(value.invalidationConcerns) &&
-    stringArray(value.recommendationReasons) && typeof value.summary === 'string' &&
-    value.modelMetadata?.structuredOutput === true;
+    typeof value.marketContextSummary === 'string' &&
+    typeof value.sectorContextSummary === 'string' &&
+    typeof value.newsSummary === 'string' &&
+    typeof value.thesis === 'string' &&
+    stringArray(value.bullishFactors) &&
+    stringArray(value.bearishFactors) &&
+    stringArray(value.contradictions) &&
+    stringArray(value.redFlags) &&
+    stringArray(value.missingEvidence) &&
+    stringArray(value.invalidationConcerns) &&
+    stringArray(value.recommendationReasons) &&
+    typeof value.summary === 'string' &&
+    value.modelMetadata?.structuredOutput === true
+  );
 }
 
 function stringArray(value: readonly string[]): boolean {
-  return Array.isArray(value) && value.every(item => typeof item === 'string');
+  return Array.isArray(value) && value.every((item) => typeof item === 'string');
 }
 
 function decimalBetweenZeroAndOne(value: string): boolean {

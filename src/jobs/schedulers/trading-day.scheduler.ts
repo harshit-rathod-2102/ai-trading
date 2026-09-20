@@ -39,7 +39,10 @@ export class TradingDayScheduler implements OnApplicationBootstrap {
         this.postMarketQueue.removeJobScheduler(POST_MARKET_SCHEDULER_ID),
         this.eveningQueue.removeJobScheduler(EVENING_SCHEDULER_ID),
       ]);
-      this.logger.log({ event: 'scheduler.disabled', status: 'disabled' }, 'Production schedules disabled');
+      this.logger.log(
+        { event: 'scheduler.disabled', status: 'disabled' },
+        'Production schedules disabled',
+      );
       return;
     }
 
@@ -49,30 +52,75 @@ export class TradingDayScheduler implements OnApplicationBootstrap {
     const close = this.parts(this.config.getOrThrow<string>('scheduler.marketCloseTime'));
     const post = this.parts(this.config.getOrThrow<string>('scheduler.postMarketRunTime'));
     const evening = this.parts(this.config.getOrThrow<string>('scheduler.eveningRunTime'));
-    const retained = { attempts: 2, backoff: { type: 'fixed' as const, delay: 30_000 },
-      removeOnComplete: { count: 1000 }, removeOnFail: false };
-    await this.monitoringQueue.upsertJobScheduler(TRADE_MONITOR_SCHEDULER_ID, {
-      pattern: `*/${interval} ${open.hour}-${close.hour} * * 1-5`, tz: timezone,
-    }, { name: TRADE_MONITOR_RUN, data: { triggerSource: JobTriggerSource.SCHEDULED }, opts: retained });
-    await this.postMarketQueue.upsertJobScheduler(POST_MARKET_SCHEDULER_ID, {
-      pattern: `${post.minute} ${post.hour} * * 1-5`, tz: timezone,
-    }, { name: POST_MARKET_PIPELINE, data: { triggerSource: JobTriggerSource.SCHEDULED },
-      opts: { attempts: 3, backoff: { type: 'exponential', delay: 60_000 },
-        removeOnComplete: { count: 400 }, removeOnFail: false } });
-    await this.eveningQueue.upsertJobScheduler(EVENING_SCHEDULER_ID, {
-      pattern: `${evening.minute} ${evening.hour} * * 1-5`, tz: timezone,
-    }, { name: EVENING_SUMMARY, data: { triggerSource: JobTriggerSource.SCHEDULED }, opts: retained });
-    this.logger.log({ event: 'scheduler.registered', timezone,
-      tradeMonitorPattern: `*/${interval} ${open.hour}-${close.hour} * * 1-5`,
-      postMarketTime: this.config.getOrThrow<string>('scheduler.postMarketRunTime'),
-      eveningTime: this.config.getOrThrow<string>('scheduler.eveningRunTime'), status: 'registered' },
-    'Operating-cycle schedules registered');
+    const retained = {
+      attempts: 2,
+      backoff: { type: 'fixed' as const, delay: 30_000 },
+      removeOnComplete: { count: 1000 },
+      removeOnFail: false,
+    };
+    await this.monitoringQueue.upsertJobScheduler(
+      TRADE_MONITOR_SCHEDULER_ID,
+      {
+        pattern: `*/${interval} ${open.hour}-${close.hour} * * 1-5`,
+        tz: timezone,
+      },
+      {
+        name: TRADE_MONITOR_RUN,
+        data: { triggerSource: JobTriggerSource.SCHEDULED },
+        opts: retained,
+      },
+    );
+    await this.postMarketQueue.upsertJobScheduler(
+      POST_MARKET_SCHEDULER_ID,
+      {
+        pattern: `${post.minute} ${post.hour} * * 1-5`,
+        tz: timezone,
+      },
+      {
+        name: POST_MARKET_PIPELINE,
+        data: { triggerSource: JobTriggerSource.SCHEDULED },
+        opts: {
+          attempts: 3,
+          backoff: { type: 'exponential', delay: 60_000 },
+          removeOnComplete: { count: 400 },
+          removeOnFail: false,
+        },
+      },
+    );
+    await this.eveningQueue.upsertJobScheduler(
+      EVENING_SCHEDULER_ID,
+      {
+        pattern: `${evening.minute} ${evening.hour} * * 1-5`,
+        tz: timezone,
+      },
+      {
+        name: EVENING_SUMMARY,
+        data: { triggerSource: JobTriggerSource.SCHEDULED },
+        opts: retained,
+      },
+    );
+    this.logger.log(
+      {
+        event: 'scheduler.registered',
+        timezone,
+        tradeMonitorPattern: `*/${interval} ${open.hour}-${close.hour} * * 1-5`,
+        postMarketTime: this.config.getOrThrow<string>('scheduler.postMarketRunTime'),
+        eveningTime: this.config.getOrThrow<string>('scheduler.eveningRunTime'),
+        status: 'registered',
+      },
+      'Operating-cycle schedules registered',
+    );
     try {
       await this.enqueueCatchUpIfNeeded(now);
     } catch (error: unknown) {
-      this.logger.warn({ event: 'scheduler.catch_up.failed', status: 'deferred',
-        errorMessage: error instanceof Error ? error.message : 'Unknown catch-up check failure' },
-      'Catch-up check failed; application startup will continue');
+      this.logger.warn(
+        {
+          event: 'scheduler.catch_up.failed',
+          status: 'deferred',
+          errorMessage: error instanceof Error ? error.message : 'Unknown catch-up check failure',
+        },
+        'Catch-up check failed; application startup will continue',
+      );
     }
   }
 
@@ -82,11 +130,23 @@ export class TradingDayScheduler implements OnApplicationBootstrap {
     const now = timeToMinutes(clock.hhmm);
     const post = timeToMinutes(this.config.getOrThrow<string>('scheduler.postMarketRunTime'));
     const cutoff = timeToMinutes(this.config.getOrThrow<string>('scheduler.catchUpCutoffTime'));
-    if (now < post || now >= cutoff || !await this.tradingDays.isTradingDay(clock.marketDate) ||
-        await this.pipeline.hasSuccessfulRun(clock.marketDate)) return;
+    if (
+      now < post ||
+      now >= cutoff ||
+      !(await this.tradingDays.isTradingDay(clock.marketDate)) ||
+      (await this.pipeline.hasSuccessfulRun(clock.marketDate))
+    )
+      return;
     const result = await this.jobs.enqueuePostMarket(JobTriggerSource.CATCH_UP, clock.marketDate);
-    this.logger.log({ event: 'scheduler.catch_up.enqueued', marketDate: clock.marketDate,
-      jobId: result.jobId, status: 'queued' }, 'Post-market catch-up enqueued');
+    this.logger.log(
+      {
+        event: 'scheduler.catch_up.enqueued',
+        marketDate: clock.marketDate,
+        jobId: result.jobId,
+        status: 'queued',
+      },
+      'Post-market catch-up enqueued',
+    );
   }
 
   private validateTimes(): void {
@@ -96,7 +156,9 @@ export class TradingDayScheduler implements OnApplicationBootstrap {
     const evening = timeToMinutes(this.config.getOrThrow<string>('scheduler.eveningRunTime'));
     const cutoff = timeToMinutes(this.config.getOrThrow<string>('scheduler.catchUpCutoffTime'));
     if (!(open < close && close < post && post < evening && post < cutoff)) {
-      throw new Error('Scheduler times must satisfy market open < close < post-market < evening and catch-up cutoff');
+      throw new Error(
+        'Scheduler times must satisfy market open < close < post-market < evening and catch-up cutoff',
+      );
     }
   }
 

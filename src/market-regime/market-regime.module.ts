@@ -8,8 +8,12 @@ import { MarketRegimeController } from './market-regime.controller';
 import { MarketRegimeService } from './market-regime.service';
 
 @Module({
-  imports: [IndicatorsModule, InstrumentsModule, MarketDataModule,
-    TypeOrmModule.forFeature([MarketRegimeSnapshot])],
+  imports: [
+    IndicatorsModule,
+    InstrumentsModule,
+    MarketDataModule,
+    TypeOrmModule.forFeature([MarketRegimeSnapshot]),
+  ],
   controllers: [MarketRegimeController],
   providers: [MarketRegimeService],
   exports: [MarketRegimeService],

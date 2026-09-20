@@ -6,5 +6,7 @@ export class MarketRegimeController {
   constructor(private readonly marketRegime: MarketRegimeService) {}
 
   @Get()
-  current() { return this.marketRegime.calculateCurrentRegime(); }
+  current() {
+    return this.marketRegime.calculateCurrentRegime();
+  }
 }

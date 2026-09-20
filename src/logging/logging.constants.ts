@@ -55,4 +55,3 @@ export const LOG_REDACTION_PATHS = [
 export const LOG_REDACTION_CENSOR = '[REDACTED]';
 
 export const REQUEST_ID_HEADER = 'x-request-id';
-

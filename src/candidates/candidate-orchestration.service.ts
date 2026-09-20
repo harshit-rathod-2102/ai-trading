@@ -44,15 +44,23 @@ export class CandidateOrchestrationService {
   ): Promise<CandidateOrchestrationResult> {
     const startedAt = performance.now();
     let record: ScanResultRecord | undefined;
-    this.logger.log({ event: 'candidate.orchestration.started',
-      module: CandidateOrchestrationService.name, operation: 'createFromScanResult',
-      scanResultId, orchestrationVersion: config.version }, 'Candidate orchestration started');
+    this.logger.log(
+      {
+        event: 'candidate.orchestration.started',
+        module: CandidateOrchestrationService.name,
+        operation: 'createFromScanResult',
+        scanResultId,
+        orchestrationVersion: config.version,
+      },
+      'Candidate orchestration started',
+    );
 
     try {
-      record = await this.scanResults.findOne({
-        where: { id: scanResultId },
-        relations: { scanRun: true },
-      }) ?? undefined;
+      record =
+        (await this.scanResults.findOne({
+          where: { id: scanResultId },
+          relations: { scanRun: true },
+        })) ?? undefined;
       if (!record) {
         throw new NotFoundException({
           code: CandidateOrchestrationErrorCode.SCAN_RESULT_NOT_FOUND,
@@ -73,11 +81,17 @@ export class CandidateOrchestrationService {
           reason: riskPlan.reasons.join('; ') || 'Deterministic risk validation rejected the setup',
           riskPlan,
         });
-        this.logger.warn({ event: 'candidate.orchestration.risk_rejected',
-          ...this.logContext(record), riskVersion: riskPlan.riskVersion,
-          rejectionCodes: riskPlan.rejectionCodes,
-          durationMs: elapsedMilliseconds(startedAt), status: 'rejected' },
-        'Candidate orchestration rejected by risk');
+        this.logger.warn(
+          {
+            event: 'candidate.orchestration.risk_rejected',
+            ...this.logContext(record),
+            riskVersion: riskPlan.riskVersion,
+            rejectionCodes: riskPlan.rejectionCodes,
+            durationMs: elapsedMilliseconds(startedAt),
+            status: 'rejected',
+          },
+          'Candidate orchestration rejected by risk',
+        );
         return result;
       }
 
@@ -91,17 +105,31 @@ export class CandidateOrchestrationService {
         riskRejectionCodes: [],
         candidate: creation.candidate,
       });
-      this.logger.log({ event: 'candidate.created', ...this.logContext(record),
-        candidateId: creation.candidate.id, riskVersion: riskPlan.riskVersion,
-        durationMs: elapsedMilliseconds(startedAt), status: CandidateStatus.NEW },
-      'Quant-qualified candidate created');
+      this.logger.log(
+        {
+          event: 'candidate.created',
+          ...this.logContext(record),
+          candidateId: creation.candidate.id,
+          riskVersion: riskPlan.riskVersion,
+          durationMs: elapsedMilliseconds(startedAt),
+          status: CandidateStatus.NEW,
+        },
+        'Quant-qualified candidate created',
+      );
       return result;
     } catch (error: unknown) {
-      this.logger.error({ event: 'candidate.orchestration.failed',
-        module: CandidateOrchestrationService.name, operation: 'createFromScanResult',
-        scanResultId, ...(record ? this.logContext(record) : {}),
-        durationMs: elapsedMilliseconds(startedAt), ...structuredError(error) },
-      'Candidate orchestration failed');
+      this.logger.error(
+        {
+          event: 'candidate.orchestration.failed',
+          module: CandidateOrchestrationService.name,
+          operation: 'createFromScanResult',
+          scanResultId,
+          ...(record ? this.logContext(record) : {}),
+          durationMs: elapsedMilliseconds(startedAt),
+          ...structuredError(error),
+        },
+        'Candidate orchestration failed',
+      );
       throw error;
     }
   }
@@ -109,44 +137,78 @@ export class CandidateOrchestrationService {
   private validateScanResult(record: ScanResultRecord, evaluatedAt: Date): void {
     const run = record.scanRun;
     if (!run || run.status !== ScanStatus.SUCCESS || !run.completedAt) {
-      this.invalid(CandidateOrchestrationErrorCode.SCAN_NOT_COMPLETE,
-        'Candidate creation requires a successfully completed scan', record.id);
+      this.invalid(
+        CandidateOrchestrationErrorCode.SCAN_NOT_COMPLETE,
+        'Candidate creation requires a successfully completed scan',
+        record.id,
+      );
     }
     if (!record.isShortlisted) {
-      this.invalid(CandidateOrchestrationErrorCode.SETUP_NOT_SHORTLISTED,
-        'Scanner result is not shortlisted for candidate creation', record.id);
+      this.invalid(
+        CandidateOrchestrationErrorCode.SETUP_NOT_SHORTLISTED,
+        'Scanner result is not shortlisted for candidate creation',
+        record.id,
+      );
     }
-    if (!record.strategy?.trim() || !record.strategyVersion?.trim() ||
-        !isRecord(record.strategyResult) || record.strategyResult.qualified !== true ||
-        record.strategyResult.strategy !== record.strategy ||
-        record.strategyResult.strategyVersion !== record.strategyVersion) {
-      this.invalid(CandidateOrchestrationErrorCode.SETUP_NOT_QUALIFIED,
-        'Scanner result does not contain a consistent qualified strategy result', record.id);
+    if (
+      !record.strategy?.trim() ||
+      !record.strategyVersion?.trim() ||
+      !isRecord(record.strategyResult) ||
+      record.strategyResult.qualified !== true ||
+      record.strategyResult.strategy !== record.strategy ||
+      record.strategyResult.strategyVersion !== record.strategyVersion
+    ) {
+      this.invalid(
+        CandidateOrchestrationErrorCode.SETUP_NOT_QUALIFIED,
+        'Scanner result does not contain a consistent qualified strategy result',
+        record.id,
+      );
     }
-    if (!isNonEmptyRecord(record.technicalSnapshot) || !isNonEmptyRecord(record.rankingFeatures) ||
-        !isPositiveRank(record.strategyRank) || !isPositiveRank(record.strategyQualifiedCount) ||
-        !isPositiveRank(record.globalRank) || !isPositiveRank(record.globalQualifiedCount) ||
-        !isScore(record.strategyScore) || !isScore(record.rankingScore) ||
-        !isScore(record.globalRankingScore) || !isNonEmptyRecord(run.marketRegimeSnapshot) ||
-        run.marketRegimeSnapshot.marketDate !== run.marketDate ||
-        !run.scannerVersion?.trim()) {
-      this.invalid(CandidateOrchestrationErrorCode.MISSING_SCAN_EVIDENCE,
-        'Scanner result is missing required technical, regime, strategy, or ranking evidence', record.id);
+    if (
+      !isNonEmptyRecord(record.technicalSnapshot) ||
+      !isNonEmptyRecord(record.rankingFeatures) ||
+      !isPositiveRank(record.strategyRank) ||
+      !isPositiveRank(record.strategyQualifiedCount) ||
+      !isPositiveRank(record.globalRank) ||
+      !isPositiveRank(record.globalQualifiedCount) ||
+      !isScore(record.strategyScore) ||
+      !isScore(record.rankingScore) ||
+      !isScore(record.globalRankingScore) ||
+      !isNonEmptyRecord(run.marketRegimeSnapshot) ||
+      run.marketRegimeSnapshot.marketDate !== run.marketDate ||
+      !run.scannerVersion?.trim()
+    ) {
+      this.invalid(
+        CandidateOrchestrationErrorCode.MISSING_SCAN_EVIDENCE,
+        'Scanner result is missing required technical, regime, strategy, or ranking evidence',
+        record.id,
+      );
     }
     const ageDays = marketDateAgeDays(run.marketDate, evaluatedAt);
     if (ageDays < 0 || ageDays > config.maxMarketDateAgeCalendarDays) {
-      this.invalid(CandidateOrchestrationErrorCode.STALE_SCAN_RESULT,
+      this.invalid(
+        CandidateOrchestrationErrorCode.STALE_SCAN_RESULT,
         `Scanner result market date is outside the ${config.maxMarketDateAgeCalendarDays}-day creation window`,
-        record.id);
+        record.id,
+      );
     }
   }
 
   private validateAcceptedRisk(riskPlan: RiskPlanResult, scanResultId: string): void {
-    if (!riskPlan.accepted || !riskPlan.proposedEntry || !riskPlan.structuralStop ||
-        !riskPlan.target1 || !riskPlan.target2 || riskPlan.recommendedQuantity <= 0 ||
-        !isNonEmptyRecord(riskPlan.snapshot)) {
-      this.invalid(CandidateOrchestrationErrorCode.MISSING_SCAN_EVIDENCE,
-        'Accepted risk plan is missing required candidate evidence', scanResultId);
+    if (
+      !riskPlan.accepted ||
+      !riskPlan.proposedEntry ||
+      !riskPlan.structuralStop ||
+      !riskPlan.target1 ||
+      !riskPlan.target2 ||
+      riskPlan.recommendedQuantity <= 0 ||
+      !isNonEmptyRecord(riskPlan.snapshot)
+    ) {
+      this.invalid(
+        CandidateOrchestrationErrorCode.MISSING_SCAN_EVIDENCE,
+        'Accepted risk plan is missing required candidate evidence',
+        scanResultId,
+      );
     }
   }
 
@@ -173,7 +235,7 @@ export class CandidateOrchestrationService {
     const technicalSnapshot = jsonRecord(record.technicalSnapshot);
 
     try {
-      return await this.dataSource.transaction(async manager => {
+      return await this.dataSource.transaction(async (manager) => {
         const repository = manager.getRepository(TradeCandidate);
         const existing = await repository.findOne({
           where: { scanResultId: record.id },
@@ -247,9 +309,16 @@ export class CandidateOrchestrationService {
     candidate: TradeCandidate,
     startedAt: number,
   ): CandidateOrchestrationResult {
-    this.logger.log({ event: 'candidate.already_exists', ...this.logContext(record),
-      candidateId: candidate.id, durationMs: elapsedMilliseconds(startedAt),
-      status: 'existing' }, 'Candidate already exists for scanner result');
+    this.logger.log(
+      {
+        event: 'candidate.already_exists',
+        ...this.logContext(record),
+        candidateId: candidate.id,
+        durationMs: elapsedMilliseconds(startedAt),
+        status: 'existing',
+      },
+      'Candidate already exists for scanner result',
+    );
     return this.result(CandidateOrchestrationOutcome.ALREADY_EXISTS, record, {
       candidateId: candidate.id,
       riskAccepted: true,
@@ -262,8 +331,16 @@ export class CandidateOrchestrationService {
   private result(
     outcome: CandidateOrchestrationOutcome,
     record: ScanResultRecord,
-    values: Omit<CandidateOrchestrationResult,
-      'outcome' | 'created' | 'scanRunId' | 'scanResultId' | 'symbol' | 'strategy' | 'strategyVersion'>,
+    values: Omit<
+      CandidateOrchestrationResult,
+      | 'outcome'
+      | 'created'
+      | 'scanRunId'
+      | 'scanResultId'
+      | 'symbol'
+      | 'strategy'
+      | 'strategyVersion'
+    >,
   ): CandidateOrchestrationResult {
     return {
       outcome,
@@ -289,7 +366,11 @@ export class CandidateOrchestrationService {
     };
   }
 
-  private invalid(code: CandidateOrchestrationErrorCode, message: string, scanResultId: string): never {
+  private invalid(
+    code: CandidateOrchestrationErrorCode,
+    message: string,
+    scanResultId: string,
+  ): never {
     throw new UnprocessableEntityException({ code, message, scanResultId });
   }
 }
@@ -312,9 +393,13 @@ function isScore(value: unknown): boolean {
 }
 
 function marketDateAgeDays(marketDate: string, evaluatedAt: Date): number {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(marketDate) || Number.isNaN(evaluatedAt.getTime())) return Infinity;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(marketDate) || Number.isNaN(evaluatedAt.getTime()))
+    return Infinity;
   const currentMarketDate = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit',
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
   }).format(evaluatedAt);
   const current = Date.parse(`${currentMarketDate}T00:00:00.000Z`);
   const scan = Date.parse(`${marketDate}T00:00:00.000Z`);
@@ -330,6 +415,8 @@ function jsonRecord(value: unknown): Record<string, unknown> {
 
 function isScanResultDuplicate(error: unknown): boolean {
   if (!isRecord(error) || !isRecord(error.driverError)) return false;
-  return error.driverError.code === '23505' &&
-    error.driverError.constraint === 'uq_trade_candidates_scan_result';
+  return (
+    error.driverError.code === '23505' &&
+    error.driverError.constraint === 'uq_trade_candidates_scan_result'
+  );
 }

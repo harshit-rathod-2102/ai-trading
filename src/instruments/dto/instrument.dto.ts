@@ -1,4 +1,13 @@
-import { IsBoolean, IsEnum, IsIn, IsString, IsUUID, Matches, MaxLength, ValidateIf } from 'class-validator';
+import {
+  IsBoolean,
+  IsEnum,
+  IsIn,
+  IsString,
+  IsUUID,
+  Matches,
+  MaxLength,
+  ValidateIf,
+} from 'class-validator';
 import { InstrumentType } from '../../common/enums/instrument-type.enum';
 
 export class CreateInstrumentDto {
@@ -7,22 +16,36 @@ export class CreateInstrumentDto {
   @IsString() @Matches(/\S/) @MaxLength(160) name!: string;
   @IsEnum(InstrumentType) type!: InstrumentType;
   @ValidateIf((_o, value: unknown) => value !== undefined && value !== null)
-  @IsString() @Matches(/\S/) @MaxLength(100) sector?: string | null;
+  @IsString()
+  @Matches(/\S/)
+  @MaxLength(100)
+  sector?: string | null;
   @ValidateIf((_o, value: unknown) => value !== undefined && value !== null)
-  @IsString() @Matches(/\S/) @MaxLength(100) industry?: string | null;
+  @IsString()
+  @Matches(/\S/)
+  @MaxLength(100)
+  industry?: string | null;
 }
 
 export class ListInstrumentsDto {
   @ValidateIf((_o, value: unknown) => value !== undefined)
-  @IsString() @Matches(/^[A-Z0-9][A-Z0-9&._-]*$/) @MaxLength(32) symbol?: string;
+  @IsString()
+  @Matches(/^[A-Z0-9][A-Z0-9&._-]*$/)
+  @MaxLength(32)
+  symbol?: string;
   @ValidateIf((_o, value: unknown) => value !== undefined)
-  @IsEnum(InstrumentType) type?: InstrumentType;
+  @IsEnum(InstrumentType)
+  type?: InstrumentType;
   @ValidateIf((_o, value: unknown) => value !== undefined)
-  @IsIn(['NSE']) exchange?: string;
+  @IsIn(['NSE'])
+  exchange?: string;
   @ValidateIf((_o, value: unknown) => value !== undefined)
-  @IsIn(['true', 'false']) active?: string;
+  @IsIn(['true', 'false'])
+  active?: string;
   @ValidateIf((_o, value: unknown) => value !== undefined)
-  @IsString() @Matches(/^[A-Z0-9_-]{1,32}$/) universe?: string;
+  @IsString()
+  @Matches(/^[A-Z0-9_-]{1,32}$/)
+  universe?: string;
 }
 
 export class SetInstrumentActivityDto {

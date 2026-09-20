@@ -22,38 +22,48 @@ export class TradesService {
   ) {}
 
   // Called only by candidate acceptance, within its locked transaction.
-  openFromCandidate(manager: EntityManager, candidate: TradeCandidate, command: OpenTradeCommand): Promise<Trade> {
+  openFromCandidate(
+    manager: EntityManager,
+    candidate: TradeCandidate,
+    command: OpenTradeCommand,
+  ): Promise<Trade> {
     const repository = manager.getRepository(Trade);
-    return repository.save(repository.create({
-      id: randomUUID(),
-      candidateId: candidate.id,
-      symbol: candidate.symbol,
-      strategy: candidate.strategy,
-      strategyVersion: candidate.strategyVersion,
-      status: TradeStatus.OPEN,
-      entryDecisionAt: new Date(),
-      plannedEntry: candidate.proposedEntry,
-      actualEntry: command.actualEntry,
-      quantity: command.quantity,
-      initialStop: candidate.proposedStop,
-      currentStop: candidate.proposedStop,
-      target1: candidate.target1,
-      target2: candidate.target2,
-      initialRiskAmount: initialRisk(command.actualEntry, candidate.proposedStop, command.quantity),
-      currentPrice: null,
-      unrealizedPnl: null,
-      unrealizedPnlPercent: null,
-      currentR: null,
-      maxFavorablePrice: null,
-      maxFavorableR: null,
-      maxAdversePrice: null,
-      maxAdverseR: null,
-      lastPriceObservedAt: null,
-      lastMonitoredAt: null,
-      monitoringVersion: null,
-      realizedPnl: '0.0000',
-      closedAt: null,
-    }));
+    return repository.save(
+      repository.create({
+        id: randomUUID(),
+        candidateId: candidate.id,
+        symbol: candidate.symbol,
+        strategy: candidate.strategy,
+        strategyVersion: candidate.strategyVersion,
+        status: TradeStatus.OPEN,
+        entryDecisionAt: new Date(),
+        plannedEntry: candidate.proposedEntry,
+        actualEntry: command.actualEntry,
+        quantity: command.quantity,
+        initialStop: candidate.proposedStop,
+        currentStop: candidate.proposedStop,
+        target1: candidate.target1,
+        target2: candidate.target2,
+        initialRiskAmount: initialRisk(
+          command.actualEntry,
+          candidate.proposedStop,
+          command.quantity,
+        ),
+        currentPrice: null,
+        unrealizedPnl: null,
+        unrealizedPnlPercent: null,
+        currentR: null,
+        maxFavorablePrice: null,
+        maxFavorableR: null,
+        maxAdversePrice: null,
+        maxAdverseR: null,
+        lastPriceObservedAt: null,
+        lastMonitoredAt: null,
+        monitoringVersion: null,
+        realizedPnl: '0.0000',
+        closedAt: null,
+      }),
+    );
   }
 
   list(filters: ListTradesDto): Promise<Trade[]> {

@@ -41,4 +41,8 @@ export type WhatsAppCommand = BuyWhatsAppCommand | SkipWhatsAppCommand | StatusW
 
 export type WhatsAppCommandParseResult =
   | { readonly success: true; readonly command: WhatsAppCommand }
-  | { readonly success: false; readonly errorCode: WhatsAppCommandErrorCode; readonly message: string };
+  | {
+      readonly success: false;
+      readonly errorCode: WhatsAppCommandErrorCode;
+      readonly message: string;
+    };

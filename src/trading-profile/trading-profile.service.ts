@@ -12,7 +12,9 @@ export class TradingProfileService {
   constructor(private readonly dataSource: DataSource) {}
 
   async getActiveProfile(): Promise<TradingProfile> {
-    const profile = await this.dataSource.getRepository(TradingProfile).findOneBy({ isActive: true });
+    const profile = await this.dataSource
+      .getRepository(TradingProfile)
+      .findOneBy({ isActive: true });
     if (!profile) throw new NotFoundException('Trading profile is not configured');
     return profile;
   }
@@ -21,12 +23,16 @@ export class TradingProfileService {
     const validated = Object.assign(new UpsertTradingProfileDto(), input);
     const errors = validateSync(validated, { whitelist: true, forbidNonWhitelisted: true });
     if (errors.length) {
-      throw new BadRequestException(errors.flatMap(error => Object.values(error.constraints ?? {})));
+      throw new BadRequestException(
+        errors.flatMap((error) => Object.values(error.constraints ?? {})),
+      );
     }
     if (new Decimal(validated.riskPerTradePercent).gt(validated.maxOpenPortfolioRiskPercent)) {
-      throw new BadRequestException('riskPerTradePercent must not exceed maxOpenPortfolioRiskPercent');
+      throw new BadRequestException(
+        'riskPerTradePercent must not exceed maxOpenPortfolioRiskPercent',
+      );
     }
-    const outcome = await this.dataSource.transaction(async manager => {
+    const outcome = await this.dataSource.transaction(async (manager) => {
       // Serializes even concurrent first-time PUTs, when no profile row exists to lock.
       // This table is tiny and updates are infrequent personal settings operations.
       await manager.query('LOCK TABLE trading_profiles IN SHARE ROW EXCLUSIVE MODE');
@@ -48,10 +54,16 @@ export class TradingProfileService {
         created: !current,
       };
     });
-    this.logger.log({ event: outcome.created ? 'trading_profile.created' : 'trading_profile.updated',
-      module: TradingProfileService.name, operation: 'upsertActiveProfile',
-      tradingProfileId: outcome.profile.id, status: 'active' },
-    outcome.created ? 'Trading profile created' : 'Trading profile updated');
+    this.logger.log(
+      {
+        event: outcome.created ? 'trading_profile.created' : 'trading_profile.updated',
+        module: TradingProfileService.name,
+        operation: 'upsertActiveProfile',
+        tradingProfileId: outcome.profile.id,
+        status: 'active',
+      },
+      outcome.created ? 'Trading profile created' : 'Trading profile updated',
+    );
     return outcome.profile;
   }
 }

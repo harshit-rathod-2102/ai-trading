@@ -17,8 +17,13 @@ import { DailySummaryRecord } from './entities/daily-summary.entity';
 @Module({
   imports: [
     TypeOrmModule.forFeature([
-      DailySummaryRecord, DailyPipelineRun, MarketRegimeSnapshot, ScanRun,
-      TradeCandidate, Trade, TradeEvent,
+      DailySummaryRecord,
+      DailyPipelineRun,
+      MarketRegimeSnapshot,
+      ScanRun,
+      TradeCandidate,
+      Trade,
+      TradeEvent,
     ]),
     TradingProfileModule,
     RiskModule,

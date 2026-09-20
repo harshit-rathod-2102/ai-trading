@@ -3,11 +3,18 @@ import { IndicatorsService } from '../indicators/indicators.service';
 import { StrategyService } from '../strategy/strategy.service';
 import { SCANNER_V1_CONFIG as config } from './config/scanner-v1.config';
 import { UniverseEvaluationInput } from './models/scan-request.model';
-import { QualifiedSetup, ScanExclusion, UniverseEvaluationResult } from './models/scan-result.model';
+import {
+  QualifiedSetup,
+  ScanExclusion,
+  UniverseEvaluationResult,
+} from './models/scan-result.model';
 
 @Injectable()
 export class ScannerEvaluationService {
-  constructor(private readonly indicators: IndicatorsService, private readonly strategies: StrategyService) {}
+  constructor(
+    private readonly indicators: IndicatorsService,
+    private readonly strategies: StrategyService,
+  ) {}
 
   evaluate(input: UniverseEvaluationInput): UniverseEvaluationResult {
     this.validateSharedContext(input);
@@ -18,26 +25,38 @@ export class ScannerEvaluationService {
 
     for (const item of input.instruments) {
       if (item.candles.length < config.minimumHistory) {
-        exclusions.push({ instrumentId: item.instrument.id, symbol: item.instrument.symbol,
+        exclusions.push({
+          instrumentId: item.instrument.id,
+          symbol: item.instrument.symbol,
           code: 'INSUFFICIENT_HISTORY',
-          message: `Requires at least ${config.minimumHistory} finalized sessions; found ${item.candles.length}` });
+          message: `Requires at least ${config.minimumHistory} finalized sessions; found ${item.candles.length}`,
+        });
         continue;
       }
       let markedEligible = false;
       try {
-        const technicalSnapshot = this.indicators.calculateTechnicalSnapshot(item.candles, input.benchmarkCandles);
+        const technicalSnapshot = this.indicators.calculateTechnicalSnapshot(
+          item.candles,
+          input.benchmarkCandles,
+        );
         eligibleUniverse++;
         markedEligible = true;
         const results = this.strategies.evaluateAll({
-          instrument: { symbol: item.instrument.symbol, exchange: item.instrument.exchange,
-            sector: item.instrument.sector },
+          instrument: {
+            symbol: item.instrument.symbol,
+            exchange: item.instrument.exchange,
+            sector: item.instrument.sector,
+          },
           candles: item.candles,
           indicators: technicalSnapshot,
           marketRegime: input.marketRegime,
           evaluatedAt: input.evaluatedAt,
         });
-        if (results.length > 0 && results.every(result => result.rejectionCodes.includes('INVALID_DATA'))) {
-          throw new RangeError(results.flatMap(result => result.rejectionReasons).join('; '));
+        if (
+          results.length > 0 &&
+          results.every((result) => result.rejectionCodes.includes('INVALID_DATA'))
+        ) {
+          throw new RangeError(results.flatMap((result) => result.rejectionReasons).join('; '));
         }
         evaluatedSymbols++;
         for (const result of results) {
@@ -57,8 +76,12 @@ export class ScannerEvaluationService {
         }
       } catch (error: unknown) {
         if (markedEligible) eligibleUniverse--;
-        exclusions.push({ instrumentId: item.instrument.id, symbol: item.instrument.symbol,
-          code: 'INVALID_DATA', message: this.message(error) });
+        exclusions.push({
+          instrumentId: item.instrument.id,
+          symbol: item.instrument.symbol,
+          code: 'INVALID_DATA',
+          message: this.message(error),
+        });
       }
     }
     return { eligibleUniverse, evaluatedSymbols, qualifiedSetups, exclusions };
@@ -66,7 +89,9 @@ export class ScannerEvaluationService {
 
   private validateSharedContext(input: UniverseEvaluationInput): void {
     if (input.benchmarkCandles.length < config.minimumHistory) {
-      throw new RangeError(`NIFTY benchmark requires at least ${config.minimumHistory} finalized sessions`);
+      throw new RangeError(
+        `NIFTY benchmark requires at least ${config.minimumHistory} finalized sessions`,
+      );
     }
     const snapshot = this.indicators.calculateTechnicalSnapshot(input.benchmarkCandles);
     const benchmarkDate = snapshot.asOf?.slice(0, 10);

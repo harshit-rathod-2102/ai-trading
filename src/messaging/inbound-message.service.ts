@@ -10,9 +10,18 @@ export class InboundMessageService {
   constructor(private readonly commands: WhatsAppCommandService) {}
 
   async handle(message: InboundMessage): Promise<WhatsAppCommandResult> {
-    this.logger.log({ event: 'message.inbound.accepted', module: InboundMessageService.name,
-      operation: 'handle', provider: 'meta-whatsapp', providerMessageId: message.providerMessageId,
-      authorizedSender: true, status: 'accepted' }, 'Normalized inbound message accepted');
+    this.logger.log(
+      {
+        event: 'message.inbound.accepted',
+        module: InboundMessageService.name,
+        operation: 'handle',
+        provider: 'meta-whatsapp',
+        providerMessageId: message.providerMessageId,
+        authorizedSender: true,
+        status: 'accepted',
+      },
+      'Normalized inbound message accepted',
+    );
     return this.commands.handle(message);
   }
 }

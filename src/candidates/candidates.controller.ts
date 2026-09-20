@@ -1,4 +1,14 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { CandidatesService } from './candidates.service';
 import { CreateCandidateDto } from './dto/create-candidate.dto';
 import { BuyCandidateDto } from './dto/buy-candidate.dto';
@@ -58,10 +68,14 @@ export class CandidatesController {
   }
 
   @Get()
-  list(@Query() filters: ListCandidatesDto) { return this.candidates.list(filters); }
+  list(@Query() filters: ListCandidatesDto) {
+    return this.candidates.list(filters);
+  }
 
   @Get(':id')
-  get(@Param('id', ParseUUIDPipe) id: string) { return this.candidates.get(id); }
+  get(@Param('id', ParseUUIDPipe) id: string) {
+    return this.candidates.get(id);
+  }
 
   @Post(':id/buy')
   buy(@Param('id', ParseUUIDPipe) id: string, @Body() input: BuyCandidateDto) {
@@ -74,5 +88,7 @@ export class CandidatesController {
   }
 
   @Get(':id/events')
-  events(@Param('id', ParseUUIDPipe) id: string) { return this.candidates.events(id); }
+  events(@Param('id', ParseUUIDPipe) id: string) {
+    return this.candidates.events(id);
+  }
 }

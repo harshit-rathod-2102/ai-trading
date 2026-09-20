@@ -69,6 +69,8 @@ function addMetadata(entries: [string, JsonValue][], key: string, value: unknown
 
 function invalidResponse(message: string): ProviderError {
   return new ProviderError(message, {
-    provider: 'upstox', code: ProviderErrorCode.INVALID_RESPONSE, retryable: false,
+    provider: 'upstox',
+    code: ProviderErrorCode.INVALID_RESPONSE,
+    retryable: false,
   });
 }

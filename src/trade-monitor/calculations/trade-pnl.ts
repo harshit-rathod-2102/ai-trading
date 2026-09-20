@@ -5,8 +5,13 @@ export interface TradePnl {
   readonly unrealizedPnlPercent: string;
 }
 
-export function calculateTradePnl(currentPrice: string, actualEntry: string, quantity: number): TradePnl {
-  if (!Number.isSafeInteger(quantity) || quantity < 1) throw new RangeError('quantity must be positive');
+export function calculateTradePnl(
+  currentPrice: string,
+  actualEntry: string,
+  quantity: number,
+): TradePnl {
+  if (!Number.isSafeInteger(quantity) || quantity < 1)
+    throw new RangeError('quantity must be positive');
   const current = positiveMonitorDecimal(currentPrice, 'currentPrice');
   const entry = positiveMonitorDecimal(actualEntry, 'actualEntry');
   return {

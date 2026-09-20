@@ -21,5 +21,8 @@ export function average(values: readonly Decimal[]): Decimal {
 }
 
 export class MarketRegimeInputError extends Error {
-  constructor(message: string) { super(message); this.name = 'MarketRegimeInputError'; }
+  constructor(message: string) {
+    super(message);
+    this.name = 'MarketRegimeInputError';
+  }
 }

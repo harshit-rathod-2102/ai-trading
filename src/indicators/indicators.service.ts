@@ -9,18 +9,23 @@ import { calculateRollingHigh, calculateRollingLow } from './calculations/rollin
 import { calculateRsi } from './calculations/rsi';
 import { calculateSma } from './calculations/sma';
 import { percentageDistance, positiveDecimal, nonNegativeDecimal } from './calculations/decimal';
-import { calculateAverageTradedValue, calculateAverageVolume, calculateVolumeRatio } from './calculations/volume';
+import {
+  calculateAverageTradedValue,
+  calculateAverageVolume,
+  calculateVolumeRatio,
+} from './calculations/volume';
 
 @Injectable()
 export class IndicatorsService {
   calculateTechnicalSnapshot(
-    stockCandles: readonly IndicatorCandle[], benchmarkCandles?: readonly IndicatorCandle[],
+    stockCandles: readonly IndicatorCandle[],
+    benchmarkCandles?: readonly IndicatorCandle[],
   ): TechnicalIndicatorSnapshot {
     this.validateSeries(stockCandles, 'stock');
     if (benchmarkCandles !== undefined) this.validateSeries(benchmarkCandles, 'benchmark');
     if (stockCandles.length === 0) return this.emptySnapshot();
 
-    const closes = stockCandles.map(candle => candle.close);
+    const closes = stockCandles.map((candle) => candle.close);
     const latest = stockCandles.at(-1)!;
     const sma20 = calculateSma(closes, 20);
     const sma50 = calculateSma(closes, 50);
@@ -30,15 +35,24 @@ export class IndicatorsService {
     const atr14 = calculateAtr(stockCandles, 14);
     const rollingHigh20 = calculateRollingHigh(stockCandles, 20);
     const rollingLow20 = calculateRollingLow(stockCandles, 20);
-    const aligned = benchmarkCandles === undefined ? null : alignCandleSeries(stockCandles, benchmarkCandles);
+    const aligned =
+      benchmarkCandles === undefined ? null : alignCandleSeries(stockCandles, benchmarkCandles);
 
     return {
-      asOf: latest.timestamp.toISOString(), close: latest.close,
-      sma20, sma50, sma200, ema20, ema50,
-      rsi14: calculateRsi(closes, 14), atr14,
+      asOf: latest.timestamp.toISOString(),
+      close: latest.close,
+      sma20,
+      sma50,
+      sma200,
+      ema20,
+      ema50,
+      rsi14: calculateRsi(closes, 14),
+      atr14,
       normalizedAtr14: calculateNormalizedAtr(atr14, latest.close),
-      roc20: calculateRoc(closes, 20), roc50: calculateRoc(closes, 50),
-      rollingHigh20, rollingLow20,
+      roc20: calculateRoc(closes, 20),
+      roc50: calculateRoc(closes, 50),
+      rollingHigh20,
+      rollingLow20,
       rollingHigh50: calculateRollingHigh(stockCandles, 50),
       rollingLow50: calculateRollingLow(stockCandles, 50),
       distanceFromRollingHigh20Percent: percentageDistance(latest.close, rollingHigh20),
@@ -82,13 +96,32 @@ export class IndicatorsService {
 
   private emptySnapshot(): TechnicalIndicatorSnapshot {
     return {
-      asOf: null, close: null, sma20: null, sma50: null, sma200: null, ema20: null, ema50: null,
-      rsi14: null, atr14: null, normalizedAtr14: null, roc20: null, roc50: null,
-      rollingHigh20: null, rollingLow20: null, rollingHigh50: null, rollingLow50: null,
-      distanceFromRollingHigh20Percent: null, distanceFromRollingLow20Percent: null,
-      volumeAverage20: null, volumeRatio20: null, averageTradedValue20: null,
-      distanceFromEma20Percent: null, distanceFromEma50Percent: null,
-      distanceFromSma200Percent: null, relativeStrength20: null, relativeStrength50: null,
+      asOf: null,
+      close: null,
+      sma20: null,
+      sma50: null,
+      sma200: null,
+      ema20: null,
+      ema50: null,
+      rsi14: null,
+      atr14: null,
+      normalizedAtr14: null,
+      roc20: null,
+      roc50: null,
+      rollingHigh20: null,
+      rollingLow20: null,
+      rollingHigh50: null,
+      rollingLow50: null,
+      distanceFromRollingHigh20Percent: null,
+      distanceFromRollingLow20Percent: null,
+      volumeAverage20: null,
+      volumeRatio20: null,
+      averageTradedValue20: null,
+      distanceFromEma20Percent: null,
+      distanceFromEma50Percent: null,
+      distanceFromSma200Percent: null,
+      relativeStrength20: null,
+      relativeStrength50: null,
       relativeStrength126: null,
     };
   }

@@ -92,18 +92,29 @@ export class AiTriageService {
 
       const reused = storedAnalysis(context.candidate.aiAnalysis, context.evidenceHash);
       if (reused) {
-        this.logger.log({ event: 'ai.fast.reused', ...fields,
-          resolvedModel: reused.fast.modelMetadata.resolvedModel,
-          escalate: reused.routing.escalate,
-          escalationReasons: reused.routing.reasons,
-          durationMs: elapsedMilliseconds(startedAt), status: 'reused' },
-        'Existing candidate FAST AI triage reused');
+        this.logger.log(
+          {
+            event: 'ai.fast.reused',
+            ...fields,
+            resolvedModel: reused.fast.modelMetadata.resolvedModel,
+            escalate: reused.routing.escalate,
+            escalationReasons: reused.routing.reasons,
+            durationMs: elapsedMilliseconds(startedAt),
+            status: 'reused',
+          },
+          'Existing candidate FAST AI triage reused',
+        );
         return this.success(candidateId, context.evidenceHash, reused.fast, reused.routing, true);
       }
 
       if (!this.provider) {
-        return this.failure(context, startedAt, AiTriageErrorCode.PROVIDER_NOT_CONFIGURED, false,
-          'No AI provider is configured; set AI_PROVIDER before retrying.');
+        return this.failure(
+          context,
+          startedAt,
+          AiTriageErrorCode.PROVIDER_NOT_CONFIGURED,
+          false,
+          'No AI provider is configured; set AI_PROVIDER before retrying.',
+        );
       }
 
       let analysis: FastTriageResult;
@@ -132,32 +143,61 @@ export class AiTriageService {
           routingVersion: decision.version,
         },
       };
-      this.logger.log({ event: 'ai.routing.completed', ...fields,
-        resolvedModel: analysis.modelMetadata.resolvedModel,
-        escalate: decision.escalate, escalationReasons: decision.reasons,
-        tierSelected: decision.tierSelected,
-        durationMs: elapsedMilliseconds(startedAt), status: 'completed' },
-      'Candidate AI routing completed');
+      this.logger.log(
+        {
+          event: 'ai.routing.completed',
+          ...fields,
+          resolvedModel: analysis.modelMetadata.resolvedModel,
+          escalate: decision.escalate,
+          escalationReasons: decision.reasons,
+          tierSelected: decision.tierSelected,
+          durationMs: elapsedMilliseconds(startedAt),
+          status: 'completed',
+        },
+        'Candidate AI routing completed',
+      );
 
       const persisted = await this.persist(context, auditedAnalysis, decision);
       if (!persisted) {
-        return this.failure(context, startedAt, AiTriageErrorCode.EVIDENCE_CHANGED, true,
-          'Candidate evidence changed during FAST triage; retry against the latest snapshot.');
+        return this.failure(
+          context,
+          startedAt,
+          AiTriageErrorCode.EVIDENCE_CHANGED,
+          true,
+          'Candidate evidence changed during FAST triage; retry against the latest snapshot.',
+        );
       }
-      this.logger.log({ event: 'ai.fast.completed', ...fields,
-        resolvedModel: analysis.modelMetadata.resolvedModel,
-        escalate: decision.escalate, escalationReasons: decision.reasons,
-        durationMs: elapsedMilliseconds(startedAt), status: 'completed' },
-      'Candidate FAST AI triage completed');
+      this.logger.log(
+        {
+          event: 'ai.fast.completed',
+          ...fields,
+          resolvedModel: analysis.modelMetadata.resolvedModel,
+          escalate: decision.escalate,
+          escalationReasons: decision.reasons,
+          durationMs: elapsedMilliseconds(startedAt),
+          status: 'completed',
+        },
+        'Candidate FAST AI triage completed',
+      );
       return this.success(candidateId, context.evidenceHash, auditedAnalysis, decision, false);
     } catch (error: unknown) {
-      this.logger.error({ event: 'ai.fast.failed', module: AiTriageService.name,
-        operation: 'triageCandidate', candidateId,
-        ...(context ? { symbol: context.candidate.symbol, strategy: context.candidate.strategy } : {}),
-        promptVersion: CANDIDATE_FAST_TRIAGE_PROMPT_VERSION,
-        routingVersion: AI_ROUTING_V1_CONFIG.version,
-        durationMs: elapsedMilliseconds(startedAt), status: 'failed', ...structuredError(error) },
-      'Candidate FAST AI triage failed');
+      this.logger.error(
+        {
+          event: 'ai.fast.failed',
+          module: AiTriageService.name,
+          operation: 'triageCandidate',
+          candidateId,
+          ...(context
+            ? { symbol: context.candidate.symbol, strategy: context.candidate.strategy }
+            : {}),
+          promptVersion: CANDIDATE_FAST_TRIAGE_PROMPT_VERSION,
+          routingVersion: AI_ROUTING_V1_CONFIG.version,
+          durationMs: elapsedMilliseconds(startedAt),
+          status: 'failed',
+          ...structuredError(error),
+        },
+        'Candidate FAST AI triage failed',
+      );
       throw error;
     }
   }
@@ -177,8 +217,11 @@ export class AiTriageService {
       exchange: candidate.exchange,
     });
     if (!instrument?.name?.trim()) {
-      this.ineligible(candidate, CandidateTriageEligibilityCode.MISSING_DETERMINISTIC_EVIDENCE,
-        'Candidate instrument company metadata is required for FAST triage');
+      this.ineligible(
+        candidate,
+        CandidateTriageEligibilityCode.MISSING_DETERMINISTIC_EVIDENCE,
+        'Candidate instrument company metadata is required for FAST triage',
+      );
     }
     const input = buildFastTriageInput(candidate, instrument.name);
     return {
@@ -195,21 +238,38 @@ export class AiTriageService {
 
   private ensureEligible(candidate: TradeCandidate): void {
     if (candidate.status !== CandidateStatus.NEW) {
-      this.ineligible(candidate, CandidateTriageEligibilityCode.CANDIDATE_NOT_PRE_FINAL,
-        'FAST triage requires a candidate in NEW status');
+      this.ineligible(
+        candidate,
+        CandidateTriageEligibilityCode.CANDIDATE_NOT_PRE_FINAL,
+        'FAST triage requires a candidate in NEW status',
+      );
     }
-    if (!candidate.scanResultId || !candidate.strategy?.trim() || !candidate.strategyVersion?.trim() ||
-        !isScore(candidate.strategyScore) || !isScore(candidate.rankingScore) ||
-        !isPositiveRank(candidate.strategyRank) || !isPositiveRank(candidate.globalRank) ||
-        !isNonEmptyRecord(candidate.technicalSnapshot) || !isNonEmptyRecord(candidate.riskSnapshot) ||
-        !isNonEmptyRecord(candidate.marketRegimeSnapshot) || !isNonEmptyRecord(candidate.strategySnapshot) ||
-        !isNonEmptyRecord(candidate.rankingSnapshot)) {
-      this.ineligible(candidate, CandidateTriageEligibilityCode.MISSING_DETERMINISTIC_EVIDENCE,
-        'Candidate is missing persisted technical, regime, strategy, ranking, or risk evidence');
+    if (
+      !candidate.scanResultId ||
+      !candidate.strategy?.trim() ||
+      !candidate.strategyVersion?.trim() ||
+      !isScore(candidate.strategyScore) ||
+      !isScore(candidate.rankingScore) ||
+      !isPositiveRank(candidate.strategyRank) ||
+      !isPositiveRank(candidate.globalRank) ||
+      !isNonEmptyRecord(candidate.technicalSnapshot) ||
+      !isNonEmptyRecord(candidate.riskSnapshot) ||
+      !isNonEmptyRecord(candidate.marketRegimeSnapshot) ||
+      !isNonEmptyRecord(candidate.strategySnapshot) ||
+      !isNonEmptyRecord(candidate.rankingSnapshot)
+    ) {
+      this.ineligible(
+        candidate,
+        CandidateTriageEligibilityCode.MISSING_DETERMINISTIC_EVIDENCE,
+        'Candidate is missing persisted technical, regime, strategy, ranking, or risk evidence',
+      );
     }
     if (!candidate.newsEnrichedAt || !validNewsSnapshot(candidate.newsSnapshot)) {
-      this.ineligible(candidate, CandidateTriageEligibilityCode.NEWS_SNAPSHOT_REQUIRED,
-        'A completed candidate news snapshot is required before FAST triage');
+      this.ineligible(
+        candidate,
+        CandidateTriageEligibilityCode.NEWS_SNAPSHOT_REQUIRED,
+        'A completed candidate news snapshot is required before FAST triage',
+      );
     }
   }
 
@@ -218,7 +278,7 @@ export class AiTriageService {
     analysis: FastTriageResult,
     routing: AiRoutingDecision,
   ): Promise<boolean> {
-    return this.dataSource.transaction(async manager => {
+    return this.dataSource.transaction(async (manager) => {
       const repository = manager.getRepository(TradeCandidate);
       const candidate = await repository.findOne({
         where: { id: context.candidate.id },
@@ -230,11 +290,12 @@ export class AiTriageService {
         symbol: candidate.symbol,
         exchange: candidate.exchange,
       });
-      if (!instrument || fastEvidenceHash(
-        candidate,
-        instrument.name,
-        CANDIDATE_FAST_TRIAGE_PROMPT_VERSION,
-      ) !== context.evidenceHash) return false;
+      if (
+        !instrument ||
+        fastEvidenceHash(candidate, instrument.name, CANDIDATE_FAST_TRIAGE_PROMPT_VERSION) !==
+          context.evidenceHash
+      )
+        return false;
       const alreadyStored = storedAnalysis(candidate.aiAnalysis, context.evidenceHash);
       if (alreadyStored) return true;
 
@@ -276,9 +337,18 @@ export class AiTriageService {
     warning: string,
     error?: unknown,
   ): AiTriageExecutionResult {
-    this.logger.error({ event: 'ai.fast.failed', ...this.logContext(context), errorCode, retryable,
-      durationMs: elapsedMilliseconds(startedAt), status: 'failed',
-      ...(error ? structuredError(error) : {}) }, 'Candidate FAST AI triage failed');
+    this.logger.error(
+      {
+        event: 'ai.fast.failed',
+        ...this.logContext(context),
+        errorCode,
+        retryable,
+        durationMs: elapsedMilliseconds(startedAt),
+        status: 'failed',
+        ...(error ? structuredError(error) : {}),
+      },
+      'Candidate FAST AI triage failed',
+    );
     return {
       candidateId: context.candidate.id,
       success: false,
@@ -318,13 +388,18 @@ function storedAnalysis(
   hash: string,
 ): { readonly fast: FastTriageResult; readonly routing: AiRoutingDecision } | null {
   if (!isRecord(value) || !isRecord(value.fast) || !isRecord(value.routing)) return null;
-  if (value.fast.evidenceHash !== hash || value.fast.tier !== AiAnalysisTier.FAST ||
-      !isRecord(value.fast.modelMetadata) ||
-      value.fast.modelMetadata.routingVersion !== AI_ROUTING_V1_CONFIG.version ||
-      !Array.isArray(value.fast.contradictions) ||
-      !Array.isArray(value.fast.missingEvidence) ||
-      value.routing.version !== AI_ROUTING_V1_CONFIG.version ||
-      typeof value.routing.escalate !== 'boolean' || !Array.isArray(value.routing.reasons)) return null;
+  if (
+    value.fast.evidenceHash !== hash ||
+    value.fast.tier !== AiAnalysisTier.FAST ||
+    !isRecord(value.fast.modelMetadata) ||
+    value.fast.modelMetadata.routingVersion !== AI_ROUTING_V1_CONFIG.version ||
+    !Array.isArray(value.fast.contradictions) ||
+    !Array.isArray(value.fast.missingEvidence) ||
+    value.routing.version !== AI_ROUTING_V1_CONFIG.version ||
+    typeof value.routing.escalate !== 'boolean' ||
+    !Array.isArray(value.routing.reasons)
+  )
+    return null;
   const { evidenceHash: _evidenceHash, ...fast } = value.fast;
   return {
     fast: fast as unknown as FastTriageResult,
@@ -338,32 +413,53 @@ function providerFailure(error: unknown): {
   readonly warning: string;
 } {
   if (!(error instanceof ProviderError)) {
-    return { code: AiTriageErrorCode.PROVIDER_UNAVAILABLE, retryable: true,
-      warning: 'The AI provider failed unexpectedly; FAST triage remains retryable.' };
+    return {
+      code: AiTriageErrorCode.PROVIDER_UNAVAILABLE,
+      retryable: true,
+      warning: 'The AI provider failed unexpectedly; FAST triage remains retryable.',
+    };
   }
   switch (error.code) {
     case ProviderErrorCode.AUTHENTICATION:
-      return { code: AiTriageErrorCode.PROVIDER_AUTH, retryable: false,
-        warning: 'AI-provider authentication failed; configuration must be corrected.' };
+      return {
+        code: AiTriageErrorCode.PROVIDER_AUTH,
+        retryable: false,
+        warning: 'AI-provider authentication failed; configuration must be corrected.',
+      };
     case ProviderErrorCode.RATE_LIMIT:
-      return { code: /quota|credit/i.test(error.message)
-        ? AiTriageErrorCode.PROVIDER_QUOTA : AiTriageErrorCode.PROVIDER_RATE_LIMIT,
-      retryable: true,
-      warning: /quota|credit/i.test(error.message)
-        ? 'The AI-provider quota is exhausted; retry after it resets.'
-        : 'The AI-provider rate limit was reached; retry later.' };
+      return {
+        code: /quota|credit/i.test(error.message)
+          ? AiTriageErrorCode.PROVIDER_QUOTA
+          : AiTriageErrorCode.PROVIDER_RATE_LIMIT,
+        retryable: true,
+        warning: /quota|credit/i.test(error.message)
+          ? 'The AI-provider quota is exhausted; retry after it resets.'
+          : 'The AI-provider rate limit was reached; retry later.',
+      };
     case ProviderErrorCode.TIMEOUT:
-      return { code: AiTriageErrorCode.PROVIDER_TIMEOUT, retryable: true,
-        warning: 'The AI-provider request timed out; FAST triage remains retryable.' };
+      return {
+        code: AiTriageErrorCode.PROVIDER_TIMEOUT,
+        retryable: true,
+        warning: 'The AI-provider request timed out; FAST triage remains retryable.',
+      };
     case ProviderErrorCode.INVALID_RESPONSE:
-      return { code: AiTriageErrorCode.OUTPUT_INVALID, retryable: true,
-        warning: 'The AI provider returned malformed FAST output; no analysis was stored.' };
+      return {
+        code: AiTriageErrorCode.OUTPUT_INVALID,
+        retryable: true,
+        warning: 'The AI provider returned malformed FAST output; no analysis was stored.',
+      };
     case ProviderErrorCode.REQUEST_REJECTED:
-      return { code: AiTriageErrorCode.REQUEST_REJECTED, retryable: false,
-        warning: 'The AI provider rejected the FAST triage request.' };
+      return {
+        code: AiTriageErrorCode.REQUEST_REJECTED,
+        retryable: false,
+        warning: 'The AI provider rejected the FAST triage request.',
+      };
     default:
-      return { code: AiTriageErrorCode.PROVIDER_UNAVAILABLE, retryable: true,
-        warning: 'The AI provider is temporarily unavailable; FAST triage remains retryable.' };
+      return {
+        code: AiTriageErrorCode.PROVIDER_UNAVAILABLE,
+        retryable: true,
+        warning: 'The AI provider is temporarily unavailable; FAST triage remains retryable.',
+      };
   }
 }
 

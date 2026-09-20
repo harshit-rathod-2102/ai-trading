@@ -8,13 +8,19 @@ export class JobsController {
 
   @Post('trade-monitor/run')
   @HttpCode(HttpStatus.ACCEPTED)
-  runTradeMonitor() { return this.jobs.enqueueTradeMonitor(JobTriggerSource.MANUAL); }
+  runTradeMonitor() {
+    return this.jobs.enqueueTradeMonitor(JobTriggerSource.MANUAL);
+  }
 
   @Post('post-market/run')
   @HttpCode(HttpStatus.ACCEPTED)
-  runPostMarket() { return this.jobs.enqueuePostMarket(JobTriggerSource.MANUAL); }
+  runPostMarket() {
+    return this.jobs.enqueuePostMarket(JobTriggerSource.MANUAL);
+  }
 
   @Post('evening/run')
   @HttpCode(HttpStatus.ACCEPTED)
-  runEvening() { return this.jobs.enqueueEvening(JobTriggerSource.MANUAL); }
+  runEvening() {
+    return this.jobs.enqueueEvening(JobTriggerSource.MANUAL);
+  }
 }

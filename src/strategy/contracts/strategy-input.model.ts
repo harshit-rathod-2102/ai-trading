@@ -10,7 +10,11 @@ export interface SectorContext {
 }
 
 export interface StrategyInput {
-  readonly instrument: { readonly symbol: string; readonly exchange: string; readonly sector?: string | null };
+  readonly instrument: {
+    readonly symbol: string;
+    readonly exchange: string;
+    readonly sector?: string | null;
+  };
   /** Finalized daily observations, oldest first. Timestamp represents the session date in UTC. */
   readonly candles: readonly IndicatorCandle[];
   readonly indicators: TechnicalIndicatorSnapshot;

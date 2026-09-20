@@ -14,10 +14,13 @@ export function isSessionDate(value: unknown): value is string {
 }
 
 export function IsSessionDate(): PropertyDecorator {
-  return ValidateBy({ name: 'isSessionDate', validator: {
-    validate: isSessionDate,
-    defaultMessage: () => '$property must be a real calendar date in YYYY-MM-DD format',
-  } });
+  return ValidateBy({
+    name: 'isSessionDate',
+    validator: {
+      validate: isSessionDate,
+      defaultMessage: () => '$property must be a real calendar date in YYYY-MM-DD format',
+    },
+  });
 }
 
 export function marketDate(now = new Date()): string {
@@ -25,53 +28,84 @@ export function marketDate(now = new Date()): string {
 }
 
 export function assertRange(from: string, to: string, now = new Date()): void {
-  if (!isSessionDate(from) || !isSessionDate(to) || from > to ||
-      from < '2000-01-01' || to > marketDate(now) ||
-      (Date.parse(to) - Date.parse(from)) / 86400000 > 365) {
-    throw new BadRequestException('Use an ordered date range since 2000, at most 366 days, ending no later than today in Asia/Kolkata');
+  if (
+    !isSessionDate(from) ||
+    !isSessionDate(to) ||
+    from > to ||
+    from < '2000-01-01' ||
+    to > marketDate(now) ||
+    (Date.parse(to) - Date.parse(from)) / 86400000 > 365
+  ) {
+    throw new BadRequestException(
+      'Use an ordered date range since 2000, at most 366 days, ending no later than today in Asia/Kolkata',
+    );
   }
 }
 
 export function calendarIssues(calendar: TradingCalendar): string[] {
-  if (!calendar || typeof calendar.source !== 'string' || !calendar.source.trim() ||
-      typeof calendar.isSynthetic !== 'boolean' ||
-      !isSessionDate(calendar.coverageFrom) || !isSessionDate(calendar.coverageTo) ||
-      calendar.coverageFrom > calendar.coverageTo || !Array.isArray(calendar.sessions)) {
+  if (
+    !calendar ||
+    typeof calendar.source !== 'string' ||
+    !calendar.source.trim() ||
+    typeof calendar.isSynthetic !== 'boolean' ||
+    !isSessionDate(calendar.coverageFrom) ||
+    !isSessionDate(calendar.coverageTo) ||
+    calendar.coverageFrom > calendar.coverageTo ||
+    !Array.isArray(calendar.sessions)
+  ) {
     return ['Invalid provider calendar metadata'];
   }
   const dates = new Set<string>();
   const issues: string[] = [];
   for (const session of calendar.sessions) {
-    if (!session || !isSessionDate(session.date) || session.date < calendar.coverageFrom ||
-        session.date > calendar.coverageTo || dates.has(session.date) ||
-        typeof session.closeAt !== 'string' || !/Z$/.test(session.closeAt) ||
-        !Number.isFinite(Date.parse(session.closeAt)) ||
-        marketDate(new Date(session.closeAt)) !== session.date) {
+    if (
+      !session ||
+      !isSessionDate(session.date) ||
+      session.date < calendar.coverageFrom ||
+      session.date > calendar.coverageTo ||
+      dates.has(session.date) ||
+      typeof session.closeAt !== 'string' ||
+      !/Z$/.test(session.closeAt) ||
+      !Number.isFinite(Date.parse(session.closeAt)) ||
+      marketDate(new Date(session.closeAt)) !== session.date
+    ) {
       issues.push('Invalid or duplicate provider calendar session');
     } else dates.add(session.date);
   }
   return issues;
 }
 
-export function expectedSessions(calendar: TradingCalendar, from: string, to: string, now = new Date()): string[] {
-  return calendar.sessions.filter(session => session.date >= from && session.date <= to &&
-    Date.parse(session.closeAt) <= now.getTime()).map(session => session.date).sort();
+export function expectedSessions(
+  calendar: TradingCalendar,
+  from: string,
+  to: string,
+  now = new Date(),
+): string[] {
+  return calendar.sessions
+    .filter(
+      (session) =>
+        session.date >= from && session.date <= to && Date.parse(session.closeAt) <= now.getTime(),
+    )
+    .map((session) => session.date)
+    .sort();
 }
 
-type OhlcvBar = Pick<
-  ProviderCandle,
-  'sessionDate' | 'open' | 'high' | 'low' | 'close' | 'volume'
->;
+type OhlcvBar = Pick<ProviderCandle, 'sessionDate' | 'open' | 'high' | 'low' | 'close' | 'volume'>;
 
 export function barIssues(bar: OhlcvBar, type: InstrumentType): string[] {
   if (!bar || typeof bar !== 'object') return ['Candle must be an object'];
   const issues: string[] = [];
   if (!isSessionDate(bar.sessionDate)) issues.push('Invalid session date');
   const prices = [bar.open, bar.high, bar.low, bar.close];
-  if (!prices.every(price => typeof price === 'string' && PRICE_PATTERN.test(price))) {
+  if (!prices.every((price) => typeof price === 'string' && PRICE_PATTERN.test(price))) {
     issues.push('OHLC must be positive decimal strings within NUMERIC(18,4)');
-  } else if (new Decimal(bar.high).lt(bar.low) || new Decimal(bar.high).lt(bar.open) ||
-    new Decimal(bar.high).lt(bar.close) || new Decimal(bar.low).gt(bar.open) || new Decimal(bar.low).gt(bar.close)) {
+  } else if (
+    new Decimal(bar.high).lt(bar.low) ||
+    new Decimal(bar.high).lt(bar.open) ||
+    new Decimal(bar.high).lt(bar.close) ||
+    new Decimal(bar.low).gt(bar.open) ||
+    new Decimal(bar.low).gt(bar.close)
+  ) {
     issues.push('OHLC ordering is inconsistent');
   }
   if (bar.volume === null) {

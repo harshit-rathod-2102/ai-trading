@@ -23,15 +23,17 @@ export class JournalService {
   // Require the caller's transaction so events cannot commit independently of state.
   record(manager: EntityManager, input: RecordEvent): Promise<TradeEvent> {
     const repository = manager.getRepository(TradeEvent);
-    return repository.save(repository.create({
-      id: randomUUID(),
-      ...input,
-      tradeId: input.tradeId ?? null,
-      candidateId: input.candidateId ?? null,
-      price: input.price ?? null,
-      quantity: input.quantity ?? null,
-      data: input.data ?? null,
-    }));
+    return repository.save(
+      repository.create({
+        id: randomUUID(),
+        ...input,
+        tradeId: input.tradeId ?? null,
+        candidateId: input.candidateId ?? null,
+        price: input.price ?? null,
+        quantity: input.quantity ?? null,
+        data: input.data ?? null,
+      }),
+    );
   }
 
   forCandidate(candidateId: string): Promise<TradeEvent[]> {

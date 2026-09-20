@@ -118,7 +118,8 @@ export default (): ApplicationConfiguration => ({
     redirectUri: process.env.UPSTOX_REDIRECT_URI || null,
     accessToken: process.env.UPSTOX_ACCESS_TOKEN || null,
     apiBaseUrl: process.env.UPSTOX_API_BASE_URL ?? 'https://api.upstox.com',
-    instrumentFileUrl: process.env.UPSTOX_INSTRUMENT_FILE_URL ??
+    instrumentFileUrl:
+      process.env.UPSTOX_INSTRUMENT_FILE_URL ??
       'https://assets.upstox.com/market-quote/instruments/exchange/NSE.json.gz',
     httpTimeoutMs: Number.parseInt(process.env.UPSTOX_HTTP_TIMEOUT_MS ?? '10000', 10),
     maxRetries: Number.parseInt(process.env.UPSTOX_MAX_RETRIES ?? '2', 10),
@@ -139,7 +140,8 @@ export default (): ApplicationConfiguration => ({
     apiKey: process.env.OPENROUTER_API_KEY || null,
     baseUrl: process.env.OPENROUTER_BASE_URL ?? 'https://openrouter.ai/api/v1',
     model: process.env.OPENROUTER_MODEL ?? 'openrouter/free',
-    fastModel: process.env.OPENROUTER_FAST_MODEL ?? process.env.OPENROUTER_MODEL ?? 'openrouter/free',
+    fastModel:
+      process.env.OPENROUTER_FAST_MODEL ?? process.env.OPENROUTER_MODEL ?? 'openrouter/free',
     deepModel: process.env.OPENROUTER_DEEP_MODEL ?? 'nvidia/nemotron-3-ultra:free',
     httpTimeoutMs: Number.parseInt(process.env.OPENROUTER_HTTP_TIMEOUT_MS ?? '30000', 10),
     appName: process.env.OPENROUTER_APP_NAME ?? 'swing-trading-assistant',
@@ -197,14 +199,14 @@ export default (): ApplicationConfiguration => ({
     eveningRunTime: process.env.EVENING_RUN_TIME ?? '19:00',
     catchUpCutoffTime: process.env.POST_MARKET_CATCH_UP_CUTOFF_TIME ?? '21:00',
     tradeMonitorIntervalMinutes: Number.parseInt(
-      process.env.TRADE_MONITOR_INTERVAL_MINUTES ?? '15', 10,
+      process.env.TRADE_MONITOR_INTERVAL_MINUTES ?? '15',
+      10,
     ),
     candidateAnalysisConcurrency: Number.parseInt(
-      process.env.CANDIDATE_ANALYSIS_CONCURRENCY ?? '2', 10,
+      process.env.CANDIDATE_ANALYSIS_CONCURRENCY ?? '2',
+      10,
     ),
-    marketDataLookbackDays: Number.parseInt(
-      process.env.POST_MARKET_SYNC_LOOKBACK_DAYS ?? '10', 10,
-    ),
+    marketDataLookbackDays: Number.parseInt(process.env.POST_MARKET_SYNC_LOOKBACK_DAYS ?? '10', 10),
   },
   dailySummary: {
     maxCandidates: Number.parseInt(process.env.DAILY_SUMMARY_MAX_CANDIDATES ?? '5', 10),

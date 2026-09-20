@@ -49,31 +49,63 @@ export class OpenRouterClient {
         }
         const error = this.httpError(response);
         if (!shouldRetry(response.status) || attempt === this.config.maxRetries) {
-          this.logger.error({ event: 'provider.request.failed', module: OpenRouterClient.name,
-            provider: 'openrouter', operation: 'createChatCompletion', endpoint: '/chat/completions',
-            statusCode: response.status, providerErrorCode: error.code,
-            retryable: error.retryable, attempt: attempt + 1,
-            maxAttempts: this.config.maxRetries + 1 }, 'OpenRouter request failed');
+          this.logger.error(
+            {
+              event: 'provider.request.failed',
+              module: OpenRouterClient.name,
+              provider: 'openrouter',
+              operation: 'createChatCompletion',
+              endpoint: '/chat/completions',
+              statusCode: response.status,
+              providerErrorCode: error.code,
+              retryable: error.retryable,
+              attempt: attempt + 1,
+              maxAttempts: this.config.maxRetries + 1,
+            },
+            'OpenRouter request failed',
+          );
           throw error;
         }
         const delayMs = retryDelay(attempt, this.config.retryBaseDelayMs, response);
-        this.logger.warn({ event: 'provider.request.retrying', module: OpenRouterClient.name,
-          provider: 'openrouter', operation: 'createChatCompletion', endpoint: '/chat/completions',
-          statusCode: response.status, attempt: attempt + 1,
-          maxAttempts: this.config.maxRetries + 1, delayMs,
-          reason: error.code }, 'OpenRouter request will be retried');
+        this.logger.warn(
+          {
+            event: 'provider.request.retrying',
+            module: OpenRouterClient.name,
+            provider: 'openrouter',
+            operation: 'createChatCompletion',
+            endpoint: '/chat/completions',
+            statusCode: response.status,
+            attempt: attempt + 1,
+            maxAttempts: this.config.maxRetries + 1,
+            delayMs,
+            reason: error.code,
+          },
+          'OpenRouter request will be retried',
+        );
         await delay(delayMs, context?.signal);
       } catch (error: unknown) {
-        if (error instanceof ProviderError || error instanceof OpenRouterStructuredOutputUnsupportedError) {
+        if (
+          error instanceof ProviderError ||
+          error instanceof OpenRouterStructuredOutputUnsupportedError
+        ) {
           throw error;
         }
         if (context?.signal?.aborted) throw cancelled();
         if (attempt === this.config.maxRetries) {
-          this.logger.error({ event: 'provider.request.failed', module: OpenRouterClient.name,
-            provider: 'openrouter', operation: 'createChatCompletion', endpoint: '/chat/completions',
-            providerErrorCode: ProviderErrorCode.UNAVAILABLE, retryable: true,
-            attempt: attempt + 1, maxAttempts: this.config.maxRetries + 1 },
-          'OpenRouter request failed after retries');
+          this.logger.error(
+            {
+              event: 'provider.request.failed',
+              module: OpenRouterClient.name,
+              provider: 'openrouter',
+              operation: 'createChatCompletion',
+              endpoint: '/chat/completions',
+              providerErrorCode: ProviderErrorCode.UNAVAILABLE,
+              retryable: true,
+              attempt: attempt + 1,
+              maxAttempts: this.config.maxRetries + 1,
+            },
+            'OpenRouter request failed after retries',
+          );
           throw new ProviderUnavailableError(
             'openrouter',
             'OpenRouter request failed after bounded retries',
@@ -81,10 +113,20 @@ export class OpenRouterClient {
           );
         }
         const delayMs = retryDelay(attempt, this.config.retryBaseDelayMs);
-        this.logger.warn({ event: 'provider.request.retrying', module: OpenRouterClient.name,
-          provider: 'openrouter', operation: 'createChatCompletion', endpoint: '/chat/completions',
-          attempt: attempt + 1, maxAttempts: this.config.maxRetries + 1,
-          delayMs, reason: 'network_failure' }, 'OpenRouter request will be retried');
+        this.logger.warn(
+          {
+            event: 'provider.request.retrying',
+            module: OpenRouterClient.name,
+            provider: 'openrouter',
+            operation: 'createChatCompletion',
+            endpoint: '/chat/completions',
+            attempt: attempt + 1,
+            maxAttempts: this.config.maxRetries + 1,
+            delayMs,
+            reason: 'network_failure',
+          },
+          'OpenRouter request will be retried',
+        );
         await delay(delayMs, context?.signal);
       }
     }
@@ -150,13 +192,24 @@ export class OpenRouterClient {
       return new ProviderAuthenticationError('openrouter', 'OpenRouter authentication failed');
     }
     if (response.status === 402) {
-      return new ProviderRateLimitError('openrouter', 'OpenRouter credits or quota are unavailable', retryAfter);
+      return new ProviderRateLimitError(
+        'openrouter',
+        'OpenRouter credits or quota are unavailable',
+        retryAfter,
+      );
     }
     if (response.status === 429) {
-      return new ProviderRateLimitError('openrouter', 'OpenRouter request rate was exceeded', retryAfter);
+      return new ProviderRateLimitError(
+        'openrouter',
+        'OpenRouter request rate was exceeded',
+        retryAfter,
+      );
     }
     if (response.status >= 500 || [408, 524, 529].includes(response.status)) {
-      return new ProviderUnavailableError('openrouter', `OpenRouter is unavailable (HTTP ${response.status})`);
+      return new ProviderUnavailableError(
+        'openrouter',
+        `OpenRouter is unavailable (HTTP ${response.status})`,
+      );
     }
     return new ProviderError(`OpenRouter rejected the request (HTTP ${response.status})`, {
       provider: 'openrouter',
@@ -180,9 +233,11 @@ async function providerMessage(response: Response): Promise<string> {
 }
 
 function isUnsupportedStructuredOutput(status: number, message: string): boolean {
-  return [400, 404, 422].includes(status)
-    && /(response_format|json.schema|structured output)/i.test(message)
-    && /(not supported|unsupported|does not support|unavailable)/i.test(message);
+  return (
+    [400, 404, 422].includes(status) &&
+    /(response_format|json.schema|structured output)/i.test(message) &&
+    /(not supported|unsupported|does not support|unavailable)/i.test(message)
+  );
 }
 
 function shouldRetry(status: number): boolean {
@@ -191,7 +246,7 @@ function shouldRetry(status: number): boolean {
 
 function retryDelay(attempt: number, baseMs: number, response?: Response): number {
   const retryAfter = response ? parseRetryAfter(response.headers.get('retry-after')) : undefined;
-  return Math.min(retryAfter === undefined ? baseMs * (2 ** attempt) : retryAfter * 1000, 30_000);
+  return Math.min(retryAfter === undefined ? baseMs * 2 ** attempt : retryAfter * 1000, 30_000);
 }
 
 function parseRetryAfter(value: string | null): number | undefined {
@@ -199,7 +254,9 @@ function parseRetryAfter(value: string | null): number | undefined {
   const seconds = Number(value);
   if (Number.isFinite(seconds) && seconds >= 0) return seconds;
   const timestamp = Date.parse(value);
-  return Number.isNaN(timestamp) ? undefined : Math.max(0, Math.ceil((timestamp - Date.now()) / 1000));
+  return Number.isNaN(timestamp)
+    ? undefined
+    : Math.max(0, Math.ceil((timestamp - Date.now()) / 1000));
 }
 
 function delay(milliseconds: number, signal?: AbortSignal): Promise<void> {

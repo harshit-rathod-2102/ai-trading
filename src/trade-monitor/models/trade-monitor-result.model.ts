@@ -1,4 +1,8 @@
-import { TradeAlertDeliveryStatus, TradeAlertSeverity, TradeAlertType } from './trade-alert-type.enum';
+import {
+  TradeAlertDeliveryStatus,
+  TradeAlertSeverity,
+  TradeAlertType,
+} from './trade-alert-type.enum';
 
 export interface TradeMonitorAlert {
   readonly eventId: string;

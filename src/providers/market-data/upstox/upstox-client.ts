@@ -41,7 +41,11 @@ export class UpstoxClient {
     }
   }
 
-  private async requestJson<T>(url: string, authenticated: boolean, context?: ProviderRequestContext): Promise<T> {
+  private async requestJson<T>(
+    url: string,
+    authenticated: boolean,
+    context?: ProviderRequestContext,
+  ): Promise<T> {
     const response = await this.request(url, authenticated, context);
     try {
       return JSON.parse(await response.text()) as T;
@@ -50,52 +54,105 @@ export class UpstoxClient {
     }
   }
 
-  private async requestBytes(url: string, authenticated: boolean, context?: ProviderRequestContext): Promise<Buffer> {
+  private async requestBytes(
+    url: string,
+    authenticated: boolean,
+    context?: ProviderRequestContext,
+  ): Promise<Buffer> {
     const response = await this.request(url, authenticated, context);
     return Buffer.from(await response.arrayBuffer());
   }
 
-  private async request(url: string, authenticated: boolean, context?: ProviderRequestContext): Promise<Response> {
+  private async request(
+    url: string,
+    authenticated: boolean,
+    context?: ProviderRequestContext,
+  ): Promise<Response> {
     for (let attempt = 0; attempt <= this.config.maxRetries; attempt += 1) {
       try {
         const response = await this.fetchOnce(url, authenticated, context);
         if (response.ok) return response;
         const error = this.httpError(response);
         if (!this.shouldRetryStatus(response.status) || attempt === this.config.maxRetries) {
-          this.logger.error({ event: 'provider.request.failed', module: UpstoxClient.name,
-            provider: 'upstox', operation: 'httpGet', endpoint: safeEndpoint(url),
-            statusCode: response.status, providerErrorCode: error.code,
-            retryable: error.retryable, attempt: attempt + 1,
-            maxAttempts: this.config.maxRetries + 1 }, 'Upstox request failed');
+          this.logger.error(
+            {
+              event: 'provider.request.failed',
+              module: UpstoxClient.name,
+              provider: 'upstox',
+              operation: 'httpGet',
+              endpoint: safeEndpoint(url),
+              statusCode: response.status,
+              providerErrorCode: error.code,
+              retryable: error.retryable,
+              attempt: attempt + 1,
+              maxAttempts: this.config.maxRetries + 1,
+            },
+            'Upstox request failed',
+          );
           throw error;
         }
         const delayMs = this.retryDelay(attempt, error);
-        this.logger.warn({ event: 'provider.request.retrying', module: UpstoxClient.name,
-          provider: 'upstox', operation: 'httpGet', endpoint: safeEndpoint(url),
-          statusCode: response.status, attempt: attempt + 1,
-          maxAttempts: this.config.maxRetries + 1, delayMs,
-          reason: error.code }, 'Upstox request will be retried');
+        this.logger.warn(
+          {
+            event: 'provider.request.retrying',
+            module: UpstoxClient.name,
+            provider: 'upstox',
+            operation: 'httpGet',
+            endpoint: safeEndpoint(url),
+            statusCode: response.status,
+            attempt: attempt + 1,
+            maxAttempts: this.config.maxRetries + 1,
+            delayMs,
+            reason: error.code,
+          },
+          'Upstox request will be retried',
+        );
         await this.delay(delayMs, context?.signal);
       } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
         if (context?.signal?.aborted) {
           throw new ProviderError('Upstox request was cancelled', {
-            provider: 'upstox', code: ProviderErrorCode.REQUEST_REJECTED, retryable: false,
+            provider: 'upstox',
+            code: ProviderErrorCode.REQUEST_REJECTED,
+            retryable: false,
           });
         }
         if (attempt === this.config.maxRetries) {
-          this.logger.error({ event: 'provider.request.failed', module: UpstoxClient.name,
-            provider: 'upstox', operation: 'httpGet', endpoint: safeEndpoint(url),
-            providerErrorCode: ProviderErrorCode.UNAVAILABLE, retryable: true,
-            attempt: attempt + 1, maxAttempts: this.config.maxRetries + 1 },
-          'Upstox request failed after retries');
-          throw new ProviderUnavailableError('upstox', 'Upstox request failed after bounded retries', error);
+          this.logger.error(
+            {
+              event: 'provider.request.failed',
+              module: UpstoxClient.name,
+              provider: 'upstox',
+              operation: 'httpGet',
+              endpoint: safeEndpoint(url),
+              providerErrorCode: ProviderErrorCode.UNAVAILABLE,
+              retryable: true,
+              attempt: attempt + 1,
+              maxAttempts: this.config.maxRetries + 1,
+            },
+            'Upstox request failed after retries',
+          );
+          throw new ProviderUnavailableError(
+            'upstox',
+            'Upstox request failed after bounded retries',
+            error,
+          );
         }
         const delayMs = this.retryDelay(attempt);
-        this.logger.warn({ event: 'provider.request.retrying', module: UpstoxClient.name,
-          provider: 'upstox', operation: 'httpGet', endpoint: safeEndpoint(url),
-          attempt: attempt + 1, maxAttempts: this.config.maxRetries + 1,
-          delayMs, reason: 'network_failure' }, 'Upstox request will be retried');
+        this.logger.warn(
+          {
+            event: 'provider.request.retrying',
+            module: UpstoxClient.name,
+            provider: 'upstox',
+            operation: 'httpGet',
+            endpoint: safeEndpoint(url),
+            attempt: attempt + 1,
+            maxAttempts: this.config.maxRetries + 1,
+            delayMs,
+            reason: 'network_failure',
+          },
+          'Upstox request will be retried',
+        );
         await this.delay(delayMs, context?.signal);
       }
     }
@@ -127,16 +184,24 @@ export class UpstoxClient {
   private httpError(response: Response): ProviderError {
     const retryAfterSeconds = this.retryAfterSeconds(response.headers.get('retry-after'));
     if (response.status === 401 || response.status === 403) {
-      return new ProviderAuthenticationError('upstox', `Upstox authentication failed with HTTP ${response.status}`);
+      return new ProviderAuthenticationError(
+        'upstox',
+        `Upstox authentication failed with HTTP ${response.status}`,
+      );
     }
     if (response.status === 429) {
       return new ProviderRateLimitError('upstox', 'Upstox rate limit exceeded', retryAfterSeconds);
     }
     if (response.status >= 500) {
-      return new ProviderUnavailableError('upstox', `Upstox is unavailable (HTTP ${response.status})`);
+      return new ProviderUnavailableError(
+        'upstox',
+        `Upstox is unavailable (HTTP ${response.status})`,
+      );
     }
     return new ProviderError(`Upstox rejected the request (HTTP ${response.status})`, {
-      provider: 'upstox', code: ProviderErrorCode.REQUEST_REJECTED, retryable: false,
+      provider: 'upstox',
+      code: ProviderErrorCode.REQUEST_REJECTED,
+      retryable: false,
     });
   }
 
@@ -145,10 +210,12 @@ export class UpstoxClient {
   }
 
   private retryDelay(attempt: number, error?: ProviderError): number {
-    const retryAfter = error instanceof ProviderRateLimitError ? error.retryAfterSeconds : undefined;
-    return Math.min(retryAfter === undefined
-      ? this.config.retryBaseDelayMs * (2 ** attempt)
-      : retryAfter * 1000, 30_000);
+    const retryAfter =
+      error instanceof ProviderRateLimitError ? error.retryAfterSeconds : undefined;
+    return Math.min(
+      retryAfter === undefined ? this.config.retryBaseDelayMs * 2 ** attempt : retryAfter * 1000,
+      30_000,
+    );
   }
 
   private retryAfterSeconds(value: string | null): number | undefined {
@@ -168,25 +235,42 @@ export class UpstoxClient {
       const cancel = () => {
         clearTimeout(timer);
         signal?.removeEventListener('abort', cancel);
-        reject(new ProviderError('Upstox request was cancelled', {
-          provider: 'upstox', code: ProviderErrorCode.REQUEST_REJECTED, retryable: false,
-        }));
+        reject(
+          new ProviderError('Upstox request was cancelled', {
+            provider: 'upstox',
+            code: ProviderErrorCode.REQUEST_REJECTED,
+            retryable: false,
+          }),
+        );
       };
       signal?.addEventListener('abort', cancel, { once: true });
     });
   }
 
   private invalidResponse(message: string): ProviderError {
-    this.logger.error({ event: 'provider.response.invalid', module: UpstoxClient.name,
-      provider: 'upstox', operation: 'parseResponse',
-      providerErrorCode: ProviderErrorCode.INVALID_RESPONSE, retryable: false },
-    'Upstox response was invalid');
+    this.logger.error(
+      {
+        event: 'provider.response.invalid',
+        module: UpstoxClient.name,
+        provider: 'upstox',
+        operation: 'parseResponse',
+        providerErrorCode: ProviderErrorCode.INVALID_RESPONSE,
+        retryable: false,
+      },
+      'Upstox response was invalid',
+    );
     return new ProviderError(message, {
-      provider: 'upstox', code: ProviderErrorCode.INVALID_RESPONSE, retryable: false,
+      provider: 'upstox',
+      code: ProviderErrorCode.INVALID_RESPONSE,
+      retryable: false,
     });
   }
 }
 
 function safeEndpoint(url: string): string {
-  try { return new URL(url).pathname; } catch { return 'unknown'; }
+  try {
+    return new URL(url).pathname;
+  } catch {
+    return 'unknown';
+  }
 }

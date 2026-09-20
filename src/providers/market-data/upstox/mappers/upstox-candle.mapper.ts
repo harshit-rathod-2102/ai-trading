@@ -4,7 +4,10 @@ import { UpstoxCandleTuple } from '../dto/upstox-historical-response';
 import { UpstoxQuoteOhlc } from '../dto/upstox-quote-response';
 
 const marketDateFormatter = new Intl.DateTimeFormat('en-CA', {
-  timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit',
+  timeZone: 'Asia/Kolkata',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
 });
 
 export function mapUpstoxCandle(tuple: UpstoxCandleTuple): ProviderCandle {
@@ -63,6 +66,8 @@ function nullableIntegerString(value: unknown, field: string): string | null {
 
 function invalidResponse(message: string): ProviderError {
   return new ProviderError(message, {
-    provider: 'upstox', code: ProviderErrorCode.INVALID_RESPONSE, retryable: false,
+    provider: 'upstox',
+    code: ProviderErrorCode.INVALID_RESPONSE,
+    retryable: false,
   });
 }

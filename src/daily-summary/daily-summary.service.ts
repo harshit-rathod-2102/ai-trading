@@ -61,9 +61,11 @@ export class DailySummaryService {
     private readonly profileService: TradingProfileService,
     private readonly portfolioRiskReader: PortfolioRiskReaderService,
     private readonly messageBuilder: DailySummaryMessageBuilder,
-    @InjectRepository(DailySummaryRecord) private readonly summaries: Repository<DailySummaryRecord>,
+    @InjectRepository(DailySummaryRecord)
+    private readonly summaries: Repository<DailySummaryRecord>,
     @InjectRepository(DailyPipelineRun) private readonly pipelineRuns: Repository<DailyPipelineRun>,
-    @InjectRepository(MarketRegimeSnapshot) private readonly regimes: Repository<MarketRegimeSnapshot>,
+    @InjectRepository(MarketRegimeSnapshot)
+    private readonly regimes: Repository<MarketRegimeSnapshot>,
     @InjectRepository(ScanRun) private readonly scanRuns: Repository<ScanRun>,
     @InjectRepository(TradeCandidate) private readonly candidates: Repository<TradeCandidate>,
     @InjectRepository(Trade) private readonly trades: Repository<Trade>,
@@ -79,16 +81,20 @@ export class DailySummaryService {
     this.validateDate(marketDate);
     const startedAt = performance.now();
     const generatedAt = new Date();
-    this.logger.log({ event: 'daily_summary.build.started', marketDate,
-      version: DAILY_SUMMARY_VERSION }, 'Daily summary build started');
+    this.logger.log(
+      { event: 'daily_summary.build.started', marketDate, version: DAILY_SUMMARY_VERSION },
+      'Daily summary build started',
+    );
     try {
       const [{ start, end }, pipeline, regime, candidateRows, openTrades] = await Promise.all([
         Promise.resolve(marketDateUtcBounds(marketDate)),
         this.pipelineRuns.findOne({ where: { marketDate }, order: { updatedAt: 'DESC' } }),
         this.regimes.findOne({ where: { marketDate }, order: { calculatedAt: 'DESC' } }),
         this.candidates.find({ where: { marketDate }, order: { globalRank: 'ASC', id: 'ASC' } }),
-        this.trades.find({ where: { status: In([TradeStatus.OPEN, TradeStatus.PARTIALLY_CLOSED]) },
-          order: { createdAt: 'ASC', id: 'ASC' } }),
+        this.trades.find({
+          where: { status: In([TradeStatus.OPEN, TradeStatus.PARTIALLY_CLOSED]) },
+          order: { createdAt: 'ASC', id: 'ASC' },
+        }),
       ]);
       const rangeEnd = new Date(end.getTime() - 1);
       const [scan, realized, portfolio] = await Promise.all([
@@ -101,25 +107,45 @@ export class DailySummaryService {
 
       const warnings: string[] = [];
       this.pipelineWarnings(pipeline, warnings);
-      if (scan?.status === ScanStatus.FAILED) warnings.push('Scanner failed; candidate counts do not represent a zero-opportunity day.');
+      if (scan?.status === ScanStatus.FAILED)
+        warnings.push('Scanner failed; candidate counts do not represent a zero-opportunity day.');
       if (!scan) warnings.push('No scanner run is available for the requested market date.');
-      if (regime?.warnings?.length) warnings.push(...regime.warnings.map(value => `Market regime: ${value}`));
+      if (regime?.warnings?.length)
+        warnings.push(...regime.warnings.map((value) => `Market regime: ${value}`));
       warnings.push(...realized.warnings, ...portfolio.warnings);
 
-      const tradeItems = openTrades.map(trade => this.tradeItem(trade, marketDate, generatedAt));
-      const stalePriceCount = tradeItems.filter(item => item.priceStatus === 'STALE').length;
-      const unavailablePriceCount = tradeItems.filter(item => item.priceStatus === 'UNAVAILABLE').length;
-      if (stalePriceCount) warnings.push(`${stalePriceCount} open trade price(s) are stale; P&L uses the last persisted monitor observation.`);
-      if (unavailablePriceCount) warnings.push(`${unavailablePriceCount} open trade(s) have no reliable monitored price; aggregate position value and P&L are omitted.`);
+      const tradeItems = openTrades.map((trade) => this.tradeItem(trade, marketDate, generatedAt));
+      const stalePriceCount = tradeItems.filter((item) => item.priceStatus === 'STALE').length;
+      const unavailablePriceCount = tradeItems.filter(
+        (item) => item.priceStatus === 'UNAVAILABLE',
+      ).length;
+      if (stalePriceCount)
+        warnings.push(
+          `${stalePriceCount} open trade price(s) are stale; P&L uses the last persisted monitor observation.`,
+        );
+      if (unavailablePriceCount)
+        warnings.push(
+          `${unavailablePriceCount} open trade(s) have no reliable monitored price; aggregate position value and P&L are omitted.`,
+        );
 
       const candidateSummary = this.candidateSummary(candidateRows, pipeline);
       const regimeSource = scan?.marketRegimeSnapshot ?? regime;
-      const allTradeValuesAvailable = tradeItems.every(item =>
-        item.currentPrice !== null && item.unrealizedPnl !== null && item.priceObservedAt !== null);
+      const allTradeValuesAvailable = tradeItems.every(
+        (item) =>
+          item.currentPrice !== null &&
+          item.unrealizedPnl !== null &&
+          item.priceObservedAt !== null,
+      );
       const currentPositionValue = allTradeValuesAvailable
-        ? sum(openTrades.map(trade => new Decimal(trade.currentPrice as string).times(trade.quantity))) : null;
+        ? sum(
+            openTrades.map((trade) =>
+              new Decimal(trade.currentPrice as string).times(trade.quantity),
+            ),
+          )
+        : null;
       const unrealizedPnl = allTradeValuesAvailable
-        ? sum(openTrades.map(trade => new Decimal(trade.unrealizedPnl as string))) : null;
+        ? sum(openTrades.map((trade) => new Decimal(trade.unrealizedPnl as string)))
+        : null;
       const maxTrades = this.config.getOrThrow<number>('dailySummary.maxTrades');
       const summary: DailySummary = {
         version: DAILY_SUMMARY_VERSION,
@@ -127,7 +153,8 @@ export class DailySummaryService {
         pipeline: {
           status: pipeline?.status ?? 'UNAVAILABLE',
           runId: pipeline?.id ?? null,
-          failedAnalysisCount: pipeline?.candidateAnalysisFailures ?? candidateSummary.failedAnalysisCount,
+          failedAnalysisCount:
+            pipeline?.candidateAnalysisFailures ?? candidateSummary.failedAnalysisCount,
         },
         market: {
           regime: text(regimeSource?.regime),
@@ -157,48 +184,81 @@ export class DailySummaryService {
         warnings: unique(warnings),
         generatedAt,
       };
-      this.logger.log({ event: 'daily_summary.build.completed', marketDate,
-        qualifiedCount: summary.candidates.qualifiedCount, openTradeCount: summary.portfolio.openTrades,
-        pipelineStatus: summary.pipeline.status, scanStatus: summary.scan.status,
-        warningCount: summary.warnings.length, durationMs: elapsedMilliseconds(startedAt) },
-      'Daily summary build completed');
+      this.logger.log(
+        {
+          event: 'daily_summary.build.completed',
+          marketDate,
+          qualifiedCount: summary.candidates.qualifiedCount,
+          openTradeCount: summary.portfolio.openTrades,
+          pipelineStatus: summary.pipeline.status,
+          scanStatus: summary.scan.status,
+          warningCount: summary.warnings.length,
+          durationMs: elapsedMilliseconds(startedAt),
+        },
+        'Daily summary build completed',
+      );
       return summary;
     } catch (error: unknown) {
-      this.logger.error({ event: 'daily_summary.build.failed', marketDate,
-        durationMs: elapsedMilliseconds(startedAt), ...structuredError(error) },
-      'Daily summary build failed');
+      this.logger.error(
+        {
+          event: 'daily_summary.build.failed',
+          marketDate,
+          durationMs: elapsedMilliseconds(startedAt),
+          ...structuredError(error),
+        },
+        'Daily summary build failed',
+      );
       if (error instanceof BadRequestException) throw error;
-      throw new ServiceUnavailableException({ code: DailySummaryErrorCode.SUMMARY_BUILD_FAILED,
-        message: error instanceof Error ? error.message : 'Daily summary build failed' });
+      throw new ServiceUnavailableException({
+        code: DailySummaryErrorCode.SUMMARY_BUILD_FAILED,
+        message: error instanceof Error ? error.message : 'Daily summary build failed',
+      });
     }
   }
 
   async sendSummary(marketDate: string): Promise<DailySummaryResult> {
     this.validateDate(marketDate);
     const startedAt = performance.now();
-    this.logger.log({ event: 'daily_summary.send.started', marketDate,
-      version: DAILY_SUMMARY_VERSION }, 'Daily summary send started');
+    this.logger.log(
+      { event: 'daily_summary.send.started', marketDate, version: DAILY_SUMMARY_VERSION },
+      'Daily summary send started',
+    );
     const existing = await this.summaries.findOneBy({ marketDate, version: DAILY_SUMMARY_VERSION });
     if (existing?.status === DailySummaryStatus.SENT) {
-      this.logger.log({ event: 'daily_summary.reused', marketDate, summaryId: existing.id,
-        providerMessageId: existing.providerMessageId, status: existing.status },
-      'Existing daily summary delivery reused');
+      this.logger.log(
+        {
+          event: 'daily_summary.reused',
+          marketDate,
+          summaryId: existing.id,
+          providerMessageId: existing.providerMessageId,
+          status: existing.status,
+        },
+        'Existing daily summary delivery reused',
+      );
       return this.result(existing, true);
     }
 
     const preview = existing ? null : await this.preview(marketDate);
     const claim = await this.claimDelivery(marketDate, preview);
     if (claim.reused) {
-      this.logger.log({ event: 'daily_summary.reused', marketDate, summaryId: claim.record.id,
-        providerMessageId: claim.record.providerMessageId, status: claim.record.status },
-      'Existing daily summary delivery reused');
+      this.logger.log(
+        {
+          event: 'daily_summary.reused',
+          marketDate,
+          summaryId: claim.record.id,
+          providerMessageId: claim.record.providerMessageId,
+          status: claim.record.status,
+        },
+        'Existing daily summary delivery reused',
+      );
       return this.result(claim.record, true);
     }
 
     const record = claim.record;
     try {
       const recipient = this.config.get<string>('metaWhatsapp.allowedSender')?.trim();
-      if (!recipient) throw new ServiceUnavailableException('META_WHATSAPP_ALLOWED_SENDER is required');
+      if (!recipient)
+        throw new ServiceUnavailableException('META_WHATSAPP_ALLOWED_SENDER is required');
       const delivery = await this.messaging.sendMessage({
         recipient,
         messageType: MessageType.TEXT,
@@ -216,38 +276,66 @@ export class DailySummaryService {
       record.errorMessage = null;
       const saved = await this.summaries.save(record);
       const summary = fromSnapshot(saved.summarySnapshot);
-      this.logger.log({ event: 'daily_summary.sent', marketDate, summaryId: saved.id,
-        qualifiedCount: summary.candidates.qualifiedCount, openTradeCount: summary.portfolio.openTrades,
-        providerMessageId: saved.providerMessageId, durationMs: elapsedMilliseconds(startedAt),
-        status: saved.status }, 'Daily summary sent');
+      this.logger.log(
+        {
+          event: 'daily_summary.sent',
+          marketDate,
+          summaryId: saved.id,
+          qualifiedCount: summary.candidates.qualifiedCount,
+          openTradeCount: summary.portfolio.openTrades,
+          providerMessageId: saved.providerMessageId,
+          durationMs: elapsedMilliseconds(startedAt),
+          status: saved.status,
+        },
+        'Daily summary sent',
+      );
       return this.result(saved, false);
     } catch (error: unknown) {
       record.status = DailySummaryStatus.FAILED;
-      record.errorMessage = (error instanceof Error ? error.message : 'Messaging delivery failed').slice(0, 4000);
+      record.errorMessage = (
+        error instanceof Error ? error.message : 'Messaging delivery failed'
+      ).slice(0, 4000);
       await this.summaries.save(record);
-      this.logger.error({ event: 'daily_summary.send.failed', marketDate, summaryId: record.id,
-        qualifiedCount: record.summarySnapshot.candidates.qualifiedCount,
-        openTradeCount: record.summarySnapshot.portfolio.openTrades,
-        durationMs: elapsedMilliseconds(startedAt), ...structuredError(error) },
-      'Daily summary send failed');
-      throw new ServiceUnavailableException({ code: DailySummaryErrorCode.MESSAGING_DELIVERY_FAILED,
-        message: record.errorMessage, summaryId: record.id });
+      this.logger.error(
+        {
+          event: 'daily_summary.send.failed',
+          marketDate,
+          summaryId: record.id,
+          qualifiedCount: record.summarySnapshot.candidates.qualifiedCount,
+          openTradeCount: record.summarySnapshot.portfolio.openTrades,
+          durationMs: elapsedMilliseconds(startedAt),
+          ...structuredError(error),
+        },
+        'Daily summary send failed',
+      );
+      throw new ServiceUnavailableException({
+        code: DailySummaryErrorCode.MESSAGING_DELIVERY_FAILED,
+        message: record.errorMessage,
+        summaryId: record.id,
+      });
     }
   }
 
   private candidateSummary(rows: readonly TradeCandidate[], pipeline: DailyPipelineRun | null) {
-    const qualified = rows.filter(candidate => candidateOutcome(candidate) === 'QUALIFIED');
-    const waitCount = rows.filter(candidate => candidateOutcome(candidate) === 'WAIT').length;
-    const rejectedCount = rows.filter(candidate => candidateOutcome(candidate) === 'REJECTED').length;
-    const pending = rows.filter(candidate => candidateOutcome(candidate) === null &&
-      [CandidateStatus.NEW, CandidateStatus.ANALYZED].includes(candidate.status)).length;
+    const qualified = rows.filter((candidate) => candidateOutcome(candidate) === 'QUALIFIED');
+    const waitCount = rows.filter((candidate) => candidateOutcome(candidate) === 'WAIT').length;
+    const rejectedCount = rows.filter(
+      (candidate) => candidateOutcome(candidate) === 'REJECTED',
+    ).length;
+    const pending = rows.filter(
+      (candidate) =>
+        candidateOutcome(candidate) === null &&
+        [CandidateStatus.NEW, CandidateStatus.ANALYZED].includes(candidate.status),
+    ).length;
     const maxCandidates = this.config.getOrThrow<number>('dailySummary.maxCandidates');
-    const ordered = [...qualified].sort((left, right) =>
-      (left.globalRank ?? Number.MAX_SAFE_INTEGER) - (right.globalRank ?? Number.MAX_SAFE_INTEGER) ||
-      left.symbol.localeCompare(right.symbol));
+    const ordered = [...qualified].sort(
+      (left, right) =>
+        (left.globalRank ?? Number.MAX_SAFE_INTEGER) -
+          (right.globalRank ?? Number.MAX_SAFE_INTEGER) || left.symbol.localeCompare(right.symbol),
+    );
     return {
       qualifiedCount: qualified.length,
-      qualified: ordered.slice(0, maxCandidates).map(candidate => this.candidateItem(candidate)),
+      qualified: ordered.slice(0, maxCandidates).map((candidate) => this.candidateItem(candidate)),
       waitCount,
       rejectedCount,
       failedAnalysisCount: Math.max(pipeline?.candidateAnalysisFailures ?? 0, pending),
@@ -260,10 +348,15 @@ export class DailySummaryService {
     const risk = record(candidate.riskSnapshot);
     const outcome = candidateOutcome(candidate);
     const notificationStatus: DailyCandidateSummaryItem['notificationStatus'] =
-      candidate.notificationSnapshot || candidate.notifiedAt || candidate.status === CandidateStatus.NOTIFIED
+      candidate.notificationSnapshot ||
+      candidate.notifiedAt ||
+      candidate.status === CandidateStatus.NOTIFIED
         ? 'SENT'
-        : candidate.status === CandidateStatus.QUALIFIED ? 'PENDING'
-          : outcome === 'QUALIFIED' ? 'NOT_SENT' : 'NOT_APPLICABLE';
+        : candidate.status === CandidateStatus.QUALIFIED
+          ? 'PENDING'
+          : outcome === 'QUALIFIED'
+            ? 'NOT_SENT'
+            : 'NOT_APPLICABLE';
     return {
       candidateId: candidate.id,
       symbol: candidate.symbol,
@@ -275,7 +368,9 @@ export class DailySummaryService {
       quantity: candidate.suggestedQuantity,
       plannedRisk: numericText(risk?.plannedLossAtStop),
       aiSummary: text(selected?.summary),
-      primaryRisk: firstString(selected?.redFlags) ?? firstString(selected?.bearishFactors) ??
+      primaryRisk:
+        firstString(selected?.redFlags) ??
+        firstString(selected?.bearishFactors) ??
         firstString(selected?.invalidationConcerns),
       notificationStatus,
       currentStatus: candidate.status,
@@ -287,8 +382,12 @@ export class DailySummaryService {
     if (trade.currentPrice && trade.lastPriceObservedAt) {
       const staleMinutes = this.config.getOrThrow<number>('dailySummary.priceStaleMinutes');
       const ageMinutes = (generatedAt.getTime() - trade.lastPriceObservedAt.getTime()) / 60_000;
-      priceStatus = marketClock(trade.lastPriceObservedAt).marketDate === marketDate &&
-        ageMinutes >= 0 && ageMinutes <= staleMinutes ? 'CURRENT' : 'STALE';
+      priceStatus =
+        marketClock(trade.lastPriceObservedAt).marketDate === marketDate &&
+        ageMinutes >= 0 &&
+        ageMinutes <= staleMinutes
+          ? 'CURRENT'
+          : 'STALE';
     }
     return {
       tradeId: trade.id,
@@ -317,8 +416,13 @@ export class DailySummaryService {
         warnings: [...calculation.warnings],
       };
     } catch (error: unknown) {
-      return { openRisk: openTrades.length ? null : '0.0000', maxPortfolioRisk: null,
-        warnings: [`Portfolio risk unavailable: ${error instanceof Error ? error.message : 'unknown failure'}`] };
+      return {
+        openRisk: openTrades.length ? null : '0.0000',
+        maxPortfolioRisk: null,
+        warnings: [
+          `Portfolio risk unavailable: ${error instanceof Error ? error.message : 'unknown failure'}`,
+        ],
+      };
     }
   }
 
@@ -334,7 +438,9 @@ export class DailySummaryService {
       for (const event of events) {
         const recorded = numericText(record(event.data)?.realizedPnl);
         if (event.price && event.quantity && event.trade?.actualEntry) {
-          total = total.plus(new Decimal(event.price).minus(event.trade.actualEntry).times(event.quantity));
+          total = total.plus(
+            new Decimal(event.price).minus(event.trade.actualEntry).times(event.quantity),
+          );
         } else if (recorded !== null) {
           total = total.plus(recorded);
         } else {
@@ -343,9 +449,16 @@ export class DailySummaryService {
       }
       return { value: total.toDecimalPlaces(4).toFixed(4), warnings };
     }
-    const closed = await this.trades.find({ where: { closedAt: Between(start, end),
-      status: In([TradeStatus.CLOSED, TradeStatus.STOPPED_OUT]) } });
-    return { value: sum(closed.map(trade => new Decimal(trade.realizedPnl))) ?? '0.0000', warnings };
+    const closed = await this.trades.find({
+      where: {
+        closedAt: Between(start, end),
+        status: In([TradeStatus.CLOSED, TradeStatus.STOPPED_OUT]),
+      },
+    });
+    return {
+      value: sum(closed.map((trade) => new Decimal(trade.realizedPnl))) ?? '0.0000',
+      warnings,
+    };
   }
 
   private pipelineWarnings(pipeline: DailyPipelineRun | null, warnings: string[]): void {
@@ -354,39 +467,58 @@ export class DailySummaryService {
       return;
     }
     if (pipeline.status === DailyPipelineStatus.PARTIAL) {
-      warnings.push(`Pipeline is PARTIAL; ${pipeline.candidateAnalysisFailures} candidate analysis failure(s) remain.`);
+      warnings.push(
+        `Pipeline is PARTIAL; ${pipeline.candidateAnalysisFailures} candidate analysis failure(s) remain.`,
+      );
     } else if (pipeline.status === DailyPipelineStatus.FAILED) {
       warnings.push(`Pipeline FAILED${pipeline.errorMessage ? `: ${pipeline.errorMessage}` : '.'}`);
     } else if (pipeline.status === DailyPipelineStatus.STARTED) {
       warnings.push('Pipeline is still STARTED; candidate analysis may be incomplete.');
     }
-    if (pipeline.marketDataStatus !== 'CURRENT') warnings.push(`Market data status is ${pipeline.marketDataStatus}.`);
-    if (pipeline.newsFailures) warnings.push(`${pipeline.newsFailures} news enrichment failure(s).`);
+    if (pipeline.marketDataStatus !== 'CURRENT')
+      warnings.push(`Market data status is ${pipeline.marketDataStatus}.`);
+    if (pipeline.newsFailures)
+      warnings.push(`${pipeline.newsFailures} news enrichment failure(s).`);
     if (pipeline.aiFailures) warnings.push(`${pipeline.aiFailures} AI analysis failure(s).`);
-    if (pipeline.notificationFailures) warnings.push(`${pipeline.notificationFailures} candidate notification failure(s).`);
+    if (pipeline.notificationFailures)
+      warnings.push(`${pipeline.notificationFailures} candidate notification failure(s).`);
   }
 
-  private async claimDelivery(marketDate: string, preview: DailySummaryPreview | null): Promise<SummaryClaim> {
-    return this.dataSource.transaction(async manager => {
+  private async claimDelivery(
+    marketDate: string,
+    preview: DailySummaryPreview | null,
+  ): Promise<SummaryClaim> {
+    return this.dataSource.transaction(async (manager) => {
       await manager.query('LOCK TABLE daily_summaries IN SHARE ROW EXCLUSIVE MODE');
       const repository = manager.getRepository(DailySummaryRecord);
       let recordValue = await repository.findOneBy({ marketDate, version: DAILY_SUMMARY_VERSION });
-      if (recordValue?.status === DailySummaryStatus.SENT) return { record: recordValue, reused: true };
+      if (recordValue?.status === DailySummaryStatus.SENT)
+        return { record: recordValue, reused: true };
       if (recordValue?.status === DailySummaryStatus.SENDING) {
         const lease = this.config.getOrThrow<number>('dailySummary.sendLeaseMinutes') * 60_000;
         if (Date.now() - recordValue.updatedAt.getTime() < lease) {
-          throw new ConflictException({ code: DailySummaryErrorCode.SUMMARY_SEND_IN_PROGRESS,
-            message: 'Daily summary delivery is already in progress', summaryId: recordValue.id });
+          throw new ConflictException({
+            code: DailySummaryErrorCode.SUMMARY_SEND_IN_PROGRESS,
+            message: 'Daily summary delivery is already in progress',
+            summaryId: recordValue.id,
+          });
         }
       }
       if (!recordValue) {
         if (!preview) throw new Error('Daily summary preview is required for first delivery');
         recordValue = repository.create({
-          id: randomUUID(), marketDate, version: DAILY_SUMMARY_VERSION,
+          id: randomUUID(),
+          marketDate,
+          version: DAILY_SUMMARY_VERSION,
           status: DailySummaryStatus.GENERATED,
-          summarySnapshot: toSnapshot(preview.summary), messageText: preview.message,
-          provider: null, providerMessageId: null, deliveryAttempts: 0,
-          generatedAt: preview.summary.generatedAt, sentAt: null, errorMessage: null,
+          summarySnapshot: toSnapshot(preview.summary),
+          messageText: preview.message,
+          provider: null,
+          providerMessageId: null,
+          deliveryAttempts: 0,
+          generatedAt: preview.summary.generatedAt,
+          sentAt: null,
+          errorMessage: null,
         });
       }
       recordValue.status = DailySummaryStatus.SENDING;
@@ -411,8 +543,10 @@ export class DailySummaryService {
 
   private validateDate(marketDate: string): void {
     if (!isSessionDate(marketDate)) {
-      throw new BadRequestException({ code: DailySummaryErrorCode.SUMMARY_DATE_INVALID,
-        message: 'marketDate must be a real date in YYYY-MM-DD format' });
+      throw new BadRequestException({
+        code: DailySummaryErrorCode.SUMMARY_DATE_INVALID,
+        message: 'marketDate must be a real date in YYYY-MM-DD format',
+      });
     }
   }
 }
@@ -420,7 +554,11 @@ export class DailySummaryService {
 function candidateOutcome(candidate: TradeCandidate): 'QUALIFIED' | 'WAIT' | 'REJECTED' | null {
   const outcome = text(record(candidate.decisionSnapshot)?.outcome);
   if (outcome === 'QUALIFIED' || outcome === 'WAIT' || outcome === 'REJECTED') return outcome;
-  if ([CandidateStatus.QUALIFIED, CandidateStatus.NOTIFIED, CandidateStatus.ACCEPTED].includes(candidate.status)) {
+  if (
+    [CandidateStatus.QUALIFIED, CandidateStatus.NOTIFIED, CandidateStatus.ACCEPTED].includes(
+      candidate.status,
+    )
+  ) {
     return 'QUALIFIED';
   }
   if (candidate.status === CandidateStatus.WAIT) return 'WAIT';
@@ -438,28 +576,40 @@ function fromSnapshot(snapshot: DailySummarySnapshot): DailySummary {
 
 function record(value: unknown): Record<string, unknown> | null {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
-    ? value as Record<string, unknown> : null;
+    ? (value as Record<string, unknown>)
+    : null;
 }
 
 function text(value: unknown): string | null {
-  return typeof value === 'string' && value.trim() ? value.trim() :
-    typeof value === 'number' && Number.isFinite(value) ? String(value) : null;
+  return typeof value === 'string' && value.trim()
+    ? value.trim()
+    : typeof value === 'number' && Number.isFinite(value)
+      ? String(value)
+      : null;
 }
 
 function numericText(value: unknown): string | null {
   const candidate = text(value);
   if (candidate === null) return null;
-  try { return new Decimal(candidate).toDecimalPlaces(4).toFixed(4); } catch { return null; }
+  try {
+    return new Decimal(candidate).toDecimalPlaces(4).toFixed(4);
+  } catch {
+    return null;
+  }
 }
 
 function firstString(value: unknown): string | null {
   return Array.isArray(value)
-    ? value.find(item => typeof item === 'string' && item.trim())?.trim() ?? null : null;
+    ? (value.find((item) => typeof item === 'string' && item.trim())?.trim() ?? null)
+    : null;
 }
 
 function sum(values: readonly Decimal[]): string | null {
   if (!values.length) return '0.0000';
-  return values.reduce((total, value) => total.plus(value), new Decimal(0)).toDecimalPlaces(4).toFixed(4);
+  return values
+    .reduce((total, value) => total.plus(value), new Decimal(0))
+    .toDecimalPlaces(4)
+    .toFixed(4);
 }
 
 function unique(values: readonly string[]): string[] {

@@ -6,9 +6,7 @@ export function elapsedMilliseconds(startedAt: number): number {
 
 export function structuredError(error: unknown): StructuredError {
   if (error instanceof Error) {
-    const code = 'code' in error
-      ? (error as Error & { code?: string | number }).code
-      : undefined;
+    const code = 'code' in error ? (error as Error & { code?: string | number }).code : undefined;
     return {
       errorName: error.name,
       errorMessage: error.message,
@@ -18,4 +16,3 @@ export function structuredError(error: unknown): StructuredError {
   }
   return { errorName: 'UnknownError', errorMessage: String(error) };
 }
-

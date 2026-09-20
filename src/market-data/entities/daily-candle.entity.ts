@@ -1,4 +1,12 @@
-import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, PrimaryColumn, UpdateDateColumn } from 'typeorm';
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  PrimaryColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 import { Instrument } from '../../instruments/entities/instrument.entity';
 
 @Entity('daily_candles')
@@ -6,7 +14,8 @@ export class DailyCandle {
   @PrimaryColumn('uuid') id!: string;
   @Column({ name: 'instrument_id', type: 'uuid' }) instrumentId!: string;
   @ManyToOne(() => Instrument, { onDelete: 'RESTRICT' })
-  @JoinColumn({ name: 'instrument_id' }) instrument!: Instrument;
+  @JoinColumn({ name: 'instrument_id' })
+  instrument!: Instrument;
   @Column({ name: 'session_date', type: 'date' }) sessionDate!: string;
   @Column({ type: 'numeric', precision: 18, scale: 4 }) open!: string;
   @Column({ type: 'numeric', precision: 18, scale: 4 }) high!: string;

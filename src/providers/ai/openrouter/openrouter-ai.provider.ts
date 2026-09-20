@@ -5,10 +5,7 @@ import { CandidateAnalysisInput } from '../models/candidate-analysis-input';
 import { CandidateAnalysisResult } from '../models/candidate-analysis-result';
 import { ProviderError, ProviderErrorCode } from '../../provider-error';
 import { ProviderRequestContext } from '../../provider-request-context';
-import {
-  OpenRouterClient,
-  OpenRouterStructuredOutputUnsupportedError,
-} from './openrouter-client';
+import { OpenRouterClient, OpenRouterStructuredOutputUnsupportedError } from './openrouter-client';
 import { OPENROUTER_CONFIG, OpenRouterConfig } from './openrouter.config';
 import { mapOpenRouterAnalysis } from './mappers/openrouter-analysis.mapper';
 import {
@@ -82,22 +79,39 @@ export class OpenRouterAiProvider implements AiProvider {
     const cacheKey = snapshotKey(input, this.config.model);
     const cached = this.cache.get(cacheKey);
     if (cached && cached.expiresAt > Date.now()) {
-      this.logger.debug({ event: 'provider.cache.hit', module: OpenRouterAiProvider.name,
-        provider: 'openrouter', operation: 'analyzeCandidate', symbol: input.symbol,
-        strategyVersion: input.strategyVersion, requestedModel: this.config.model },
-      'OpenRouter analysis cache hit');
+      this.logger.debug(
+        {
+          event: 'provider.cache.hit',
+          module: OpenRouterAiProvider.name,
+          provider: 'openrouter',
+          operation: 'analyzeCandidate',
+          symbol: input.symbol,
+          strategyVersion: input.strategyVersion,
+          requestedModel: this.config.model,
+        },
+        'OpenRouter analysis cache hit',
+      );
       return cached.result;
     }
     if (cached) this.cache.delete(cacheKey);
 
     const startedAt = performance.now();
-    const fields = { module: OpenRouterAiProvider.name, provider: 'openrouter',
-      operation: 'analyzeCandidate', endpoint: '/chat/completions', symbol: input.symbol,
-      strategy: input.strategy, strategyVersion: input.strategyVersion,
-      promptVersion: CANDIDATE_ANALYSIS_PROMPT_VERSION, requestedModel: this.config.model,
-      newsArticleCount: input.newsArticles.length };
-    this.logger.debug({ event: 'provider.request.started', ...fields },
-    'OpenRouter analysis started');
+    const fields = {
+      module: OpenRouterAiProvider.name,
+      provider: 'openrouter',
+      operation: 'analyzeCandidate',
+      endpoint: '/chat/completions',
+      symbol: input.symbol,
+      strategy: input.strategy,
+      strategyVersion: input.strategyVersion,
+      promptVersion: CANDIDATE_ANALYSIS_PROMPT_VERSION,
+      requestedModel: this.config.model,
+      newsArticleCount: input.newsArticles.length,
+    };
+    this.logger.debug(
+      { event: 'provider.request.started', ...fields },
+      'OpenRouter analysis started',
+    );
 
     try {
       let response;
@@ -107,9 +121,16 @@ export class OpenRouterAiProvider implements AiProvider {
       } catch (error: unknown) {
         if (!(error instanceof OpenRouterStructuredOutputUnsupportedError)) throw error;
         structuredOutput = false;
-        this.logger.warn({ event: 'provider.request.retrying', ...fields, attempt: 2,
-          maxAttempts: 2, reason: 'structured_output_unsupported' },
-        'OpenRouter analysis is retrying without structured output');
+        this.logger.warn(
+          {
+            event: 'provider.request.retrying',
+            ...fields,
+            attempt: 2,
+            maxAttempts: 2,
+            reason: 'structured_output_unsupported',
+          },
+          'OpenRouter analysis is retrying without structured output',
+        );
         response = await this.client.createChatCompletion(this.request(input, false), context);
       }
 
@@ -124,17 +145,31 @@ export class OpenRouterAiProvider implements AiProvider {
           : undefined,
       };
       this.remember(cacheKey, enriched);
-      this.logger.debug({ event: 'provider.request.completed', ...fields,
-        resolvedModel: enriched.modelMetadata?.model, recommendation: enriched.recommendation,
-        durationMs: elapsedMilliseconds(startedAt), status: 'completed' },
-      'OpenRouter analysis completed');
+      this.logger.debug(
+        {
+          event: 'provider.request.completed',
+          ...fields,
+          resolvedModel: enriched.modelMetadata?.model,
+          recommendation: enriched.recommendation,
+          durationMs: elapsedMilliseconds(startedAt),
+          status: 'completed',
+        },
+        'OpenRouter analysis completed',
+      );
       return enriched;
     } catch (error: unknown) {
-      this.logger.error({ event: 'provider.request.failed', ...fields,
-        providerErrorCode: error instanceof ProviderError ? error.code : undefined,
-        retryable: error instanceof ProviderError ? error.retryable : undefined,
-        durationMs: elapsedMilliseconds(startedAt), status: 'failed',
-        ...structuredError(error) }, 'OpenRouter analysis failed');
+      this.logger.error(
+        {
+          event: 'provider.request.failed',
+          ...fields,
+          providerErrorCode: error instanceof ProviderError ? error.code : undefined,
+          retryable: error instanceof ProviderError ? error.retryable : undefined,
+          durationMs: elapsedMilliseconds(startedAt),
+          status: 'failed',
+          ...structuredError(error),
+        },
+        'OpenRouter analysis failed',
+      );
       throw error;
     }
   }
@@ -145,7 +180,10 @@ export class OpenRouterAiProvider implements AiProvider {
     context?: ProviderRequestContext,
   ): Promise<FastTriageResult> {
     validateFastInput(input);
-    if (options.tier !== AiAnalysisTier.FAST || options.promptVersion !== CANDIDATE_FAST_TRIAGE_PROMPT_VERSION) {
+    if (
+      options.tier !== AiAnalysisTier.FAST ||
+      options.promptVersion !== CANDIDATE_FAST_TRIAGE_PROMPT_VERSION
+    ) {
       throw rejected('OpenRouter FAST triage received unsupported tier or prompt version');
     }
     const requestedModel = options.requestedModel?.trim() || this.config.fastModel;
@@ -156,22 +194,40 @@ export class OpenRouterAiProvider implements AiProvider {
     );
     const cached = this.fastCache.get(cacheKey);
     if (!options.bypassCache && cached && cached.expiresAt > Date.now()) {
-      this.logger.debug({ event: 'provider.cache.hit', module: OpenRouterAiProvider.name,
-        provider: 'openrouter', operation: 'triageCandidate', symbol: input.symbol,
-        strategyVersion: input.strategyVersion, requestedModel },
-      'OpenRouter FAST triage cache hit');
+      this.logger.debug(
+        {
+          event: 'provider.cache.hit',
+          module: OpenRouterAiProvider.name,
+          provider: 'openrouter',
+          operation: 'triageCandidate',
+          symbol: input.symbol,
+          strategyVersion: input.strategyVersion,
+          requestedModel,
+        },
+        'OpenRouter FAST triage cache hit',
+      );
       return cached.result;
     }
     if (cached) this.fastCache.delete(cacheKey);
 
     const startedAt = performance.now();
-    const fields = { module: OpenRouterAiProvider.name, provider: 'openrouter',
-      operation: 'triageCandidate', endpoint: '/chat/completions', symbol: input.symbol,
-      strategy: input.strategy, strategyVersion: input.strategyVersion,
-      promptVersion: options.promptVersion, analysisTier: options.tier, requestedModel,
-      newsArticleCount: articleCount(input.newsSnapshot) };
-    this.logger.debug({ event: 'provider.request.started', ...fields },
-    'OpenRouter FAST triage started');
+    const fields = {
+      module: OpenRouterAiProvider.name,
+      provider: 'openrouter',
+      operation: 'triageCandidate',
+      endpoint: '/chat/completions',
+      symbol: input.symbol,
+      strategy: input.strategy,
+      strategyVersion: input.strategyVersion,
+      promptVersion: options.promptVersion,
+      analysisTier: options.tier,
+      requestedModel,
+      newsArticleCount: articleCount(input.newsSnapshot),
+    };
+    this.logger.debug(
+      { event: 'provider.request.started', ...fields },
+      'OpenRouter FAST triage started',
+    );
 
     try {
       let response;
@@ -184,9 +240,16 @@ export class OpenRouterAiProvider implements AiProvider {
       } catch (error: unknown) {
         if (!(error instanceof OpenRouterStructuredOutputUnsupportedError)) throw error;
         structuredOutput = false;
-        this.logger.warn({ event: 'provider.request.retrying', ...fields, attempt: 2,
-          maxAttempts: 2, reason: 'structured_output_unsupported' },
-        'OpenRouter FAST triage is retrying without structured output');
+        this.logger.warn(
+          {
+            event: 'provider.request.retrying',
+            ...fields,
+            attempt: 2,
+            maxAttempts: 2,
+            reason: 'structured_output_unsupported',
+          },
+          'OpenRouter FAST triage is retrying without structured output',
+        );
         response = await this.client.createChatCompletion(
           this.fastRequest(input, requestedModel, false),
           context,
@@ -200,17 +263,30 @@ export class OpenRouterAiProvider implements AiProvider {
         structuredOutput,
       });
       if (!options.bypassCache) this.rememberFast(cacheKey, result);
-      this.logger.debug({ event: 'provider.request.completed', ...fields,
-        resolvedModel: result.modelMetadata.resolvedModel,
-        durationMs: elapsedMilliseconds(startedAt), status: 'completed' },
-      'OpenRouter FAST triage completed');
+      this.logger.debug(
+        {
+          event: 'provider.request.completed',
+          ...fields,
+          resolvedModel: result.modelMetadata.resolvedModel,
+          durationMs: elapsedMilliseconds(startedAt),
+          status: 'completed',
+        },
+        'OpenRouter FAST triage completed',
+      );
       return result;
     } catch (error: unknown) {
-      this.logger.error({ event: 'provider.request.failed', ...fields,
-        providerErrorCode: error instanceof ProviderError ? error.code : undefined,
-        retryable: error instanceof ProviderError ? error.retryable : undefined,
-        durationMs: elapsedMilliseconds(startedAt), status: 'failed',
-        ...structuredError(error) }, 'OpenRouter FAST triage failed');
+      this.logger.error(
+        {
+          event: 'provider.request.failed',
+          ...fields,
+          providerErrorCode: error instanceof ProviderError ? error.code : undefined,
+          retryable: error instanceof ProviderError ? error.retryable : undefined,
+          durationMs: elapsedMilliseconds(startedAt),
+          status: 'failed',
+          ...structuredError(error),
+        },
+        'OpenRouter FAST triage failed',
+      );
       throw error;
     }
   }
@@ -221,7 +297,10 @@ export class OpenRouterAiProvider implements AiProvider {
     context?: ProviderRequestContext,
   ): Promise<DeepReviewResult> {
     validateDeepInput(input);
-    if (options.tier !== AiAnalysisTier.DEEP || options.promptVersion !== CANDIDATE_DEEP_REVIEW_PROMPT_VERSION) {
+    if (
+      options.tier !== AiAnalysisTier.DEEP ||
+      options.promptVersion !== CANDIDATE_DEEP_REVIEW_PROMPT_VERSION
+    ) {
       throw rejected('OpenRouter DEEP review received unsupported tier or prompt version');
     }
     if (options.requestedModel?.trim() && options.requestedModel.trim() !== this.config.deepModel) {
@@ -235,24 +314,42 @@ export class OpenRouterAiProvider implements AiProvider {
     );
     const cached = this.deepCache.get(cacheKey);
     if (!options.bypassCache && cached && cached.expiresAt > Date.now()) {
-      this.logger.debug({ event: 'provider.cache.hit', module: OpenRouterAiProvider.name,
-        provider: 'openrouter', operation: 'reviewCandidate', symbol: input.symbol,
-        strategyVersion: input.strategyVersion, requestedModel },
-      'OpenRouter DEEP review cache hit');
+      this.logger.debug(
+        {
+          event: 'provider.cache.hit',
+          module: OpenRouterAiProvider.name,
+          provider: 'openrouter',
+          operation: 'reviewCandidate',
+          symbol: input.symbol,
+          strategyVersion: input.strategyVersion,
+          requestedModel,
+        },
+        'OpenRouter DEEP review cache hit',
+      );
       return cached.result;
     }
     if (cached) this.deepCache.delete(cacheKey);
 
     const startedAt = performance.now();
-    const fields = { module: OpenRouterAiProvider.name, provider: 'openrouter',
-      operation: 'reviewCandidate', endpoint: '/chat/completions', symbol: input.symbol,
-      strategy: input.strategy, strategyVersion: input.strategyVersion,
-      promptVersion: options.promptVersion, analysisTier: options.tier, requestedModel,
+    const fields = {
+      module: OpenRouterAiProvider.name,
+      provider: 'openrouter',
+      operation: 'reviewCandidate',
+      endpoint: '/chat/completions',
+      symbol: input.symbol,
+      strategy: input.strategy,
+      strategyVersion: input.strategyVersion,
+      promptVersion: options.promptVersion,
+      analysisTier: options.tier,
+      requestedModel,
       routingVersion: input.routingDecision.version,
       routingReasons: input.routingDecision.reasons,
-      newsArticleCount: articleCount(input.newsSnapshot) };
-    this.logger.debug({ event: 'provider.request.started', ...fields },
-    'OpenRouter DEEP review started');
+      newsArticleCount: articleCount(input.newsSnapshot),
+    };
+    this.logger.debug(
+      { event: 'provider.request.started', ...fields },
+      'OpenRouter DEEP review started',
+    );
 
     try {
       let response;
@@ -265,9 +362,16 @@ export class OpenRouterAiProvider implements AiProvider {
       } catch (error: unknown) {
         if (!(error instanceof OpenRouterStructuredOutputUnsupportedError)) throw error;
         structuredOutput = false;
-        this.logger.warn({ event: 'provider.request.retrying', ...fields, attempt: 2,
-          maxAttempts: 2, reason: 'structured_output_unsupported' },
-        'OpenRouter DEEP review is retrying without structured output');
+        this.logger.warn(
+          {
+            event: 'provider.request.retrying',
+            ...fields,
+            attempt: 2,
+            maxAttempts: 2,
+            reason: 'structured_output_unsupported',
+          },
+          'OpenRouter DEEP review is retrying without structured output',
+        );
         response = await this.client.createChatCompletion(
           this.deepRequest(input, requestedModel, false),
           context,
@@ -282,24 +386,41 @@ export class OpenRouterAiProvider implements AiProvider {
         structuredOutput,
       });
       if (!options.bypassCache) this.rememberDeep(cacheKey, result);
-      this.logger.debug({ event: 'provider.request.completed', ...fields,
-        resolvedModel: result.modelMetadata.resolvedModel,
-        recommendation: result.recommendation,
-        overallRisk: result.overallRisk, eventRisk: result.eventRisk,
-        durationMs: elapsedMilliseconds(startedAt), status: 'completed' },
-      'OpenRouter DEEP review completed');
+      this.logger.debug(
+        {
+          event: 'provider.request.completed',
+          ...fields,
+          resolvedModel: result.modelMetadata.resolvedModel,
+          recommendation: result.recommendation,
+          overallRisk: result.overallRisk,
+          eventRisk: result.eventRisk,
+          durationMs: elapsedMilliseconds(startedAt),
+          status: 'completed',
+        },
+        'OpenRouter DEEP review completed',
+      );
       return result;
     } catch (error: unknown) {
-      this.logger.error({ event: 'provider.request.failed', ...fields,
-        providerErrorCode: error instanceof ProviderError ? error.code : undefined,
-        retryable: error instanceof ProviderError ? error.retryable : undefined,
-        durationMs: elapsedMilliseconds(startedAt), status: 'failed',
-        ...structuredError(error) }, 'OpenRouter DEEP review failed');
+      this.logger.error(
+        {
+          event: 'provider.request.failed',
+          ...fields,
+          providerErrorCode: error instanceof ProviderError ? error.code : undefined,
+          retryable: error instanceof ProviderError ? error.retryable : undefined,
+          durationMs: elapsedMilliseconds(startedAt),
+          status: 'failed',
+          ...structuredError(error),
+        },
+        'OpenRouter DEEP review failed',
+      );
       throw error;
     }
   }
 
-  private request(input: CandidateAnalysisInput, structured: boolean): Readonly<Record<string, unknown>> {
+  private request(
+    input: CandidateAnalysisInput,
+    structured: boolean,
+  ): Readonly<Record<string, unknown>> {
     const body: Record<string, unknown> = {
       model: this.config.model,
       stream: false,
@@ -435,10 +556,15 @@ function validateFastInput(input: FastTriageInput): void {
     ['strategyScore', input.strategyScore],
     ['rankingScore', input.rankingScore],
   ] as const) {
-    if (typeof value !== 'string' || !value.trim()) throw rejected(`FAST triage ${name} is required`);
+    if (typeof value !== 'string' || !value.trim())
+      throw rejected(`FAST triage ${name} is required`);
   }
-  if (!Number.isInteger(input.strategyRank) || input.strategyRank < 1 ||
-      !Number.isInteger(input.globalRank) || input.globalRank < 1) {
+  if (
+    !Number.isInteger(input.strategyRank) ||
+    input.strategyRank < 1 ||
+    !Number.isInteger(input.globalRank) ||
+    input.globalRank < 1
+  ) {
     throw rejected('FAST triage ranks must be positive integers');
   }
   for (const [name, value] of [
@@ -461,10 +587,15 @@ function validateDeepInput(input: DeepReviewInput): void {
     ['strategyScore', input.strategyScore],
     ['rankingScore', input.rankingScore],
   ] as const) {
-    if (typeof value !== 'string' || !value.trim()) throw rejected(`DEEP review ${name} is required`);
+    if (typeof value !== 'string' || !value.trim())
+      throw rejected(`DEEP review ${name} is required`);
   }
-  if (!Number.isInteger(input.strategyRank) || input.strategyRank < 1 ||
-      !Number.isInteger(input.globalRank) || input.globalRank < 1) {
+  if (
+    !Number.isInteger(input.strategyRank) ||
+    input.strategyRank < 1 ||
+    !Number.isInteger(input.globalRank) ||
+    input.globalRank < 1
+  ) {
     throw rejected('DEEP review ranks must be positive integers');
   }
   for (const [name, value] of [
@@ -479,14 +610,20 @@ function validateDeepInput(input: DeepReviewInput): void {
   ] as const) {
     if (!isRecord(value)) throw rejected(`DEEP review ${name} must be an object`);
   }
-  if (input.fastAnalysis.tier !== AiAnalysisTier.FAST ||
-      input.routingDecision.escalate !== true ||
-      input.routingDecision.tierSelected !== AiAnalysisTier.DEEP) {
+  if (
+    input.fastAnalysis.tier !== AiAnalysisTier.FAST ||
+    input.routingDecision.escalate !== true ||
+    input.routingDecision.tierSelected !== AiAnalysisTier.DEEP
+  ) {
     throw rejected('DEEP review requires an escalated FAST routing decision');
   }
 }
 
-function snapshotKey(input: unknown, model: string, promptVersion = CANDIDATE_ANALYSIS_PROMPT_VERSION): string {
+function snapshotKey(
+  input: unknown,
+  model: string,
+  promptVersion = CANDIDATE_ANALYSIS_PROMPT_VERSION,
+): string {
   const serialized = stableStringify({ input, model, promptVersion });
   return createHash('sha256').update(serialized).digest('hex');
 }
@@ -498,7 +635,10 @@ function articleCount(snapshot: Record<string, unknown>): number {
 function stableStringify(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
   if (isRecord(value)) {
-    return `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(',')}}`;
+    return `{${Object.keys(value)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`)
+      .join(',')}}`;
   }
   return JSON.stringify(value) ?? 'undefined';
 }

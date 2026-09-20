@@ -56,20 +56,39 @@ export class DailyPipelineService {
 
   async run(data: PostMarketJobData, job?: Job): Promise<Record<string, unknown>> {
     const marketDate = data.marketDate as string;
-    if (!await this.tradingDays.isTradingDay(marketDate)) {
-      this.logger.log({ event: 'job.skipped', operation: 'postMarketPipeline', marketDate,
-        reason: 'SKIPPED_NON_TRADING_DAY', triggerSource: data.triggerSource },
-      'Post-market pipeline skipped on non-trading day');
+    if (!(await this.tradingDays.isTradingDay(marketDate))) {
+      this.logger.log(
+        {
+          event: 'job.skipped',
+          operation: 'postMarketPipeline',
+          marketDate,
+          reason: 'SKIPPED_NON_TRADING_DAY',
+          triggerSource: data.triggerSource,
+        },
+        'Post-market pipeline skipped on non-trading day',
+      );
       return { status: 'SKIPPED_NON_TRADING_DAY', marketDate };
     }
 
-    const claim = await this.claim(marketDate, data.triggerSource,
-      job?.id === undefined ? undefined : String(job.id));
-    if (claim.reused) return { status: claim.run.status, pipelineRunId: claim.run.id, reused: true };
+    const claim = await this.claim(
+      marketDate,
+      data.triggerSource,
+      job?.id === undefined ? undefined : String(job.id),
+    );
+    if (claim.reused)
+      return { status: claim.run.status, pipelineRunId: claim.run.id, reused: true };
     const run = claim.run;
     const startedAt = performance.now();
-    this.logger.log({ event: 'daily_pipeline.started', pipelineRunId: run.id, marketDate,
-      version: DAILY_PIPELINE_VERSION, triggerSource: data.triggerSource }, 'Daily pipeline started');
+    this.logger.log(
+      {
+        event: 'daily_pipeline.started',
+        pipelineRunId: run.id,
+        marketDate,
+        version: DAILY_PIPELINE_VERSION,
+        triggerSource: data.triggerSource,
+      },
+      'Daily pipeline started',
+    );
     try {
       await job?.updateProgress(10);
       await this.runs.update(run.id, { marketDataStatus: 'SYNCING' });
@@ -77,8 +96,15 @@ export class DailyPipelineService {
       run.metadata = { ...run.metadata, marketData: sync };
       run.marketDataStatus = 'CURRENT';
       await this.runs.save(run);
-      this.logger.log({ event: 'daily_pipeline.market_data.completed', pipelineRunId: run.id,
-        marketDate, instrumentCount: sync.instrumentCount }, 'Daily market data completed');
+      this.logger.log(
+        {
+          event: 'daily_pipeline.market_data.completed',
+          pipelineRunId: run.id,
+          marketDate,
+          instrumentCount: sync.instrumentCount,
+        },
+        'Daily market data completed',
+      );
 
       await job?.updateProgress(25);
       const scan = await this.scanner.runDailyScan(new Date());
@@ -86,9 +112,16 @@ export class DailyPipelineService {
         throw new Error(`Scanner resolved ${scan.run.marketDate}; expected ${marketDate}`);
       }
       await this.runs.update(run.id, { scannerRunId: scan.run.id });
-      this.logger.log({ event: 'daily_pipeline.scanner.completed', pipelineRunId: run.id,
-        scannerRunId: scan.run.id, marketDate, shortlistCount: scan.shortlist.length },
-      'Daily scanner completed');
+      this.logger.log(
+        {
+          event: 'daily_pipeline.scanner.completed',
+          pipelineRunId: run.id,
+          scannerRunId: scan.run.id,
+          marketDate,
+          shortlistCount: scan.shortlist.length,
+        },
+        'Daily scanner completed',
+      );
 
       await job?.updateProgress(55);
       const candidates: Array<{ candidateId: string; evidenceHash: string }> = [];
@@ -108,12 +141,16 @@ export class DailyPipelineService {
           if (outcome.created) created += 1;
           candidates.push({
             candidateId: outcome.candidateId,
-            evidenceHash: createHash('sha256').update(stableStringify({
-              candidateId: outcome.candidate.id,
-              scanResultId: outcome.candidate.scanResultId,
-              technicalSnapshot: outcome.candidate.technicalSnapshot,
-              riskSnapshot: outcome.candidate.riskSnapshot,
-            })).digest('hex'),
+            evidenceHash: createHash('sha256')
+              .update(
+                stableStringify({
+                  candidateId: outcome.candidate.id,
+                  scanResultId: outcome.candidate.scanResultId,
+                  technicalSnapshot: outcome.candidate.technicalSnapshot,
+                  riskSnapshot: outcome.candidate.riskSnapshot,
+                }),
+              )
+              .digest('hex'),
           });
         } catch (error: unknown) {
           orchestrationFailures.push({
@@ -130,46 +167,74 @@ export class DailyPipelineService {
         candidateAnalysisFailures: orchestrationFailures.length,
         metadata: { ...run.metadata, orchestrationFailures },
       });
-      this.logger.log({ event: 'daily_pipeline.candidates.completed', pipelineRunId: run.id,
-        scannerRunId: scan.run.id, marketDate, candidatesCreated: created,
-        candidatesRiskRejected: riskRejected, candidateJobs: candidates.length,
-        orchestrationFailures: orchestrationFailures.length }, 'Daily candidates completed');
+      this.logger.log(
+        {
+          event: 'daily_pipeline.candidates.completed',
+          pipelineRunId: run.id,
+          scannerRunId: scan.run.id,
+          marketDate,
+          candidatesCreated: created,
+          candidatesRiskRejected: riskRejected,
+          candidateJobs: candidates.length,
+          orchestrationFailures: orchestrationFailures.length,
+        },
+        'Daily candidates completed',
+      );
 
       for (const candidate of candidates) {
-        await this.candidateQueue.add(CANDIDATE_ANALYSIS, {
-          pipelineRunId: run.id,
-          candidateId: candidate.candidateId,
-          marketDate,
-          evidenceHash: candidate.evidenceHash,
-        }, {
-          jobId: `candidate-analysis-${candidate.candidateId}-${candidate.evidenceHash}`,
-          attempts: 3,
-          backoff: { type: 'exponential', delay: 30_000 },
-          removeOnComplete: { count: 1000 },
-          removeOnFail: false,
-        });
+        await this.candidateQueue.add(
+          CANDIDATE_ANALYSIS,
+          {
+            pipelineRunId: run.id,
+            candidateId: candidate.candidateId,
+            marketDate,
+            evidenceHash: candidate.evidenceHash,
+          },
+          {
+            jobId: `candidate-analysis-${candidate.candidateId}-${candidate.evidenceHash}`,
+            attempts: 3,
+            backoff: { type: 'exponential', delay: 30_000 },
+            removeOnComplete: { count: 1000 },
+            removeOnFail: false,
+          },
+        );
       }
       await job?.updateProgress(candidates.length ? 60 : 100);
       if (!candidates.length) await this.finalizeIfComplete(run.id);
-      return { status: 'CANDIDATE_ANALYSIS_ENQUEUED', pipelineRunId: run.id,
-        scannerRunId: scan.run.id, candidateJobs: candidates.length };
+      return {
+        status: 'CANDIDATE_ANALYSIS_ENQUEUED',
+        pipelineRunId: run.id,
+        scannerRunId: scan.run.id,
+        candidateJobs: candidates.length,
+      };
     } catch (error: unknown) {
       await this.fail(run.id, error);
-      this.logger.error({ event: 'daily_pipeline.failed', pipelineRunId: run.id, marketDate,
-        durationMs: elapsedMilliseconds(startedAt), ...structuredError(error) }, 'Daily pipeline failed');
+      this.logger.error(
+        {
+          event: 'daily_pipeline.failed',
+          pipelineRunId: run.id,
+          marketDate,
+          durationMs: elapsedMilliseconds(startedAt),
+          ...structuredError(error),
+        },
+        'Daily pipeline failed',
+      );
       throw error;
     }
   }
 
   async hasSuccessfulRun(marketDate: string): Promise<boolean> {
-    return this.runs.existsBy({ marketDate, version: DAILY_PIPELINE_VERSION,
-      status: DailyPipelineStatus.SUCCESS });
+    return this.runs.existsBy({
+      marketDate,
+      version: DAILY_PIPELINE_VERSION,
+      status: DailyPipelineStatus.SUCCESS,
+    });
   }
 
   async recordCandidateSuccess(runId: string, summary: CandidateAnalysisSummary): Promise<void> {
     const recovered = await this.recoverCandidateFailure(runId, summary);
     if (recovered) return;
-    await this.recordCandidate(runId, summary.candidateId, run => {
+    await this.recordCandidate(runId, summary.candidateId, (run) => {
       this.addSummary(run, summary);
     });
   }
@@ -180,7 +245,7 @@ export class DailyPipelineService {
     stage: CandidateFailureStage,
     message: string,
   ): Promise<void> {
-    await this.recordCandidate(runId, candidateId, run => {
+    await this.recordCandidate(runId, candidateId, (run) => {
       run.candidateAnalysisFailures += 1;
       if (stage === 'NEWS') run.newsFailures += 1;
       if (stage === 'AI' || stage === 'DECISION') run.aiFailures += 1;
@@ -188,7 +253,8 @@ export class DailyPipelineService {
       const metadata = run.metadata as PipelineMetadata;
       metadata.failedCandidateIds = [...(metadata.failedCandidateIds ?? []), candidateId];
       metadata.failureStageByCandidate = {
-        ...(metadata.failureStageByCandidate ?? {}), [candidateId]: stage,
+        ...(metadata.failureStageByCandidate ?? {}),
+        [candidateId]: stage,
       };
       metadata.lastCandidateError = message.slice(0, 1000);
       run.metadata = metadata;
@@ -201,59 +267,99 @@ export class DailyPipelineService {
     const instruments = await this.instruments.list({ universe: universeCode, active: 'true' });
     const lookbackDays = this.config.getOrThrow<number>('scheduler.marketDataLookbackDays');
     const from = subtractCalendarDays(marketDate, lookbackDays);
-    for (const instrument of instruments) await this.marketData.refresh(instrument.id, from, marketDate);
+    for (const instrument of instruments)
+      await this.marketData.refresh(instrument.id, from, marketDate);
 
     const requiredSymbols = [
       ...MARKET_REGIME_V1_CONFIG.indexSymbols.nifty,
       ...MARKET_REGIME_V1_CONFIG.indexSymbols.vix,
     ];
-    const required = instruments.filter(instrument =>
-      instrument.type === InstrumentType.INDEX && requiredSymbols.includes(instrument.symbol as never));
+    const required = instruments.filter(
+      (instrument) =>
+        instrument.type === InstrumentType.INDEX &&
+        requiredSymbols.includes(instrument.symbol as never),
+    );
     for (const symbol of requiredSymbols) {
-      if (!required.some(instrument => instrument.symbol === symbol)) {
+      if (!required.some((instrument) => instrument.symbol === symbol)) {
         throw new Error(`Required benchmark ${symbol} is absent from ${universeCode}`);
       }
     }
     for (const instrument of required) {
       const quality = await this.marketData.quality(instrument.id, marketDate, marketDate);
-      if (quality.freshness !== 'CURRENT' || quality.validity !== 'VALID' ||
-          quality.completeness !== 'COMPLETE' || quality.latestExpectedSession !== marketDate) {
-        throw new Error(`Required benchmark ${instrument.symbol} is not current and valid for ${marketDate}`);
+      if (
+        quality.freshness !== 'CURRENT' ||
+        quality.validity !== 'VALID' ||
+        quality.completeness !== 'COMPLETE' ||
+        quality.latestExpectedSession !== marketDate
+      ) {
+        throw new Error(
+          `Required benchmark ${instrument.symbol} is not current and valid for ${marketDate}`,
+        );
       }
     }
-    return { universe: universeCode, instrumentCount: instruments.length, from, to: marketDate,
-      requiredBenchmarks: required.map(instrument => instrument.symbol) };
+    return {
+      universe: universeCode,
+      instrumentCount: instruments.length,
+      from,
+      to: marketDate,
+      requiredBenchmarks: required.map((instrument) => instrument.symbol),
+    };
   }
 
   private async claim(marketDate: string, triggerSource: JobTriggerSource, activeJobId?: string) {
-    return this.dataSource.transaction(async manager => {
+    return this.dataSource.transaction(async (manager) => {
       await manager.query('LOCK TABLE daily_pipeline_runs IN SHARE ROW EXCLUSIVE MODE');
       const repository = manager.getRepository(DailyPipelineRun);
       const existing = await repository.findOneBy({ marketDate, version: DAILY_PIPELINE_VERSION });
-      if (existing?.status === DailyPipelineStatus.SUCCESS ||
-          existing?.status === DailyPipelineStatus.PARTIAL) return { run: existing, reused: true };
+      if (
+        existing?.status === DailyPipelineStatus.SUCCESS ||
+        existing?.status === DailyPipelineStatus.PARTIAL
+      )
+        return { run: existing, reused: true };
       if (existing?.status === DailyPipelineStatus.STARTED) {
         const owner = (existing.metadata as PipelineMetadata).activeJobId;
         if (!activeJobId || owner !== activeJobId) return { run: existing, reused: true };
       }
       if (existing) {
-        Object.assign(existing, this.initialValues(triggerSource, activeJobId), { startedAt: new Date() });
+        Object.assign(existing, this.initialValues(triggerSource, activeJobId), {
+          startedAt: new Date(),
+        });
         return { run: await repository.save(existing), reused: false };
       }
-      const run = repository.create({ id: randomUUID(), marketDate, version: DAILY_PIPELINE_VERSION,
-        ...this.initialValues(triggerSource, activeJobId), startedAt: new Date() });
+      const run = repository.create({
+        id: randomUUID(),
+        marketDate,
+        version: DAILY_PIPELINE_VERSION,
+        ...this.initialValues(triggerSource, activeJobId),
+        startedAt: new Date(),
+      });
       return { run: await repository.save(run), reused: false };
     });
   }
 
   private initialValues(triggerSource: JobTriggerSource, activeJobId?: string) {
     return {
-      status: DailyPipelineStatus.STARTED, triggerSource, completedAt: null,
-      marketDataStatus: 'PENDING', scannerRunId: null, candidatesCreated: 0,
-      candidatesRiskRejected: 0, candidatesTotal: 0, candidatesProcessed: 0,
-      candidateAnalysisFailures: 0, newsEnriched: 0, fastAnalyzed: 0, deepAnalyzed: 0,
-      qualified: 0, waitCount: 0, rejected: 0, notified: 0, newsFailures: 0,
-      aiFailures: 0, notificationFailures: 0, errorMessage: null,
+      status: DailyPipelineStatus.STARTED,
+      triggerSource,
+      completedAt: null,
+      marketDataStatus: 'PENDING',
+      scannerRunId: null,
+      candidatesCreated: 0,
+      candidatesRiskRejected: 0,
+      candidatesTotal: 0,
+      candidatesProcessed: 0,
+      candidateAnalysisFailures: 0,
+      newsEnriched: 0,
+      fastAnalyzed: 0,
+      deepAnalyzed: 0,
+      qualified: 0,
+      waitCount: 0,
+      rejected: 0,
+      notified: 0,
+      newsFailures: 0,
+      aiFailures: 0,
+      notificationFailures: 0,
+      errorMessage: null,
       metadata: activeJobId ? { activeJobId } : {},
     } as const;
   }
@@ -263,9 +369,12 @@ export class DailyPipelineService {
     candidateId: string,
     update: (run: DailyPipelineRun) => void,
   ): Promise<void> {
-    await this.dataSource.transaction(async manager => {
+    await this.dataSource.transaction(async (manager) => {
       const repository = manager.getRepository(DailyPipelineRun);
-      const run = await repository.findOne({ where: { id: runId }, lock: { mode: 'pessimistic_write' } });
+      const run = await repository.findOne({
+        where: { id: runId },
+        lock: { mode: 'pessimistic_write' },
+      });
       if (!run || run.status === DailyPipelineStatus.FAILED) return;
       const metadata = run.metadata as PipelineMetadata;
       const processed = metadata.processedCandidateIds ?? [];
@@ -274,8 +383,10 @@ export class DailyPipelineService {
       run.candidatesProcessed += 1;
       run.metadata = { ...run.metadata, processedCandidateIds: [...processed, candidateId] };
       if (run.candidatesProcessed >= run.candidatesTotal) {
-        run.status = run.candidateAnalysisFailures > 0
-          ? DailyPipelineStatus.PARTIAL : DailyPipelineStatus.SUCCESS;
+        run.status =
+          run.candidateAnalysisFailures > 0
+            ? DailyPipelineStatus.PARTIAL
+            : DailyPipelineStatus.SUCCESS;
         run.completedAt = new Date();
       }
       await repository.save(run);
@@ -287,9 +398,12 @@ export class DailyPipelineService {
     runId: string,
     summary: CandidateAnalysisSummary,
   ): Promise<boolean> {
-    return this.dataSource.transaction(async manager => {
+    return this.dataSource.transaction(async (manager) => {
       const repository = manager.getRepository(DailyPipelineRun);
-      const run = await repository.findOne({ where: { id: runId }, lock: { mode: 'pessimistic_write' } });
+      const run = await repository.findOne({
+        where: { id: runId },
+        lock: { mode: 'pessimistic_write' },
+      });
       if (!run) return false;
       const metadata = run.metadata as PipelineMetadata;
       const failed = metadata.failedCandidateIds ?? [];
@@ -298,16 +412,20 @@ export class DailyPipelineService {
       run.candidateAnalysisFailures = Math.max(0, run.candidateAnalysisFailures - 1);
       if (stage === 'NEWS') run.newsFailures = Math.max(0, run.newsFailures - 1);
       if (stage === 'AI' || stage === 'DECISION') run.aiFailures = Math.max(0, run.aiFailures - 1);
-      if (stage === 'NOTIFICATION') run.notificationFailures = Math.max(0, run.notificationFailures - 1);
+      if (stage === 'NOTIFICATION')
+        run.notificationFailures = Math.max(0, run.notificationFailures - 1);
       this.addSummary(run, summary);
       const stages = { ...(metadata.failureStageByCandidate ?? {}) };
       delete stages[summary.candidateId];
-      run.metadata = { ...metadata,
-        failedCandidateIds: failed.filter(id => id !== summary.candidateId),
+      run.metadata = {
+        ...metadata,
+        failedCandidateIds: failed.filter((id) => id !== summary.candidateId),
         failureStageByCandidate: stages,
       };
-      run.status = run.candidateAnalysisFailures > 0
-        ? DailyPipelineStatus.PARTIAL : DailyPipelineStatus.SUCCESS;
+      run.status =
+        run.candidateAnalysisFailures > 0
+          ? DailyPipelineStatus.PARTIAL
+          : DailyPipelineStatus.SUCCESS;
       run.completedAt = new Date();
       await repository.save(run);
       this.logCompletion(run);
@@ -327,8 +445,8 @@ export class DailyPipelineService {
 
   private async finalizeIfComplete(runId: string): Promise<void> {
     const run = await this.runs.findOneByOrFail({ id: runId });
-    run.status = run.candidateAnalysisFailures > 0
-      ? DailyPipelineStatus.PARTIAL : DailyPipelineStatus.SUCCESS;
+    run.status =
+      run.candidateAnalysisFailures > 0 ? DailyPipelineStatus.PARTIAL : DailyPipelineStatus.SUCCESS;
     run.completedAt = new Date();
     await this.runs.save(run);
     this.logCompletion(run);
@@ -336,27 +454,58 @@ export class DailyPipelineService {
 
   private async fail(runId: string, error: unknown): Promise<void> {
     const current = await this.runs.findOneBy({ id: runId });
-    await this.runs.update(runId, { status: DailyPipelineStatus.FAILED,
+    await this.runs.update(runId, {
+      status: DailyPipelineStatus.FAILED,
       completedAt: new Date(),
       marketDataStatus: current?.marketDataStatus === 'CURRENT' ? 'CURRENT' : 'FAILED',
-      errorMessage: (error instanceof Error ? error.message : 'Unknown failure').slice(0, 4000) });
+      errorMessage: (error instanceof Error ? error.message : 'Unknown failure').slice(0, 4000),
+    });
   }
 
   private logCompletion(run: DailyPipelineRun): void {
-    this.logger.log({ event: 'daily_pipeline.analysis.completed', pipelineRunId: run.id,
-      marketDate: run.marketDate, newsEnriched: run.newsEnriched, fastAnalyzed: run.fastAnalyzed,
-      deepAnalyzed: run.deepAnalyzed, candidateAnalysisFailures: run.candidateAnalysisFailures },
-    'Daily candidate analysis completed');
-    this.logger.log({ event: 'daily_pipeline.notifications.completed', pipelineRunId: run.id,
-      marketDate: run.marketDate, qualified: run.qualified, wait: run.waitCount,
-      rejected: run.rejected, notified: run.notified,
-      notificationFailures: run.notificationFailures }, 'Daily notifications completed');
-    const event = run.status === DailyPipelineStatus.PARTIAL
-      ? 'daily_pipeline.partial' : 'daily_pipeline.completed';
-    this.logger.log({ event, pipelineRunId: run.id, marketDate: run.marketDate,
-      scannerRunId: run.scannerRunId, candidatesProcessed: run.candidatesProcessed,
-      candidateAnalysisFailures: run.candidateAnalysisFailures, newsFailures: run.newsFailures,
-      aiFailures: run.aiFailures, notificationFailures: run.notificationFailures,
-      status: run.status }, 'Daily pipeline completed');
+    this.logger.log(
+      {
+        event: 'daily_pipeline.analysis.completed',
+        pipelineRunId: run.id,
+        marketDate: run.marketDate,
+        newsEnriched: run.newsEnriched,
+        fastAnalyzed: run.fastAnalyzed,
+        deepAnalyzed: run.deepAnalyzed,
+        candidateAnalysisFailures: run.candidateAnalysisFailures,
+      },
+      'Daily candidate analysis completed',
+    );
+    this.logger.log(
+      {
+        event: 'daily_pipeline.notifications.completed',
+        pipelineRunId: run.id,
+        marketDate: run.marketDate,
+        qualified: run.qualified,
+        wait: run.waitCount,
+        rejected: run.rejected,
+        notified: run.notified,
+        notificationFailures: run.notificationFailures,
+      },
+      'Daily notifications completed',
+    );
+    const event =
+      run.status === DailyPipelineStatus.PARTIAL
+        ? 'daily_pipeline.partial'
+        : 'daily_pipeline.completed';
+    this.logger.log(
+      {
+        event,
+        pipelineRunId: run.id,
+        marketDate: run.marketDate,
+        scannerRunId: run.scannerRunId,
+        candidatesProcessed: run.candidatesProcessed,
+        candidateAnalysisFailures: run.candidateAnalysisFailures,
+        newsFailures: run.newsFailures,
+        aiFailures: run.aiFailures,
+        notificationFailures: run.notificationFailures,
+        status: run.status,
+      },
+      'Daily pipeline completed',
+    );
   }
 }

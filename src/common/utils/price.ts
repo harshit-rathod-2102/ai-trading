@@ -9,15 +9,24 @@ const MoneyDecimal = Decimal.clone({ precision: 40 });
 
 export function IsPrice(): PropertyDecorator {
   return Matches(PRICE_PATTERN, {
-    message: '$property must be a positive decimal string with at most 14 integer and 4 fractional digits',
+    message:
+      '$property must be a positive decimal string with at most 14 integer and 4 fractional digits',
   });
 }
 
 export function initialRisk(actualEntry: string, initialStop: string, quantity: number): string {
-  if (typeof actualEntry !== 'string' || !PRICE_PATTERN.test(actualEntry) ||
-      typeof initialStop !== 'string' || !PRICE_PATTERN.test(initialStop) ||
-      !Number.isInteger(quantity) || quantity < 1 || quantity > 2147483647) {
-    throw new BadRequestException('Valid decimal prices and a positive integer quantity are required');
+  if (
+    typeof actualEntry !== 'string' ||
+    !PRICE_PATTERN.test(actualEntry) ||
+    typeof initialStop !== 'string' ||
+    !PRICE_PATTERN.test(initialStop) ||
+    !Number.isInteger(quantity) ||
+    quantity < 1 ||
+    quantity > 2147483647
+  ) {
+    throw new BadRequestException(
+      'Valid decimal prices and a positive integer quantity are required',
+    );
   }
   const perShare = new MoneyDecimal(actualEntry).minus(initialStop);
   if (perShare.lte(0)) {

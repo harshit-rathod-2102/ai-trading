@@ -10,18 +10,30 @@ import { TREND_PULLBACK_V1_CONFIG } from './trend-pullback/trend-pullback-v1.con
 @Injectable()
 export class StrategyService {
   private readonly logger = new Logger(StrategyService.name);
-  constructor(private readonly breakout: MomentumBreakoutStrategy, private readonly pullback: TrendPullbackStrategy) {}
+  constructor(
+    private readonly breakout: MomentumBreakoutStrategy,
+    private readonly pullback: TrendPullbackStrategy,
+  ) {}
 
-  evaluateMomentumBreakout(input: StrategyInput): StrategyResult { return this.breakout.evaluate(input); }
-  evaluateTrendPullback(input: StrategyInput): StrategyResult { return this.pullback.evaluate(input); }
+  evaluateMomentumBreakout(input: StrategyInput): StrategyResult {
+    return this.breakout.evaluate(input);
+  }
+  evaluateTrendPullback(input: StrategyInput): StrategyResult {
+    return this.pullback.evaluate(input);
+  }
 
   evaluate(strategy: StrategyName, input: StrategyInput): StrategyResult {
     const startedAt = performance.now();
     let result: StrategyResult;
     switch (strategy) {
-      case StrategyName.MOMENTUM_BREAKOUT: result = this.evaluateMomentumBreakout(input); break;
-      case StrategyName.TREND_PULLBACK: result = this.evaluateTrendPullback(input); break;
-      default: throw new RangeError(`Unknown strategy: ${strategy}`);
+      case StrategyName.MOMENTUM_BREAKOUT:
+        result = this.evaluateMomentumBreakout(input);
+        break;
+      case StrategyName.TREND_PULLBACK:
+        result = this.evaluateTrendPullback(input);
+        break;
+      default:
+        throw new RangeError(`Unknown strategy: ${strategy}`);
     }
     this.logResult(input, result, startedAt);
     return result;
@@ -46,10 +58,21 @@ export class StrategyService {
   }
 
   private logResult(input: StrategyInput, result: StrategyResult, startedAt: number): void {
-    this.logger.debug({ event: 'strategy.evaluated', module: StrategyService.name,
-      operation: 'evaluate', symbol: input.instrument.symbol, strategy: result.strategy,
-      strategyVersion: result.strategyVersion, qualified: result.qualified, score: result.score,
-      rejectionCodes: result.rejectionCodes, durationMs: Math.round((performance.now() - startedAt) * 100) / 100,
-      status: 'completed' }, 'Strategy evaluated');
+    this.logger.debug(
+      {
+        event: 'strategy.evaluated',
+        module: StrategyService.name,
+        operation: 'evaluate',
+        symbol: input.instrument.symbol,
+        strategy: result.strategy,
+        strategyVersion: result.strategyVersion,
+        qualified: result.qualified,
+        score: result.score,
+        rejectionCodes: result.rejectionCodes,
+        durationMs: Math.round((performance.now() - startedAt) * 100) / 100,
+        status: 'completed',
+      },
+      'Strategy evaluated',
+    );
   }
 }

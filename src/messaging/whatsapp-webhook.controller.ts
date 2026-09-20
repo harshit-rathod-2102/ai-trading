@@ -1,13 +1,4 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Headers,
-  HttpCode,
-  Post,
-  Query,
-  Req,
-} from '@nestjs/common';
+import { Body, Controller, Get, Headers, HttpCode, Post, Query, Req } from '@nestjs/common';
 import { MetaWebhookDto } from '../providers/messaging/meta-whatsapp/dto/meta-webhook.dto';
 import { MetaWhatsAppWebhookService } from '../providers/messaging/meta-whatsapp/meta-whatsapp-webhook.service';
 

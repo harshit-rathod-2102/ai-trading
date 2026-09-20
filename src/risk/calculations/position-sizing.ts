@@ -26,11 +26,27 @@ export function calculatePositionSizing(input: PositionSizingInput): PositionSiz
   const quantityByRisk = quantity(input.riskBudget.div(input.riskPerShare), maximum);
   const quantityByPositionCap = quantity(input.maxPositionValue.div(input.entry), maximum);
   const quantityByAvailableCapital = quantity(input.availableCapital.div(input.entry), maximum);
-  const quantityByPortfolioRisk = quantity(input.remainingPortfolioRisk.div(input.riskPerShare), maximum);
-  const quantityBySectorExposure = input.remainingSectorCapacity === null ? null :
-    quantity(input.remainingSectorCapacity.div(input.entry), maximum);
-  const applicable = [quantityByRisk, quantityByPositionCap, quantityByAvailableCapital,
-    quantityByPortfolioRisk, ...(quantityBySectorExposure === null ? [] : [quantityBySectorExposure])];
-  return { quantityByRisk, quantityByPositionCap, quantityByAvailableCapital,
-    quantityByPortfolioRisk, quantityBySectorExposure, quantityBeforeHardRejections: Math.min(...applicable) };
+  const quantityByPortfolioRisk = quantity(
+    input.remainingPortfolioRisk.div(input.riskPerShare),
+    maximum,
+  );
+  const quantityBySectorExposure =
+    input.remainingSectorCapacity === null
+      ? null
+      : quantity(input.remainingSectorCapacity.div(input.entry), maximum);
+  const applicable = [
+    quantityByRisk,
+    quantityByPositionCap,
+    quantityByAvailableCapital,
+    quantityByPortfolioRisk,
+    ...(quantityBySectorExposure === null ? [] : [quantityBySectorExposure]),
+  ];
+  return {
+    quantityByRisk,
+    quantityByPositionCap,
+    quantityByAvailableCapital,
+    quantityByPortfolioRisk,
+    quantityBySectorExposure,
+    quantityBeforeHardRejections: Math.min(...applicable),
+  };
 }

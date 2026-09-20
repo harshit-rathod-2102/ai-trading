@@ -24,38 +24,54 @@ export class CandidatesService {
     private readonly journal: JournalService,
   ) {}
 
-  async create(input: CreateCandidateDto, source: EventSource = EventSource.SYSTEM): Promise<TradeCandidate> {
+  async create(
+    input: CreateCandidateDto,
+    source: EventSource = EventSource.SYSTEM,
+  ): Promise<TradeCandidate> {
     initialRisk(input.proposedEntry, input.proposedStop, input.suggestedQuantity);
     const candidate = await this.dataSource.transaction(async (manager) => {
       const repository = manager.getRepository(TradeCandidate);
-      const created = await repository.save(repository.create({
-        id: randomUUID(),
-        symbol: input.symbol,
-        exchange: input.exchange,
-        strategy: input.strategy,
-        strategyVersion: input.strategyVersion,
-        proposedEntry: input.proposedEntry,
-        proposedStop: input.proposedStop,
-        target1: input.target1 ?? null,
-        target2: input.target2 ?? null,
-        suggestedQuantity: input.suggestedQuantity,
-        quantScore: String(input.quantScore),
-        technicalSnapshot: input.technicalSnapshot,
-        riskSnapshot: input.riskSnapshot,
-        aiAnalysis: null,
-        status: CandidateStatus.NEW,
-        detectedAt: new Date(),
-      }));
+      const created = await repository.save(
+        repository.create({
+          id: randomUUID(),
+          symbol: input.symbol,
+          exchange: input.exchange,
+          strategy: input.strategy,
+          strategyVersion: input.strategyVersion,
+          proposedEntry: input.proposedEntry,
+          proposedStop: input.proposedStop,
+          target1: input.target1 ?? null,
+          target2: input.target2 ?? null,
+          suggestedQuantity: input.suggestedQuantity,
+          quantScore: String(input.quantScore),
+          technicalSnapshot: input.technicalSnapshot,
+          riskSnapshot: input.riskSnapshot,
+          aiAnalysis: null,
+          status: CandidateStatus.NEW,
+          detectedAt: new Date(),
+        }),
+      );
       await this.journal.record(manager, {
-        candidateId: created.id, eventType: TradeEventType.CANDIDATE_CREATED, source,
+        candidateId: created.id,
+        eventType: TradeEventType.CANDIDATE_CREATED,
+        source,
         data: { status: CandidateStatus.NEW },
       });
       return created;
     });
-    this.logger.log({ event: 'candidate.created', module: CandidatesService.name,
-      operation: 'create', candidateId: candidate.id, symbol: candidate.symbol,
-      strategy: candidate.strategy, strategyVersion: candidate.strategyVersion,
-      status: candidate.status }, 'Candidate created');
+    this.logger.log(
+      {
+        event: 'candidate.created',
+        module: CandidatesService.name,
+        operation: 'create',
+        candidateId: candidate.id,
+        symbol: candidate.symbol,
+        strategy: candidate.strategy,
+        strategyVersion: candidate.strategyVersion,
+        status: candidate.status,
+      },
+      'Candidate created',
+    );
     return candidate;
   }
 
@@ -79,35 +95,58 @@ export class CandidatesService {
 
   private async lockForUserDecision(manager: EntityManager, id: string): Promise<TradeCandidate> {
     const candidate = await manager.getRepository(TradeCandidate).findOne({
-      where: { id }, lock: { mode: 'pessimistic_write' },
+      where: { id },
+      lock: { mode: 'pessimistic_write' },
     });
     if (!candidate) throw new NotFoundException('Candidate not found');
-    if (candidate.status !== CandidateStatus.NEW && candidate.status !== CandidateStatus.QUALIFIED &&
-        candidate.status !== CandidateStatus.NOTIFIED) {
+    if (
+      candidate.status !== CandidateStatus.NEW &&
+      candidate.status !== CandidateStatus.QUALIFIED &&
+      candidate.status !== CandidateStatus.NOTIFIED
+    ) {
       throw new ConflictException(`Candidate in ${candidate.status} cannot be bought or skipped`);
     }
     return candidate;
   }
 
-  async skip(id: string, reason?: string, source: EventSource = EventSource.SYSTEM): Promise<TradeCandidate> {
+  async skip(
+    id: string,
+    reason?: string,
+    source: EventSource = EventSource.SYSTEM,
+  ): Promise<TradeCandidate> {
     const candidate = await this.dataSource.transaction(async (manager) => {
       const locked = await this.lockForUserDecision(manager, id);
       const previousStatus = locked.status;
       locked.status = CandidateStatus.SKIPPED;
       const saved = await manager.getRepository(TradeCandidate).save(locked);
       await this.journal.record(manager, {
-        candidateId: id, eventType: TradeEventType.CANDIDATE_SKIPPED, source,
+        candidateId: id,
+        eventType: TradeEventType.CANDIDATE_SKIPPED,
+        source,
         data: { previousStatus, status: CandidateStatus.SKIPPED, reason: reason ?? null },
       });
       return saved;
     });
-    this.logger.log({ event: 'candidate.skipped', module: CandidatesService.name,
-      operation: 'skip', candidateId: id, symbol: candidate.symbol,
-      strategy: candidate.strategy, status: candidate.status }, 'Candidate skipped');
+    this.logger.log(
+      {
+        event: 'candidate.skipped',
+        module: CandidatesService.name,
+        operation: 'skip',
+        candidateId: id,
+        symbol: candidate.symbol,
+        strategy: candidate.strategy,
+        status: candidate.status,
+      },
+      'Candidate skipped',
+    );
     return candidate;
   }
 
-  async buy(id: string, command: OpenTradeCommand, source: EventSource = EventSource.SYSTEM): Promise<Trade> {
+  async buy(
+    id: string,
+    command: OpenTradeCommand,
+    source: EventSource = EventSource.SYSTEM,
+  ): Promise<Trade> {
     const trade = await this.dataSource.transaction(async (manager) => {
       const candidate = await this.lockForUserDecision(manager, id);
       const previousStatus = candidate.status;
@@ -118,23 +157,49 @@ export class CandidatesService {
       candidate.status = CandidateStatus.ACCEPTED;
       await manager.getRepository(TradeCandidate).save(candidate);
       await this.journal.record(manager, {
-        candidateId: id, tradeId: opened.id, eventType: TradeEventType.TRADE_OPENED, source,
-        price: opened.actualEntry, quantity: opened.quantity,
+        candidateId: id,
+        tradeId: opened.id,
+        eventType: TradeEventType.TRADE_OPENED,
+        source,
+        price: opened.actualEntry,
+        quantity: opened.quantity,
         data: {
-          previousStatus, status: CandidateStatus.ACCEPTED,
-          plannedEntry: opened.plannedEntry, initialStop: opened.initialStop,
+          previousStatus,
+          status: CandidateStatus.ACCEPTED,
+          plannedEntry: opened.plannedEntry,
+          initialStop: opened.initialStop,
           initialRiskAmount: opened.initialRiskAmount,
         },
       });
       return opened;
     });
-    this.logger.log({ event: 'candidate.buy.accepted', module: CandidatesService.name,
-      operation: 'buy', candidateId: id, tradeId: trade.id, symbol: trade.symbol,
-      strategy: trade.strategy, status: CandidateStatus.ACCEPTED }, 'Candidate accepted');
-    this.logger.log({ event: 'trade.opened', module: CandidatesService.name,
-      operation: 'buy', tradeId: trade.id, candidateId: id, symbol: trade.symbol,
-      strategy: trade.strategy, eventType: TradeEventType.TRADE_OPENED,
-      status: trade.status }, 'Trade opened');
+    this.logger.log(
+      {
+        event: 'candidate.buy.accepted',
+        module: CandidatesService.name,
+        operation: 'buy',
+        candidateId: id,
+        tradeId: trade.id,
+        symbol: trade.symbol,
+        strategy: trade.strategy,
+        status: CandidateStatus.ACCEPTED,
+      },
+      'Candidate accepted',
+    );
+    this.logger.log(
+      {
+        event: 'trade.opened',
+        module: CandidatesService.name,
+        operation: 'buy',
+        tradeId: trade.id,
+        candidateId: id,
+        symbol: trade.symbol,
+        strategy: trade.strategy,
+        eventType: TradeEventType.TRADE_OPENED,
+        status: trade.status,
+      },
+      'Trade opened',
+    );
     return trade;
   }
 

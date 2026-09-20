@@ -6,11 +6,11 @@ export class TestMessageDto {
   @IsString() recipient!: string;
   @IsEnum(MessageType) messageType!: MessageType;
 
-  @ValidateIf(value => value.messageType === MessageType.TEXT)
+  @ValidateIf((value) => value.messageType === MessageType.TEXT)
   @IsString()
   text?: string;
 
-  @ValidateIf(value => value.messageType === MessageType.TEMPLATE)
+  @ValidateIf((value) => value.messageType === MessageType.TEMPLATE)
   @IsString()
   templateId?: string;
 

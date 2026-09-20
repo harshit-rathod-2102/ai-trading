@@ -14,10 +14,12 @@ export interface MetaTemplateMessageDto {
   readonly template: {
     readonly name: string;
     readonly language: { readonly code: string };
-    readonly components?: readonly [{
-      readonly type: 'body';
-      readonly parameters: readonly { readonly type: 'text'; readonly text: string }[];
-    }];
+    readonly components?: readonly [
+      {
+        readonly type: 'body';
+        readonly parameters: readonly { readonly type: 'text'; readonly text: string }[];
+      },
+    ];
   };
 }
 

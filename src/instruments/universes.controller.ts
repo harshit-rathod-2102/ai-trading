@@ -5,8 +5,12 @@ import { CreateUniverseDto, UniverseCodeDto, UniverseMemberParamsDto } from './d
 @Controller('universes')
 export class UniversesController {
   constructor(private readonly instruments: InstrumentsService) {}
-  @Post() create(@Body() input: CreateUniverseDto) { return this.instruments.createUniverse(input); }
-  @Get() list() { return this.instruments.listUniverses(); }
+  @Post() create(@Body() input: CreateUniverseDto) {
+    return this.instruments.createUniverse(input);
+  }
+  @Get() list() {
+    return this.instruments.listUniverses();
+  }
   @Get(':code/instruments')
   async members(@Param() params: UniverseCodeDto) {
     await this.instruments.getUniverse(params.code);

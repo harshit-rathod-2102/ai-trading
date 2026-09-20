@@ -96,6 +96,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function invalidResponse(message: string): ProviderError {
   return new ProviderError(message, {
-    provider: 'gnews', code: ProviderErrorCode.INVALID_RESPONSE, retryable: false,
+    provider: 'gnews',
+    code: ProviderErrorCode.INVALID_RESPONSE,
+    retryable: false,
   });
 }

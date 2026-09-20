@@ -4,7 +4,10 @@ import { InstrumentType } from '../../common/enums/instrument-type.enum';
 import { ProviderError, ProviderErrorCode } from '../../providers/provider-error';
 import { ProviderRequestContext } from '../../providers/provider-request-context';
 import { MarketDataProvider } from '../../providers/market-data/market-data-provider.interface';
-import { AdjustmentBasis, CandleInterval } from '../../providers/market-data/models/market-data.enums';
+import {
+  AdjustmentBasis,
+  CandleInterval,
+} from '../../providers/market-data/models/market-data.enums';
 import {
   GetInstrumentsRequest,
   HistoricalCandlesRequest,
@@ -19,19 +22,37 @@ import { ProviderLatestPrice } from '../../providers/market-data/models/provider
 const DATES = ['2026-09-07', '2026-09-08', '2026-09-09', '2026-09-10', '2026-09-11'];
 const CATALOG: readonly ProviderInstrument[] = [
   {
-    symbol: 'RELIANCE', exchange: Exchange.NSE, name: 'Reliance Industries (demo data)',
-    instrumentType: InstrumentType.EQUITY, sector: null, industry: null,
-    providerInstrumentId: 'fixture:NSE:RELIANCE', providerSymbol: null, isIndex: false,
+    symbol: 'RELIANCE',
+    exchange: Exchange.NSE,
+    name: 'Reliance Industries (demo data)',
+    instrumentType: InstrumentType.EQUITY,
+    sector: null,
+    industry: null,
+    providerInstrumentId: 'fixture:NSE:RELIANCE',
+    providerSymbol: null,
+    isIndex: false,
   },
   {
-    symbol: 'TCS', exchange: Exchange.NSE, name: 'Tata Consultancy Services (demo data)',
-    instrumentType: InstrumentType.EQUITY, sector: null, industry: null,
-    providerInstrumentId: 'fixture:NSE:TCS', providerSymbol: null, isIndex: false,
+    symbol: 'TCS',
+    exchange: Exchange.NSE,
+    name: 'Tata Consultancy Services (demo data)',
+    instrumentType: InstrumentType.EQUITY,
+    sector: null,
+    industry: null,
+    providerInstrumentId: 'fixture:NSE:TCS',
+    providerSymbol: null,
+    isIndex: false,
   },
   {
-    symbol: 'NIFTY50', exchange: Exchange.NSE, name: 'Nifty 50 (demo data)',
-    instrumentType: InstrumentType.INDEX, sector: null, industry: null,
-    providerInstrumentId: 'fixture:NSE:NIFTY50', providerSymbol: null, isIndex: true,
+    symbol: 'NIFTY50',
+    exchange: Exchange.NSE,
+    name: 'Nifty 50 (demo data)',
+    instrumentType: InstrumentType.INDEX,
+    sector: null,
+    industry: null,
+    providerInstrumentId: 'fixture:NSE:NIFTY50',
+    providerSymbol: null,
+    isIndex: true,
   },
 ];
 
@@ -71,10 +92,14 @@ export class FixtureMarketDataProvider implements MarketDataProvider {
     context: ProviderRequestContext = {},
   ): Promise<readonly ProviderInstrument[]> {
     context.signal?.throwIfAborted();
-    return CATALOG
-      .filter(item => request.exchange === undefined || item.exchange === request.exchange)
-      .filter(item => request.instrumentType === undefined || item.instrumentType === request.instrumentType)
-      .map(item => ({ ...item }));
+    return CATALOG.filter(
+      (item) => request.exchange === undefined || item.exchange === request.exchange,
+    )
+      .filter(
+        (item) =>
+          request.instrumentType === undefined || item.instrumentType === request.instrumentType,
+      )
+      .map((item) => ({ ...item }));
   }
 
   async getTradingCalendar(
@@ -90,7 +115,7 @@ export class FixtureMarketDataProvider implements MarketDataProvider {
       isSynthetic: true,
       coverageFrom: '2026-09-07',
       coverageTo: '2026-09-13',
-      sessions: DATES.map(date => ({
+      sessions: DATES.map((date) => ({
         date,
         closeAt: date + 'T10:00:00.000Z',
       })),
@@ -105,19 +130,20 @@ export class FixtureMarketDataProvider implements MarketDataProvider {
     if (request.interval !== CandleInterval.ONE_DAY) {
       throw this.rejected('Fixture supports daily candles only');
     }
-    const match = CATALOG.find(item =>
-      item.symbol === request.instrument.symbol &&
-      item.exchange === request.instrument.exchange &&
-      item.instrumentType === request.instrument.instrumentType &&
-      (request.instrument.providerInstrumentId === undefined ||
-        item.providerInstrumentId === request.instrument.providerInstrumentId),
+    const match = CATALOG.find(
+      (item) =>
+        item.symbol === request.instrument.symbol &&
+        item.exchange === request.instrument.exchange &&
+        item.instrumentType === request.instrument.instrumentType &&
+        (request.instrument.providerInstrumentId === undefined ||
+          item.providerInstrumentId === request.instrument.providerInstrumentId),
     );
     if (!match) throw this.rejected('Instrument is not supported by fixture-v1');
     if (request.from < '2026-09-07' || request.to > '2026-09-13') {
       throw this.rejected('Fixture coverage is 2026-09-07 through 2026-09-13 only');
     }
-    return ROWS[match.symbol].map(
-      ([open, high, low, close, volume], index): ProviderCandle => ({
+    return ROWS[match.symbol]
+      .map(([open, high, low, close, volume], index): ProviderCandle => ({
         timestamp: DATES[index] + 'T10:00:00.000Z',
         sessionDate: DATES[index],
         open,
@@ -126,8 +152,8 @@ export class FixtureMarketDataProvider implements MarketDataProvider {
         close,
         volume,
         adjustedClose: null,
-      }),
-    ).filter(bar => bar.sessionDate >= request.from && bar.sessionDate <= request.to);
+      }))
+      .filter((bar) => bar.sessionDate >= request.from && bar.sessionDate <= request.to);
   }
 
   async getLatestPrice(
@@ -135,12 +161,14 @@ export class FixtureMarketDataProvider implements MarketDataProvider {
     context: ProviderRequestContext = {},
   ): Promise<ProviderLatestPrice | null> {
     context.signal?.throwIfAborted();
-    const match = CATALOG.find(item =>
-      item.symbol === request.instrument.symbol &&
-      item.exchange === request.instrument.exchange &&
-      item.instrumentType === request.instrument.instrumentType &&
-      (request.instrument.providerInstrumentId === undefined ||
-        item.providerInstrumentId === request.instrument.providerInstrumentId));
+    const match = CATALOG.find(
+      (item) =>
+        item.symbol === request.instrument.symbol &&
+        item.exchange === request.instrument.exchange &&
+        item.instrumentType === request.instrument.instrumentType &&
+        (request.instrument.providerInstrumentId === undefined ||
+          item.providerInstrumentId === request.instrument.providerInstrumentId),
+    );
     if (!match) throw this.rejected('Instrument is not supported by fixture-v1');
     const latest = ROWS[match.symbol].at(-1);
     if (!latest) return null;

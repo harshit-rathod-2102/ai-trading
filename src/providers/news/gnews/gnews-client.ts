@@ -17,7 +17,10 @@ export class GNewsClient {
   constructor(@Inject(GNEWS_CONFIG) private readonly config: GNewsConfig) {}
 
   async search<T>(parameters: URLSearchParams, context?: ProviderRequestContext): Promise<T> {
-    const response = await this.request(`${this.config.baseUrl}/search?${parameters.toString()}`, context);
+    const response = await this.request(
+      `${this.config.baseUrl}/search?${parameters.toString()}`,
+      context,
+    );
     try {
       return JSON.parse(await response.text()) as T;
     } catch {
@@ -34,42 +37,89 @@ export class GNewsClient {
         if (response.ok) return response;
         const error = this.httpError(response);
         if (!this.shouldRetry(response.status) || attempt === this.config.maxRetries) {
-          this.logger.error({ event: 'provider.request.failed', module: GNewsClient.name,
-            provider: 'gnews', operation: 'search', endpoint: '/search',
-            statusCode: response.status, providerErrorCode: error.code,
-            retryable: error.retryable, attempt: attempt + 1,
-            maxAttempts: this.config.maxRetries + 1 }, 'GNews request failed');
+          this.logger.error(
+            {
+              event: 'provider.request.failed',
+              module: GNewsClient.name,
+              provider: 'gnews',
+              operation: 'search',
+              endpoint: '/search',
+              statusCode: response.status,
+              providerErrorCode: error.code,
+              retryable: error.retryable,
+              attempt: attempt + 1,
+              maxAttempts: this.config.maxRetries + 1,
+            },
+            'GNews request failed',
+          );
           throw error;
         }
         const delayMs = this.retryDelay(attempt, error);
-        this.logger.warn({ event: 'provider.request.retrying', module: GNewsClient.name,
-          provider: 'gnews', operation: 'search', endpoint: '/search',
-          statusCode: response.status, attempt: attempt + 1,
-          maxAttempts: this.config.maxRetries + 1, delayMs,
-          reason: error.code }, 'GNews request will be retried');
+        this.logger.warn(
+          {
+            event: 'provider.request.retrying',
+            module: GNewsClient.name,
+            provider: 'gnews',
+            operation: 'search',
+            endpoint: '/search',
+            statusCode: response.status,
+            attempt: attempt + 1,
+            maxAttempts: this.config.maxRetries + 1,
+            delayMs,
+            reason: error.code,
+          },
+          'GNews request will be retried',
+        );
         await this.delay(delayMs, context?.signal);
       } catch (error: unknown) {
         if (error instanceof ProviderError) throw error;
         if (context?.signal?.aborted) throw this.cancelled();
         if (attempt === this.config.maxRetries) {
-          this.logger.error({ event: 'provider.request.failed', module: GNewsClient.name,
-            provider: 'gnews', operation: 'search', endpoint: '/search',
-            providerErrorCode: error instanceof GNewsRequestTimeoutError
-              ? ProviderErrorCode.TIMEOUT : ProviderErrorCode.UNAVAILABLE,
-            retryable: true,
-            attempt: attempt + 1, maxAttempts: this.config.maxRetries + 1 },
-          'GNews request failed after retries');
+          this.logger.error(
+            {
+              event: 'provider.request.failed',
+              module: GNewsClient.name,
+              provider: 'gnews',
+              operation: 'search',
+              endpoint: '/search',
+              providerErrorCode:
+                error instanceof GNewsRequestTimeoutError
+                  ? ProviderErrorCode.TIMEOUT
+                  : ProviderErrorCode.UNAVAILABLE,
+              retryable: true,
+              attempt: attempt + 1,
+              maxAttempts: this.config.maxRetries + 1,
+            },
+            'GNews request failed after retries',
+          );
           if (error instanceof GNewsRequestTimeoutError) {
-            throw new ProviderTimeoutError('gnews', 'GNews request timed out after bounded retries', error);
+            throw new ProviderTimeoutError(
+              'gnews',
+              'GNews request timed out after bounded retries',
+              error,
+            );
           }
-          throw new ProviderUnavailableError('gnews', 'GNews request failed after bounded retries', error);
+          throw new ProviderUnavailableError(
+            'gnews',
+            'GNews request failed after bounded retries',
+            error,
+          );
         }
         const delayMs = this.retryDelay(attempt);
-        this.logger.warn({ event: 'provider.request.retrying', module: GNewsClient.name,
-          provider: 'gnews', operation: 'search', endpoint: '/search',
-          attempt: attempt + 1, maxAttempts: this.config.maxRetries + 1,
-          delayMs, reason: error instanceof GNewsRequestTimeoutError ? 'timeout' : 'network_failure' },
-        'GNews request will be retried');
+        this.logger.warn(
+          {
+            event: 'provider.request.retrying',
+            module: GNewsClient.name,
+            provider: 'gnews',
+            operation: 'search',
+            endpoint: '/search',
+            attempt: attempt + 1,
+            maxAttempts: this.config.maxRetries + 1,
+            delayMs,
+            reason: error instanceof GNewsRequestTimeoutError ? 'timeout' : 'network_failure',
+          },
+          'GNews request will be retried',
+        );
         await this.delay(delayMs, context?.signal);
       }
     }
@@ -115,19 +165,35 @@ export class GNewsClient {
   private httpError(response: Response): ProviderError {
     const retryAfterSeconds = parseRetryAfter(response.headers.get('retry-after'));
     if (response.status === 401) {
-      return new ProviderAuthenticationError('gnews', 'GNews API key is missing, invalid, or expired');
+      return new ProviderAuthenticationError(
+        'gnews',
+        'GNews API key is missing, invalid, or expired',
+      );
     }
     if (response.status === 403) {
-      return new ProviderRateLimitError('gnews', 'GNews daily quota is exhausted', retryAfterSeconds);
+      return new ProviderRateLimitError(
+        'gnews',
+        'GNews daily quota is exhausted',
+        retryAfterSeconds,
+      );
     }
     if (response.status === 429) {
-      return new ProviderRateLimitError('gnews', 'GNews request rate was exceeded', retryAfterSeconds);
+      return new ProviderRateLimitError(
+        'gnews',
+        'GNews request rate was exceeded',
+        retryAfterSeconds,
+      );
     }
     if (response.status >= 500) {
-      return new ProviderUnavailableError('gnews', `GNews is unavailable (HTTP ${response.status})`);
+      return new ProviderUnavailableError(
+        'gnews',
+        `GNews is unavailable (HTTP ${response.status})`,
+      );
     }
     return new ProviderError(`GNews rejected the request (HTTP ${response.status})`, {
-      provider: 'gnews', code: ProviderErrorCode.REQUEST_REJECTED, retryable: false,
+      provider: 'gnews',
+      code: ProviderErrorCode.REQUEST_REJECTED,
+      retryable: false,
     });
   }
 
@@ -136,10 +202,12 @@ export class GNewsClient {
   }
 
   private retryDelay(attempt: number, error?: ProviderError): number {
-    const retryAfter = error instanceof ProviderRateLimitError ? error.retryAfterSeconds : undefined;
-    return Math.min(retryAfter === undefined
-      ? this.config.retryBaseDelayMs * (2 ** attempt)
-      : retryAfter * 1000, 30_000);
+    const retryAfter =
+      error instanceof ProviderRateLimitError ? error.retryAfterSeconds : undefined;
+    return Math.min(
+      retryAfter === undefined ? this.config.retryBaseDelayMs * 2 ** attempt : retryAfter * 1000,
+      30_000,
+    );
   }
 
   private delay(milliseconds: number, signal?: AbortSignal): Promise<void> {
@@ -160,17 +228,28 @@ export class GNewsClient {
 
   private cancelled(): ProviderError {
     return new ProviderError('GNews request was cancelled', {
-      provider: 'gnews', code: ProviderErrorCode.REQUEST_REJECTED, retryable: false,
+      provider: 'gnews',
+      code: ProviderErrorCode.REQUEST_REJECTED,
+      retryable: false,
     });
   }
 
   private invalidResponse(message: string): ProviderError {
-    this.logger.error({ event: 'provider.response.invalid', module: GNewsClient.name,
-      provider: 'gnews', operation: 'parseResponse',
-      providerErrorCode: ProviderErrorCode.INVALID_RESPONSE, retryable: false },
-    'GNews response was invalid');
+    this.logger.error(
+      {
+        event: 'provider.response.invalid',
+        module: GNewsClient.name,
+        provider: 'gnews',
+        operation: 'parseResponse',
+        providerErrorCode: ProviderErrorCode.INVALID_RESPONSE,
+        retryable: false,
+      },
+      'GNews response was invalid',
+    );
     return new ProviderError(message, {
-      provider: 'gnews', code: ProviderErrorCode.INVALID_RESPONSE, retryable: false,
+      provider: 'gnews',
+      code: ProviderErrorCode.INVALID_RESPONSE,
+      retryable: false,
     });
   }
 }

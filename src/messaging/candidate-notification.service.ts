@@ -53,18 +53,29 @@ export class CandidateNotificationService {
   private async execute(candidateId: string): Promise<CandidateNotificationResult> {
     const startedAt = performance.now();
     let candidate: TradeCandidate | undefined;
-    this.logger.log({
-      event: 'whatsapp.candidate.send.started', module: CandidateNotificationService.name,
-      operation: 'notifyCandidate', candidateId,
-    }, 'WhatsApp candidate delivery started');
+    this.logger.log(
+      {
+        event: 'whatsapp.candidate.send.started',
+        module: CandidateNotificationService.name,
+        operation: 'notifyCandidate',
+        candidateId,
+      },
+      'WhatsApp candidate delivery started',
+    );
     try {
-      candidate = await this.candidates.findOneBy({ id: candidateId }) ?? undefined;
+      candidate = (await this.candidates.findOneBy({ id: candidateId })) ?? undefined;
       if (!candidate) throw new NotFoundException({ code: 'CANDIDATE_NOT_FOUND', candidateId });
       const reused = existingNotification(candidate);
       if (candidate.status === CandidateStatus.NOTIFIED && reused) {
-        this.logger.log({ event: 'whatsapp.candidate.send.completed',
-          ...this.logFields(candidate, startedAt), providerMessageId: reused.providerMessageId,
-          reused: true }, 'Existing WhatsApp candidate delivery reused');
+        this.logger.log(
+          {
+            event: 'whatsapp.candidate.send.completed',
+            ...this.logFields(candidate, startedAt),
+            providerMessageId: reused.providerMessageId,
+            reused: true,
+          },
+          'Existing WhatsApp candidate delivery reused',
+        );
         return reused;
       }
       if (candidate.status !== CandidateStatus.QUALIFIED) {
@@ -74,10 +85,15 @@ export class CandidateNotificationService {
           candidateId,
         });
       }
-      if (candidate.notificationSnapshot || candidate.notifiedAt || candidate.notificationProviderMessageId) {
+      if (
+        candidate.notificationSnapshot ||
+        candidate.notifiedAt ||
+        candidate.notificationProviderMessageId
+      ) {
         throw new ConflictException({
           code: 'INVALID_NOTIFICATION_STATE',
-          message: 'Candidate has incomplete or inconsistent notification metadata', candidateId,
+          message: 'Candidate has incomplete or inconsistent notification metadata',
+          candidateId,
         });
       }
       const recipient = this.config.get<string>('metaWhatsapp.allowedSender')?.trim();
@@ -100,7 +116,8 @@ export class CandidateNotificationService {
       });
       if (delivery.status === MessageDeliveryStatus.FAILED) {
         throw new ServiceUnavailableException({
-          code: 'MESSAGING_DELIVERY_FAILED', message: 'Messaging provider reported failed delivery',
+          code: 'MESSAGING_DELIVERY_FAILED',
+          message: 'Messaging provider reported failed delivery',
         });
       }
       const recordedAt = new Date();
@@ -114,19 +131,25 @@ export class CandidateNotificationService {
         messageType: MessageType.TEXT,
         recordedAt: recordedAt.toISOString(),
       };
-      const result = await this.dataSource.transaction(async manager => {
+      const result = await this.dataSource.transaction(async (manager) => {
         const repository = manager.getRepository(TradeCandidate);
         const locked = await repository.findOne({
-          where: { id: candidateId }, lock: { mode: 'pessimistic_write' },
+          where: { id: candidateId },
+          lock: { mode: 'pessimistic_write' },
         });
         if (!locked) throw new NotFoundException({ code: 'CANDIDATE_NOT_FOUND', candidateId });
         const alreadyStored = existingNotification(locked);
         if (locked.status === CandidateStatus.NOTIFIED && alreadyStored) return alreadyStored;
-        if (locked.status !== CandidateStatus.QUALIFIED || locked.notificationSnapshot ||
-            locked.notifiedAt || locked.notificationProviderMessageId) {
+        if (
+          locked.status !== CandidateStatus.QUALIFIED ||
+          locked.notificationSnapshot ||
+          locked.notifiedAt ||
+          locked.notificationProviderMessageId
+        ) {
           throw new ConflictException({
             code: 'CANDIDATE_NOT_ACTIONABLE',
-            message: 'Candidate state changed during WhatsApp delivery', candidateId,
+            message: 'Candidate state changed during WhatsApp delivery',
+            candidateId,
           });
         }
         locked.status = CandidateStatus.NOTIFIED;
@@ -150,21 +173,45 @@ export class CandidateNotificationService {
         });
         return notificationResult(candidateId, snapshot, false);
       });
-      this.logger.log({ event: 'whatsapp.candidate.send.completed',
-        ...this.logFields(candidate, startedAt), providerMessageId: result.providerMessageId,
-        deliveryStatus: result.deliveryStatus, reused: result.reusedExistingNotification },
-      'WhatsApp candidate delivery completed');
-      this.logger.log({ event: 'candidate.notified', ...this.logFields(candidate, startedAt),
-        providerMessageId: result.providerMessageId, newStatus: CandidateStatus.NOTIFIED },
-      'Candidate marked as notified');
+      this.logger.log(
+        {
+          event: 'whatsapp.candidate.send.completed',
+          ...this.logFields(candidate, startedAt),
+          providerMessageId: result.providerMessageId,
+          deliveryStatus: result.deliveryStatus,
+          reused: result.reusedExistingNotification,
+        },
+        'WhatsApp candidate delivery completed',
+      );
+      this.logger.log(
+        {
+          event: 'candidate.notified',
+          ...this.logFields(candidate, startedAt),
+          providerMessageId: result.providerMessageId,
+          newStatus: CandidateStatus.NOTIFIED,
+        },
+        'Candidate marked as notified',
+      );
       return result;
     } catch (error: unknown) {
-      this.logger.error({ event: 'whatsapp.candidate.send.failed',
-        module: CandidateNotificationService.name, operation: 'notifyCandidate', candidateId,
-        ...(candidate ? { symbol: candidate.symbol, strategy: candidate.strategy,
-          candidateStatus: candidate.status } : {}),
-        durationMs: elapsedMilliseconds(startedAt), ...structuredError(error) },
-      'WhatsApp candidate delivery failed');
+      this.logger.error(
+        {
+          event: 'whatsapp.candidate.send.failed',
+          module: CandidateNotificationService.name,
+          operation: 'notifyCandidate',
+          candidateId,
+          ...(candidate
+            ? {
+                symbol: candidate.symbol,
+                strategy: candidate.strategy,
+                candidateStatus: candidate.status,
+              }
+            : {}),
+          durationMs: elapsedMilliseconds(startedAt),
+          ...structuredError(error),
+        },
+        'WhatsApp candidate delivery failed',
+      );
       throw error;
     }
   }
@@ -181,22 +228,34 @@ export class CandidateNotificationService {
   }
 }
 
-export function buildCandidateMessage(candidate: TradeCandidate, companyName: string | null): string {
+export function buildCandidateMessage(
+  candidate: TradeCandidate,
+  companyName: string | null,
+): string {
   const risk = candidate.riskSnapshot;
   const regime = textValue(candidate.marketRegimeSnapshot?.regime) ?? 'UNKNOWN';
   const analysis = isRecord(candidate.aiAnalysis)
-    ? (isRecord(candidate.aiAnalysis.deep) ? candidate.aiAnalysis.deep
-      : isRecord(candidate.aiAnalysis.fast) ? candidate.aiAnalysis.fast : {})
+    ? isRecord(candidate.aiAnalysis.deep)
+      ? candidate.aiAnalysis.deep
+      : isRecord(candidate.aiAnalysis.fast)
+        ? candidate.aiAnalysis.fast
+        : {}
     : {};
-  const summary = truncate(textValue(analysis.summary) ?? 'AI review completed from persisted evidence.', 420);
+  const summary = truncate(
+    textValue(analysis.summary) ?? 'AI review completed from persisted evidence.',
+    420,
+  );
   const bullish = stringValues(analysis.bullishFactors).slice(0, 2);
   const risks = [
     ...stringValues(analysis.bearishFactors),
     ...stringValues(analysis.redFlags),
     ...stringValues(risk.warnings),
-  ].filter((value, index, all) => all.indexOf(value) === index).slice(0, 3);
+  ]
+    .filter((value, index, all) => all.indexOf(value) === index)
+    .slice(0, 3);
   const sourceTier = isRecord(candidate.decisionSnapshot)
-    ? textValue(candidate.decisionSnapshot.sourceTier) : undefined;
+    ? textValue(candidate.decisionSnapshot.sourceTier)
+    : undefined;
   const lines = [
     `📈 ${candidate.symbol}${companyName ? ` — ${companyName}` : ''}`,
     candidate.strategy.replaceAll('_', ' '),
@@ -216,8 +275,10 @@ export function buildCandidateMessage(candidate: TradeCandidate, companyName: st
     '',
     `AI review${sourceTier ? ` (${sourceTier})` : ''}:`,
     summary,
-    ...(bullish.length ? ['', 'Strengths:', ...bullish.map(value => `• ${truncate(value, 180)}`)] : []),
-    ...(risks.length ? ['', 'Risks:', ...risks.map(value => `• ${truncate(value, 180)}`)] : []),
+    ...(bullish.length
+      ? ['', 'Strengths:', ...bullish.map((value) => `• ${truncate(value, 180)}`)]
+      : []),
+    ...(risks.length ? ['', 'Risks:', ...risks.map((value) => `• ${truncate(value, 180)}`)] : []),
     '',
     `Candidate: ${candidate.id.slice(0, 8).toUpperCase()}`,
     '',
@@ -234,14 +295,21 @@ export function buildCandidateMessage(candidate: TradeCandidate, companyName: st
 
 function existingNotification(candidate: TradeCandidate): CandidateNotificationResult | null {
   const value = candidate.notificationSnapshot;
-  if (!isRecord(value) || value.version !== CANDIDATE_NOTIFICATION_VERSION ||
-      typeof value.provider !== 'string' || typeof value.providerMessageId !== 'string' ||
-      !Object.values(MessageDeliveryStatus).includes(value.deliveryStatus as MessageDeliveryStatus) ||
-      value.messageType !== MessageType.TEXT || typeof value.recordedAt !== 'string' ||
-      Number.isNaN(Date.parse(value.recordedAt)) ||
-      (value.providerSentAt !== null && typeof value.providerSentAt !== 'string') ||
-      candidate.notificationProviderMessageId !== value.providerMessageId || !candidate.notifiedAt ||
-      candidate.notifiedAt.toISOString() !== value.recordedAt) return null;
+  if (
+    !isRecord(value) ||
+    value.version !== CANDIDATE_NOTIFICATION_VERSION ||
+    typeof value.provider !== 'string' ||
+    typeof value.providerMessageId !== 'string' ||
+    !Object.values(MessageDeliveryStatus).includes(value.deliveryStatus as MessageDeliveryStatus) ||
+    value.messageType !== MessageType.TEXT ||
+    typeof value.recordedAt !== 'string' ||
+    Number.isNaN(Date.parse(value.recordedAt)) ||
+    (value.providerSentAt !== null && typeof value.providerSentAt !== 'string') ||
+    candidate.notificationProviderMessageId !== value.providerMessageId ||
+    !candidate.notifiedAt ||
+    candidate.notifiedAt.toISOString() !== value.recordedAt
+  )
+    return null;
   return notificationResult(candidate.id, value as unknown as CandidateNotificationSnapshot, true);
 }
 
@@ -266,8 +334,11 @@ function moneyValue(value: unknown): string {
 }
 
 function textValue(value: unknown): string | undefined {
-  return typeof value === 'string' && value.trim() ? value.trim() :
-    typeof value === 'number' && Number.isFinite(value) ? String(value) : undefined;
+  return typeof value === 'string' && value.trim()
+    ? value.trim()
+    : typeof value === 'number' && Number.isFinite(value)
+      ? String(value)
+      : undefined;
 }
 
 function stringValues(value: unknown): string[] {

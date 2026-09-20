@@ -29,22 +29,31 @@ export class CandidateAnalysisService {
     if (candidate.status === CandidateStatus.NEW) {
       const news = await this.news.enrichCandidate(candidateId);
       if (!news.success) {
-        throw new CandidateStageError('NEWS', news.retryable === true,
-          `News enrichment failed: ${news.errorCode ?? 'UNKNOWN'}`);
+        throw new CandidateStageError(
+          'NEWS',
+          news.retryable === true,
+          `News enrichment failed: ${news.errorCode ?? 'UNKNOWN'}`,
+        );
       }
       newsEnriched = true;
 
       const fast = await this.triage.triageCandidate(candidateId);
       if (!fast.success || !fast.routing) {
-        throw new CandidateStageError('AI', fast.retryable === true,
-          `FAST analysis failed: ${fast.errorCode ?? 'UNKNOWN'}`);
+        throw new CandidateStageError(
+          'AI',
+          fast.retryable === true,
+          `FAST analysis failed: ${fast.errorCode ?? 'UNKNOWN'}`,
+        );
       }
       fastAnalyzed = true;
       if (fast.routing.escalate) {
         const deep = await this.deepReview.reviewCandidate(candidateId);
         if (!deep.success) {
-          throw new CandidateStageError('AI', deep.retryable === true,
-            `DEEP analysis failed: ${deep.errorCode ?? 'UNKNOWN'}`);
+          throw new CandidateStageError(
+            'AI',
+            deep.retryable === true,
+            `DEEP analysis failed: ${deep.errorCode ?? 'UNKNOWN'}`,
+          );
         }
         deepAnalyzed = true;
       }
@@ -52,18 +61,27 @@ export class CandidateAnalysisService {
 
     const decision = await this.decisions.finalizeCandidate(candidateId);
     if (!decision.finalized) {
-      throw new CandidateStageError('DECISION', decision.retryable,
-        `Candidate decision incomplete: ${decision.errorCode}`);
+      throw new CandidateStageError(
+        'DECISION',
+        decision.retryable,
+        `Candidate decision incomplete: ${decision.errorCode}`,
+      );
     }
     candidate = await this.candidates.get(candidateId);
     let notified = candidate.status === CandidateStatus.NOTIFIED;
-    if (candidate.status === CandidateStatus.QUALIFIED || candidate.status === CandidateStatus.NOTIFIED) {
+    if (
+      candidate.status === CandidateStatus.QUALIFIED ||
+      candidate.status === CandidateStatus.NOTIFIED
+    ) {
       try {
         await this.notifications.notifyCandidate(candidateId);
         notified = true;
       } catch (error: unknown) {
-        throw new CandidateStageError('NOTIFICATION', true,
-          error instanceof Error ? error.message : 'Candidate notification failed');
+        throw new CandidateStageError(
+          'NOTIFICATION',
+          true,
+          error instanceof Error ? error.message : 'Candidate notification failed',
+        );
       }
     }
 

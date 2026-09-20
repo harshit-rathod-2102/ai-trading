@@ -30,10 +30,12 @@ export function averageTiePercentiles<T>(
   let start = 0;
   while (start < ordered.length) {
     let end = start;
-    while (end + 1 < ordered.length && decimal(value(ordered[end + 1])).eq(value(ordered[start]))) end++;
+    while (end + 1 < ordered.length && decimal(value(ordered[end + 1])).eq(value(ordered[start])))
+      end++;
     const averageZeroBasedRank = decimal(start).plus(end).div(2);
     const percentile = averageZeroBasedRank.div(ordered.length - 1).times(100);
-    for (let index = start; index <= end; index++) result.set(key(ordered[index]), fixed(percentile));
+    for (let index = start; index <= end; index++)
+      result.set(key(ordered[index]), fixed(percentile));
     start = end + 1;
   }
   return result;

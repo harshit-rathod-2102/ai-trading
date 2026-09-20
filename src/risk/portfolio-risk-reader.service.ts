@@ -17,15 +17,24 @@ export class PortfolioRiskReaderService {
 
   async loadOpenTrades(): Promise<OpenTradeRiskView[]> {
     const [trades, instruments] = await Promise.all([
-      this.trades.find({ where: { status: In([TradeStatus.OPEN, TradeStatus.PARTIALLY_CLOSED]) },
-        order: { createdAt: 'ASC', id: 'ASC' } }),
+      this.trades.find({
+        where: { status: In([TradeStatus.OPEN, TradeStatus.PARTIALLY_CLOSED]) },
+        order: { createdAt: 'ASC', id: 'ASC' },
+      }),
       this.instruments.list({ exchange: Exchange.NSE, type: InstrumentType.EQUITY }),
     ]);
-    const sectors = new Map(instruments.map(instrument => [instrument.symbol, instrument.sector]));
-    return trades.map(trade => ({
-      tradeId: trade.id, symbol: trade.symbol, sector: sectors.get(trade.symbol) ?? null,
-      quantity: trade.quantity, actualEntry: trade.actualEntry, currentPrice: trade.currentPrice,
-      currentStop: trade.currentStop, currentPositionValue: null,
+    const sectors = new Map(
+      instruments.map((instrument) => [instrument.symbol, instrument.sector]),
+    );
+    return trades.map((trade) => ({
+      tradeId: trade.id,
+      symbol: trade.symbol,
+      sector: sectors.get(trade.symbol) ?? null,
+      quantity: trade.quantity,
+      actualEntry: trade.actualEntry,
+      currentPrice: trade.currentPrice,
+      currentStop: trade.currentStop,
+      currentPositionValue: null,
       isPartiallyClosed: trade.status === TradeStatus.PARTIALLY_CLOSED,
     }));
   }

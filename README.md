@@ -74,12 +74,12 @@ Each SPI has a distinct NestJS symbol token: `MARKET_DATA_PROVIDER`, `NEWS_PROVI
 
 Intended V1 adapter mappings are:
 
-| SPI | Intended adapter |
-| --- | --- |
-| Market data | Upstox |
-| News | GNews |
-| AI analysis | OpenRouter |
-| Messaging | Meta WhatsApp Cloud API |
+| SPI         | Intended adapter        |
+| ----------- | ----------------------- |
+| Market data | Upstox                  |
+| News        | GNews                   |
+| AI analysis | OpenRouter              |
+| Messaging   | Meta WhatsApp Cloud API |
 
 The Upstox market-data, GNews news, OpenRouter AI, and Meta WhatsApp messaging adapters are implemented. Fixture mode needs no provider credentials, while each live adapter needs its own locally supplied credential.
 
@@ -362,17 +362,17 @@ Financial values must use PostgreSQL `NUMERIC`/`DECIMAL` where precision matters
 
 These REST endpoints are temporary development interfaces. WhatsApp will later invoke the same application services.
 
-| Method | Path | Purpose |
-| --- | --- | --- |
-| POST | /api/candidates | Manually create a NEW candidate and its creation event |
-| GET | /api/candidates | List candidates; optional status and symbol filters |
-| GET | /api/candidates/:id | Read a candidate |
-| POST | /api/candidates/:id/skip | Record terminal SKIP and optional reason |
-| POST | /api/candidates/:id/buy | Record manually executed entry and return an OPEN trade |
-| GET | /api/candidates/:id/events | Inspect candidate history, including skipped opportunities |
-| GET | /api/trades | List trades; optional status and symbol filters |
-| GET | /api/trades/:id | Read trade with candidateId and copied candidate values |
-| GET | /api/trades/:id/events | Chronological trade events plus earlier candidate events |
+| Method | Path                       | Purpose                                                    |
+| ------ | -------------------------- | ---------------------------------------------------------- |
+| POST   | /api/candidates            | Manually create a NEW candidate and its creation event     |
+| GET    | /api/candidates            | List candidates; optional status and symbol filters        |
+| GET    | /api/candidates/:id        | Read a candidate                                           |
+| POST   | /api/candidates/:id/skip   | Record terminal SKIP and optional reason                   |
+| POST   | /api/candidates/:id/buy    | Record manually executed entry and return an OPEN trade    |
+| GET    | /api/candidates/:id/events | Inspect candidate history, including skipped opportunities |
+| GET    | /api/trades                | List trades; optional status and symbol filters            |
+| GET    | /api/trades/:id            | Read trade with candidateId and copied candidate values    |
+| GET    | /api/trades/:id/events     | Chronological trade events plus earlier candidate events   |
 
 Only NEW â†’ ACCEPTED and NEW â†’ SKIPPED are operational. Every other status is terminal for these commands. Repeating BUY or SKIP returns HTTP 409. Invalid input returns 400; missing records return 404. Creation and decision endpoints return 201.
 
@@ -476,23 +476,23 @@ The seed script uses the provider's advertised catalog and preserves existing in
 
 ### Development REST interfaces
 
-| Method | Path | Purpose |
-| --- | --- | --- |
-| POST | /api/instruments | Create instrument: symbol, exchange=NSE, name, type=EQUITY or INDEX, optional sector/industry |
-| GET | /api/instruments | List; filter by symbol, exchange, type, active=true/false, universe |
-| GET | /api/instruments/:id | Read instrument |
-| PATCH | /api/instruments/:id/activity | Set isActive boolean |
-| POST / GET | /api/universes | Create with code/name or list universes |
-| PUT | /api/universes/:code/instruments/:id | Add membership idempotently |
-| GET | /api/universes/:code/instruments | Read all members, including inactive instruments |
-| GET | /api/market-data/universe | Read active members of the configured universe |
-| GET | /api/market-data/provider | Read provenance, supported fixture catalog, and calendar |
-| POST | /api/market-data/instruments/sync | Import or update the selected provider's NSE equity/index catalog idempotently |
-| POST | /api/market-data/refresh-universe | Enqueue one refresh for each active configured member |
-| POST | /api/market-data/instruments/:id/refresh | Enqueue daily refresh |
-| GET | /api/market-data/jobs/:id | Inspect queued/completed/failed job and result |
-| GET | /api/market-data/instruments/:id/candles | Chronological candles; required from/to query dates |
-| GET | /api/market-data/instruments/:id/quality | Quality assessment; required from/to query dates |
+| Method     | Path                                     | Purpose                                                                                       |
+| ---------- | ---------------------------------------- | --------------------------------------------------------------------------------------------- |
+| POST       | /api/instruments                         | Create instrument: symbol, exchange=NSE, name, type=EQUITY or INDEX, optional sector/industry |
+| GET        | /api/instruments                         | List; filter by symbol, exchange, type, active=true/false, universe                           |
+| GET        | /api/instruments/:id                     | Read instrument                                                                               |
+| PATCH      | /api/instruments/:id/activity            | Set isActive boolean                                                                          |
+| POST / GET | /api/universes                           | Create with code/name or list universes                                                       |
+| PUT        | /api/universes/:code/instruments/:id     | Add membership idempotently                                                                   |
+| GET        | /api/universes/:code/instruments         | Read all members, including inactive instruments                                              |
+| GET        | /api/market-data/universe                | Read active members of the configured universe                                                |
+| GET        | /api/market-data/provider                | Read provenance, supported fixture catalog, and calendar                                      |
+| POST       | /api/market-data/instruments/sync        | Import or update the selected provider's NSE equity/index catalog idempotently                |
+| POST       | /api/market-data/refresh-universe        | Enqueue one refresh for each active configured member                                         |
+| POST       | /api/market-data/instruments/:id/refresh | Enqueue daily refresh                                                                         |
+| GET        | /api/market-data/jobs/:id                | Inspect queued/completed/failed job and result                                                |
+| GET        | /api/market-data/instruments/:id/candles | Chronological candles; required from/to query dates                                           |
+| GET        | /api/market-data/instruments/:id/quality | Quality assessment; required from/to query dates                                              |
 
 All date ranges are inclusive, contain real YYYY-MM-DD dates, span at most 366 days, and cannot end after today in Asia/Kolkata. Missing instruments return 404; malformed input returns 400; duplicate instrument/universe creation and inactive refresh requests return 409. Unsupported provider requests appear as failed jobs; inspect the job status rather than treating HTTP 202 as successful ingestion.
 
@@ -600,21 +600,21 @@ Liquidity requires the **prior 20 candles' average close Ã— volume to be at l
 
 Hard-filter failures short-circuit with `qualified=false`, score `0.0000`, empty components, and typed/human-readable rejection reasons. For eligible setups, bounded 0â€“100 component scores are weighted and compared with the qualification threshold. Every component includes raw evidence, configured percentage weight, and weighted contribution. Arithmetic uses an isolated 40-digit Decimal context; results have four decimal places. Displayed contributions sum exactly to the final score. A lower `extensionRisk` component score means a worse entry, and reduces the total.
 
-| Component | Momentum Breakout weight | Trend Pullback weight |
-| --- | ---: | ---: |
-| Trend quality | 15% | 15% |
-| Relative strength versus NIFTY | 15% | 15% |
-| Breakout structure | 20% | â€” |
-| Volume expansion | 10% | â€” |
-| Extension quality | 15% | â€” |
-| Pullback depth | â€” | 15% |
-| Support proximity | â€” | 15% |
-| Volume contraction | â€” | 10% |
-| Renewed buying strength | â€” | 10% |
-| Momentum health | 10% | 5% |
-| Volatility quality | 5% | 5% |
-| Regime fit | 5% | 5% |
-| Sector strength | 5% | 5% |
+| Component                      | Momentum Breakout weight | Trend Pullback weight |
+| ------------------------------ | -----------------------: | --------------------: |
+| Trend quality                  |                      15% |                   15% |
+| Relative strength versus NIFTY |                      15% |                   15% |
+| Breakout structure             |                      20% |                   â€” |
+| Volume expansion               |                      10% |                   â€” |
+| Extension quality              |                      15% |                   â€” |
+| Pullback depth                 |                      â€” |                   15% |
+| Support proximity              |                      â€” |                   15% |
+| Volume contraction             |                      â€” |                   10% |
+| Renewed buying strength        |                      â€” |                   10% |
+| Momentum health                |                      10% |                    5% |
+| Volatility quality             |                       5% |                    5% |
+| Regime fit                     |                       5% |                    5% |
+| Sector strength                |                       5% |                    5% |
 
 Momentum Breakout requires close above EMA50 and SMA200, EMA50 above SMA200, and close strictly above the prior 20-candle high, **excluding the current candle**. Its qualification threshold is **70**. Structure scores breakout magnitude, upper-range close, and prior base width; the prior 50-candle high is also exposed as evidence. Magnitude gets full credit at 0.5â€“3%, tapering to zero at 10%; narrower prior ranges score better. Volume compares the latest candle with the prior 20, reaching full credit at a 2Ã— ratio. Extension penalizes excessive distance from EMA20/EMA50, distance from EMA20 in ATR units, and distance above the breakout level. Structural hints are `breakoutLevel`, `recentBaseLow`, and `prior50DayHigh`.
 
@@ -643,13 +643,13 @@ The scanner is versioned as `scanner-v1`. Its centralized history window is 365 
 
 Only setups already marked `qualified=true` by `StrategyModule` are ranked. Momentum Breakout and Trend Pullback distributions are ranked separately, so the same stock can produce two independent rows. The 0â€“100 `rankingScore` uses:
 
-| Scanner component | V1 weight | Method |
-| --- | ---: | --- |
-| Strategy score | 65% | Existing deterministic strategy score |
-| Relative strength | 20% | Within-strategy percentile of a 50% RS20, 35% RS50, 15% RS126 excess-return composite; available horizons are re-normalized |
-| Liquidity | 10% | Within-strategy percentile of 20-session average traded value |
-| Sector strength | 5% | Existing supplied strategy component when usable |
-| Market regime | 0% | Evidence retained, but already weighted by StrategyModule and therefore not counted twice |
+| Scanner component | V1 weight | Method                                                                                                                      |
+| ----------------- | --------: | --------------------------------------------------------------------------------------------------------------------------- |
+| Strategy score    |       65% | Existing deterministic strategy score                                                                                       |
+| Relative strength |       20% | Within-strategy percentile of a 50% RS20, 35% RS50, 15% RS126 excess-return composite; available horizons are re-normalized |
+| Liquidity         |       10% | Within-strategy percentile of 20-session average traded value                                                               |
+| Sector strength   |        5% | Existing supplied strategy component when usable                                                                            |
+| Market regime     |        0% | Evidence retained, but already weighted by StrategyModule and therefore not counted twice                                   |
 
 Percentiles use ascending average ranks for exact ties; a one-member cross section receives 100. Missing sector evidence does not receive zero: its weight is removed and the available weights are re-normalized. Ranking evidence stores raw feature values, percentiles, component contributions, available/configured weights, the final score, and sector concentration counts. Sector concentration is informational and never rejects a setup.
 
@@ -659,12 +659,12 @@ The shortlist takes no more than the top 10 setups per strategy and then the top
 
 Flyway `V8__create_scanner_runs_and_results.sql` creates `scan_runs` and `scan_results`. A unique `(market_date, scanner_version)` constraint is the concurrency guard. Repeating a successful daily run returns the existing run with `reused=true`; a simultaneous `STARTED` run returns conflict; a `FAILED` run may be claimed and retried in place. Evaluation happens outside a database transaction. A short final transaction replaces results for that run and marks it successful. Only qualified rows are persisted; exclusions and counts remain on the run.
 
-| Method | Path | Purpose |
-| --- | --- | --- |
-| POST | `/api/scanner/run` | Run the current daily scan synchronously |
-| GET | `/api/scanner/runs` | List the latest 100 runs |
-| GET | `/api/scanner/runs/:id` | Read run status, counts, regime snapshot, and exclusions |
-| GET | `/api/scanner/runs/:id/results` | Read ranked qualified rows; filter by `strategy`, `shortlisted=true/false`, or `qualified=true/false` |
+| Method | Path                            | Purpose                                                                                               |
+| ------ | ------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| POST   | `/api/scanner/run`              | Run the current daily scan synchronously                                                              |
+| GET    | `/api/scanner/runs`             | List the latest 100 runs                                                                              |
+| GET    | `/api/scanner/runs/:id`         | Read run status, counts, regime snapshot, and exclusions                                              |
+| GET    | `/api/scanner/runs/:id/results` | Read ranked qualified rows; filter by `strategy`, `shortlisted=true/false`, or `qualified=true/false` |
 
 Because rejected strategy hypotheses are intentionally not persisted, `qualified=false` returns an empty list. Run the deterministic Aâ€“G verification without external services, then use Flyway/PostgreSQL to verify the H duplicate constraint:
 
@@ -853,11 +853,11 @@ Every report includes prompt/routing versions, requested and resolved models, sc
 
 All evaluation routes default to disabled. Set `AI_EVALUATION_ENABLED=true` only in development or test; production rejects them even if the flag is accidentally enabled. Listing fixtures returns compact metadata rather than full evidence payloads.
 
-| Method | Path | Purpose |
-| --- | --- | --- |
-| GET | `/api/ai-evaluation/fixtures` | List compact fixture metadata |
-| POST | `/api/ai-evaluation/fixtures/:id/run` | Run one fixture |
-| POST | `/api/ai-evaluation/run` | Run all fixtures or a `category`/`fixtureIds` subset |
+| Method | Path                                  | Purpose                                              |
+| ------ | ------------------------------------- | ---------------------------------------------------- |
+| GET    | `/api/ai-evaluation/fixtures`         | List compact fixture metadata                        |
+| POST   | `/api/ai-evaluation/fixtures/:id/run` | Run one fixture                                      |
+| POST   | `/api/ai-evaluation/run`              | Run all fixtures or a `category`/`fixtureIds` subset |
 
 Start with a small FAST-only subset to conserve OpenRouter quota:
 

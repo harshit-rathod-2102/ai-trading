@@ -17,8 +17,11 @@ import { MarketDataController } from './market-data.controller';
 import { MARKET_DATA_QUEUE, MarketDataJobs, MarketDataWorker } from './market-data.jobs';
 
 @Module({
-  imports: [InstrumentsModule, TypeOrmModule.forFeature([DailyCandle]),
-    BullModule.registerQueue({ name: MARKET_DATA_QUEUE })],
+  imports: [
+    InstrumentsModule,
+    TypeOrmModule.forFeature([DailyCandle]),
+    BullModule.registerQueue({ name: MARKET_DATA_QUEUE }),
+  ],
   controllers: [MarketDataController],
   providers: [
     FixtureMarketDataProvider,
@@ -45,7 +48,10 @@ import { MARKET_DATA_QUEUE, MarketDataJobs, MarketDataWorker } from './market-da
         throw new Error(`Unsupported market-data provider: ${selected}`);
       },
     },
-    MarketDataService, DataQualityService, MarketDataJobs, MarketDataWorker,
+    MarketDataService,
+    DataQualityService,
+    MarketDataJobs,
+    MarketDataWorker,
   ],
   exports: [MarketDataService],
 })

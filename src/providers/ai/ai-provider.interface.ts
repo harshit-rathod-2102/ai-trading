@@ -1,9 +1,15 @@
 import { ProviderRequestContext } from '../provider-request-context';
 import { CandidateAnalysisInput } from './models/candidate-analysis-input';
 import { CandidateAnalysisResult } from './models/candidate-analysis-result';
-import { FastTriageInput, FastTriageResult } from '../../ai-analysis/models/fast-triage-result.model';
+import {
+  FastTriageInput,
+  FastTriageResult,
+} from '../../ai-analysis/models/fast-triage-result.model';
 import { AiAnalysisOptions } from './models/ai-analysis-options';
-import { DeepReviewInput, DeepReviewResult } from '../../ai-analysis/models/deep-review-result.model';
+import {
+  DeepReviewInput,
+  DeepReviewResult,
+} from '../../ai-analysis/models/deep-review-result.model';
 
 export interface AiProvider {
   analyzeCandidate(

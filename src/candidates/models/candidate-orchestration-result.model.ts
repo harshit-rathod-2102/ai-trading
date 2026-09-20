@@ -31,4 +31,3 @@ export interface CandidateOrchestrationResult {
   readonly candidate?: TradeCandidate;
   readonly riskPlan?: RiskPlanResult;
 }
-

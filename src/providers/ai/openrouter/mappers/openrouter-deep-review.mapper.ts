@@ -12,11 +12,24 @@ import {
 } from '../dto/openrouter-response.dto';
 
 const RESULT_FIELDS = new Set([
-  'tier', 'overallRisk', 'eventRisk', 'uncertainty', 'confidence',
-  'marketContextSummary', 'sectorContextSummary', 'newsSummary',
-  'bullishFactors', 'bearishFactors', 'contradictions', 'redFlags',
-  'missingEvidence', 'thesis', 'invalidationConcerns', 'recommendation',
-  'recommendationReasons', 'summary',
+  'tier',
+  'overallRisk',
+  'eventRisk',
+  'uncertainty',
+  'confidence',
+  'marketContextSummary',
+  'sectorContextSummary',
+  'newsSummary',
+  'bullishFactors',
+  'bearishFactors',
+  'contradictions',
+  'redFlags',
+  'missingEvidence',
+  'thesis',
+  'invalidationConcerns',
+  'recommendation',
+  'recommendationReasons',
+  'summary',
 ]);
 
 export interface DeepReviewMapperContext {
@@ -35,10 +48,17 @@ export function mapOpenRouterDeepReview(
   const id = optionalString(responseRecord.id, 'response id');
   const resolvedModel = requiredString(responseRecord.model, 'resolved model', 200);
   const choices = responseRecord.choices;
-  if (!Array.isArray(choices) || choices.length === 0) throw invalid('OpenRouter response has no choices');
+  if (!Array.isArray(choices) || choices.length === 0)
+    throw invalid('OpenRouter response has no choices');
   const choice = record(choices[0] as OpenRouterChoiceDto, 'first choice');
-  if (choice.finish_reason !== undefined && choice.finish_reason !== null && choice.finish_reason !== 'stop') {
-    throw invalid(`OpenRouter DEEP review did not finish normally: ${String(choice.finish_reason)}`);
+  if (
+    choice.finish_reason !== undefined &&
+    choice.finish_reason !== null &&
+    choice.finish_reason !== 'stop'
+  ) {
+    throw invalid(
+      `OpenRouter DEEP review did not finish normally: ${String(choice.finish_reason)}`,
+    );
   }
   const message = record(choice.message as OpenRouterMessageDto, 'assistant message');
   if (message.refusal !== undefined && message.refusal !== null && message.refusal !== '') {
@@ -53,7 +73,7 @@ export function mapOpenRouterDeepReview(
     throw invalid('OpenRouter DEEP review content is not valid JSON');
   }
   const value = record(parsed, 'DEEP review');
-  const extraField = Object.keys(value).find(key => !RESULT_FIELDS.has(key));
+  const extraField = Object.keys(value).find((key) => !RESULT_FIELDS.has(key));
   if (extraField) throw invalid(`OpenRouter DEEP review has unexpected field: ${extraField}`);
   if (value.tier !== AiAnalysisTier.DEEP) throw invalid('OpenRouter DEEP review tier is invalid');
 
@@ -144,7 +164,8 @@ function optionalUsage(value: unknown): JsonObject | undefined {
   const usage = record(value as OpenRouterUsageDto, 'usage');
   const result: Record<string, number> = {};
   for (const [key, raw] of Object.entries(usage)) {
-    if (!Number.isInteger(raw) || Number(raw) < 0) throw invalid(`OpenRouter usage.${key} is invalid`);
+    if (!Number.isInteger(raw) || Number(raw) < 0)
+      throw invalid(`OpenRouter usage.${key} is invalid`);
     result[key] = Number(raw);
   }
   return result;
