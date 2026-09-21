@@ -1,4 +1,5 @@
 import Decimal from 'decimal.js';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   Equals,
   IsInt,
@@ -39,24 +40,51 @@ function IsProfileDecimal(integerDigits: number, maximum: string): PropertyDecor
 }
 
 export class UpsertTradingProfileDto {
-  @IsString() @Matches(/\S/) @MaxLength(160) name!: string;
+  @ApiProperty({ example: 'Default Trading Profile' })
+  @IsString()
+  @Matches(/\S/)
+  @MaxLength(160)
+  name!: string;
 
-  @IsString() @Matches(/^[A-Z]{3}$/) currency!: string;
+  @ApiProperty({ example: 'INR', description: 'ISO-style three-letter currency code' })
+  @IsString()
+  @Matches(/^[A-Z]{3}$/)
+  currency!: string;
 
-  @IsProfileDecimal(14, '99999999999999.9999') accountCapital!: string;
+  @ApiProperty({ example: '500000.0000', description: 'Account capital' })
+  @IsProfileDecimal(14, '99999999999999.9999')
+  accountCapital!: string;
 
-  @IsProfileDecimal(3, '100') riskPerTradePercent!: string;
+  @ApiProperty({ example: '0.5000', description: 'Risk budget per trade as a percentage' })
+  @IsProfileDecimal(3, '100')
+  riskPerTradePercent!: string;
 
-  @IsProfileDecimal(3, '100') maxPositionPercent!: string;
+  @ApiProperty({ example: '20.0000', description: 'Maximum position value as a percentage' })
+  @IsProfileDecimal(3, '100')
+  maxPositionPercent!: string;
 
-  @IsProfileDecimal(3, '100') maxOpenPortfolioRiskPercent!: string;
+  @ApiProperty({
+    example: '2.5000',
+    description: 'Maximum aggregate open portfolio risk percentage',
+  })
+  @IsProfileDecimal(3, '100')
+  maxOpenPortfolioRiskPercent!: string;
 
-  @IsProfileDecimal(3, '100') maxSectorExposurePercent!: string;
+  @ApiProperty({ example: '30.0000', description: 'Maximum sector exposure percentage' })
+  @IsProfileDecimal(3, '100')
+  maxSectorExposurePercent!: string;
 
-  @IsProfileDecimal(14, '99999999999999.9999') minimumRiskRewardRatio!: string;
+  @ApiProperty({ example: '2.0000', description: 'Minimum accepted reward-to-risk ratio' })
+  @IsProfileDecimal(14, '99999999999999.9999')
+  minimumRiskRewardRatio!: string;
 
-  @IsInt() @Min(1) @Max(2147483647) maxOpenTrades!: number;
+  @ApiProperty({ example: 6, minimum: 1 })
+  @IsInt()
+  @Min(1)
+  @Max(2147483647)
+  maxOpenTrades!: number;
 
+  @ApiPropertyOptional({ example: true, enum: [true] })
   @ValidateIf((_object, value: unknown) => value !== undefined)
   @Equals(true, { message: 'This endpoint manages the active profile; isActive must be true' })
   isActive?: true;

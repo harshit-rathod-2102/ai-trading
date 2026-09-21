@@ -12,6 +12,12 @@
       "type": "string"
     },
     {
+      "key": "upstoxClientId",
+      "value": "",
+      "type": "string",
+      "description": "Must match UPSTOX_CLIENT_ID for webhook testing."
+    },
+    {
       "key": "instrumentId",
       "value": "",
       "type": "string",
@@ -84,6 +90,16 @@
       "description": "Explicit NSE market date in YYYY-MM-DD format."
     },
     {
+      "key": "analyticsFrom",
+      "value": "2026-01-01",
+      "type": "string"
+    },
+    {
+      "key": "analyticsTo",
+      "value": "2026-09-20",
+      "type": "string"
+    },
+    {
       "key": "newsFrom",
       "value": "2026-09-01T00:00:00.000Z",
       "type": "string"
@@ -134,6 +150,65 @@
             "url": "{{baseUrl}}/health",
             "description": "Checks PostgreSQL and Redis connectivity."
           }
+        }
+      ]
+    },
+    {
+      "name": "Upstox Auth",
+      "description": "Semi-automated access-token approval and safe runtime status.",
+      "item": [
+        {
+          "name": "Get Upstox Auth Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/upstox/auth/status",
+            "description": "Returns readiness, source, expiry, and pending state without exposing credentials."
+          }
+        },
+        {
+          "name": "Request Upstox Access Token",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/upstox/auth/request-token",
+            "description": "Calls the Upstox request API once; repeated calls reuse an unexpired pending request."
+          }
+        },
+        {
+          "name": "Receive Upstox Access Token Webhook",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_id\": \"{{upstoxClientId}}\",\n  \"user_id\": \"POSTMAN_USER\",\n  \"access_token\": \"POSTMAN_RUNTIME_TOKEN\",\n  \"token_type\": \"Bearer\",\n  \"expires_at\": \"{{upstoxExpiresAt}}\",\n  \"issued_at\": \"{{upstoxIssuedAt}}\",\n  \"message_type\": \"access_token\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/webhooks/upstox/access-token",
+            "description": "Development replay of the documented notifier payload. Set upstoxClientId to UPSTOX_CLIENT_ID."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('upstoxIssuedAt', String(Date.now()));",
+                  "pm.collectionVariables.set('upstoxExpiresAt', String(Date.now() + 60 * 60 * 1000));"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -973,6 +1048,70 @@
             "header": [],
             "url": "{{baseUrl}}/daily-summary/{{summaryMarketDate}}/send",
             "description": "Sends via MessagingProvider. A SENT market-date/version record is reused; FAILED delivery retries the preserved snapshot."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Analytics",
+      "description": "Read-only analytics-v1 metrics derived from persisted factual history.",
+      "item": [
+        {
+          "name": "Get Analytics Overview",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/analytics/overview?from={{analyticsFrom}}&to={{analyticsTo}}",
+            "description": "Realized P&L, R, expectancy, win rate, profit factor, drawdown, holding period, MFE/MAE, and coverage metadata."
+          }
+        },
+        {
+          "name": "Get Strategy Performance",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/analytics/strategies?from={{analyticsFrom}}&to={{analyticsTo}}"
+          }
+        },
+        {
+          "name": "Get Regime Performance",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/analytics/regimes?from={{analyticsFrom}}&to={{analyticsTo}}"
+          }
+        },
+        {
+          "name": "Get Sector Performance",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/analytics/sectors?from={{analyticsFrom}}&to={{analyticsTo}}"
+          }
+        },
+        {
+          "name": "Get Score-Bucket Performance",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/analytics/score-buckets?from={{analyticsFrom}}&to={{analyticsTo}}"
+          }
+        },
+        {
+          "name": "Get Accepted vs Skipped",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/analytics/accepted-vs-skipped?from={{analyticsFrom}}&to={{analyticsTo}}",
+            "description": "Accepted candidates use factual closed outcomes. Skipped counterfactual P&L remains unavailable in V1."
+          }
+        },
+        {
+          "name": "Get Candidate Funnel",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/analytics/funnel?from={{analyticsFrom}}&to={{analyticsTo}}"
           }
         }
       ]

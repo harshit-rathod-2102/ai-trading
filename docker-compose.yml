@@ -55,7 +55,7 @@ services:
       dockerfile: Dockerfile
       target: build
     env_file:
-      - .env
+      - '${APP_ENV_FILE:?Set APP_ENV_FILE to an environment file outside the repository}'
     environment:
       DATABASE_HOST: postgres
       DATABASE_PORT: 5432

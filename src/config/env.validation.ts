@@ -5,9 +5,9 @@ export const environmentValidationSchema = Joi.object({
   MARKET_DATA_UNIVERSE: Joi.string()
     .pattern(/^[A-Z0-9_-]{1,32}$/)
     .default('DEVELOPMENT'),
+  CREDENTIAL_ENCRYPTION_KEY: Joi.string().base64().allow('').default(''),
   UPSTOX_CLIENT_ID: Joi.string().allow('').default(''),
   UPSTOX_CLIENT_SECRET: Joi.string().allow('').default(''),
-  UPSTOX_REDIRECT_URI: Joi.string().uri().allow('').default(''),
   UPSTOX_ACCESS_TOKEN: Joi.string().allow('').default(''),
   UPSTOX_API_BASE_URL: Joi.string()
     .uri({ scheme: ['https'] })
@@ -72,6 +72,7 @@ export const environmentValidationSchema = Joi.object({
   META_WHATSAPP_DEDUP_TTL_SECONDS: Joi.number().integer().min(60).max(2592000).default(604800),
   NODE_ENV: Joi.string().valid('development', 'test', 'production').default('development'),
   APP_PORT: Joi.number().port().default(3000),
+  SWAGGER_ENABLED: Joi.boolean().truthy('true').falsy('false'),
   DATABASE_HOST: Joi.string().trim().required(),
   DATABASE_PORT: Joi.number().port().default(5432),
   DATABASE_NAME: Joi.string().trim().required(),

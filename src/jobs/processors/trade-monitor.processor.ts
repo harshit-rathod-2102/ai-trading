@@ -5,6 +5,7 @@ import { Job } from 'bullmq';
 import { isWithinTimeRange, marketClock } from '../../common/utils/market-time';
 import { elapsedMilliseconds, structuredError } from '../../logging/logging.utils';
 import { TradeMonitorService } from '../../trade-monitor/trade-monitor.service';
+import { UpstoxTokenService } from '../../providers/upstox/auth/upstox-token.service';
 import { MarketJobData } from '../models/job-data.model';
 import { MARKET_MONITORING_QUEUE } from '../queues';
 import { TradingDayService } from '../services/trading-day.service';
@@ -17,6 +18,7 @@ export class TradeMonitorProcessor extends WorkerHost {
     private readonly config: ConfigService,
     private readonly tradingDays: TradingDayService,
     private readonly monitor: TradeMonitorService,
+    private readonly upstoxTokens: UpstoxTokenService,
   ) {
     super();
   }
@@ -45,6 +47,16 @@ export class TradeMonitorProcessor extends WorkerHost {
           'Trade-monitor job skipped',
         );
         return { status: 'SKIPPED_OUTSIDE_MARKET_HOURS', marketDate: clock.marketDate };
+      }
+      if (this.config.getOrThrow<string>('providers.marketData') === 'upstox') {
+        const auth = await this.upstoxTokens.getStatus();
+        if (!auth.authenticated) {
+          this.logger.warn(
+            { event: 'job.skipped', ...fields, reason: 'UPSTOX_AUTH_REQUIRED' },
+            'Trade-monitor job skipped because Upstox authentication is required',
+          );
+          return { status: 'UPSTOX_AUTH_REQUIRED', marketDate: clock.marketDate };
+        }
       }
       if (!(await this.tradingDays.isTradingDay(clock.marketDate))) {
         this.logger.log(

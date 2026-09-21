@@ -1,15 +1,15 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { gunzipSync } from 'node:zlib';
 import {
-  ProviderAuthenticationError,
   ProviderError,
   ProviderErrorCode,
   ProviderRateLimitError,
   ProviderUnavailableError,
 } from '../../provider-error';
 import { ProviderRequestContext } from '../../provider-request-context';
-import { UpstoxAuthService } from './upstox-auth.service';
-import { UPSTOX_CONFIG, UpstoxConfig } from './upstox.config';
+import { UpstoxTokenService } from '../../upstox/auth/upstox-token.service';
+import { UpstoxAuthenticationFailedError } from '../../upstox/auth/upstox-auth.errors';
+import { UPSTOX_CONFIG, UpstoxConfig } from '../../upstox/upstox.config';
 
 @Injectable()
 export class UpstoxClient {
@@ -17,7 +17,7 @@ export class UpstoxClient {
 
   constructor(
     @Inject(UPSTOX_CONFIG) private readonly config: UpstoxConfig,
-    private readonly auth: UpstoxAuthService,
+    private readonly tokens: UpstoxTokenService,
   ) {}
 
   getJson<T>(path: string, context?: ProviderRequestContext): Promise<T> {
@@ -72,7 +72,7 @@ export class UpstoxClient {
       try {
         const response = await this.fetchOnce(url, authenticated, context);
         if (response.ok) return response;
-        const error = this.httpError(response);
+        const error = await this.httpError(response);
         if (!this.shouldRetryStatus(response.status) || attempt === this.config.maxRetries) {
           this.logger.error(
             {
@@ -173,7 +173,10 @@ export class UpstoxClient {
         Accept: 'application/json',
         'Content-Type': 'application/json',
       };
-      if (authenticated) Object.assign(headers, this.auth.authorizationHeaders());
+      if (authenticated) {
+        const accessToken = await this.tokens.getValidAccessToken();
+        headers.Authorization = `Bearer ${accessToken}`;
+      }
       return await fetch(url, { method: 'GET', headers, signal: controller.signal });
     } finally {
       clearTimeout(timeout);
@@ -181,13 +184,20 @@ export class UpstoxClient {
     }
   }
 
-  private httpError(response: Response): ProviderError {
+  private async httpError(response: Response): Promise<ProviderError> {
     const retryAfterSeconds = this.retryAfterSeconds(response.headers.get('retry-after'));
     if (response.status === 401 || response.status === 403) {
-      return new ProviderAuthenticationError(
-        'upstox',
-        `Upstox authentication failed with HTTP ${response.status}`,
+      await this.tokens.invalidateCurrentToken(`HTTP_${response.status}`);
+      this.logger.warn(
+        {
+          event: 'upstox.request.auth_failed',
+          module: UpstoxClient.name,
+          provider: 'upstox',
+          statusCode: response.status,
+        },
+        'Upstox rejected request authentication',
       );
+      return new UpstoxAuthenticationFailedError(response.status);
     }
     if (response.status === 429) {
       return new ProviderRateLimitError('upstox', 'Upstox rate limit exceeded', retryAfterSeconds);

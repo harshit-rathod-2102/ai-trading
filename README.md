@@ -36,9 +36,26 @@ Provider logs record the provider-neutral operation, safe endpoint path, status,
 
 Pino redaction censors authorization fields and common nested `password`, `secret`, `token`, `accessToken`, `apiKey`, and `clientSecret` fields. Explicit environment-name rules cover Upstox, GNews, OpenRouter, Meta WhatsApp, and database credentials. Redaction is defense in depth; application logs avoid adding these values in the first place.
 
+## Swagger / OpenAPI
+
+Interactive API documentation is available during local development:
+
+```text
+Swagger UI:   http://localhost:3000/api/docs
+OpenAPI JSON: http://localhost:3000/api/docs-json
+```
+
+Swagger documents the existing REST API and does not replace runtime validation. Normal endpoints can be exercised with **Try it out**. Meta WhatsApp webhook requests still require the provider's raw-body signature, so Swagger cannot generate a valid signed webhook event.
+
+```env
+SWAGGER_ENABLED=true
+```
+
+Swagger is enabled by default when `NODE_ENV` is not `production`. Production does not register the documentation routes unless `SWAGGER_ENABLED=true` is set explicitly. The API currently has no REST authentication, so the OpenAPI document does not advertise bearer authentication.
+
 ## Postman collection
 
-Import [`postman/AI-Trading-Backend.postman_collection.json`](postman/AI-Trading-Backend.postman_collection.json) into Postman to inspect or exercise every API currently exposed by the backend. The collection follows Postman Collection v2.1 and contains 58 requests covering all 55 unique routes across health, profiles, instruments, universes, market data, regime, scanner, risk, candidates, trades, trade monitoring, scheduling, daily summary, news, AI analysis/evaluation, messaging, and WhatsApp webhooks.
+Import [`postman/AI-Trading-Backend.postman_collection.json`](postman/AI-Trading-Backend.postman_collection.json) into Postman to inspect or exercise every API currently exposed by the backend. The collection follows Postman Collection v2.1 and contains 65 requests covering all 62 unique routes across health, profiles, instruments, universes, market data, regime, scanner, risk, candidates, trades, trade monitoring, scheduling, daily summary, analytics, news, AI analysis/evaluation, messaging, and WhatsApp webhooks.
 
 The collection is self-contained: `baseUrl` defaults to `http://localhost:3000/api`, so a separate environment import is optional. Test scripts capture instrument, job, scan, candidate, and trade IDs for later requests. Review the active-profile update before sending it. News, AI, and messaging calls need their configured providers; those inspection routes are unavailable in production. The fixture's limited NIFTY history makes market-regime and scanner requests return the documented 503 until current persisted history is configured.
 
@@ -224,11 +241,23 @@ The script checks text/template payloads, delivery normalization, verification-t
 
 ## Configuration
 
-Copy the example configuration before starting the application:
+Keep the runtime environment file outside the repository. Copy the non-secret template to a secure external location, edit it there, and expose only its path to the current shell:
 
 ```bash
-cp .env.example .env
+mkdir -p "$HOME/.config/ai-trading"
+cp .env.example "$HOME/.config/ai-trading/app.env"
+export APP_ENV_FILE="$HOME/.config/ai-trading/app.env"
 ```
+
+PowerShell equivalent:
+
+```powershell
+New-Item -ItemType Directory -Force "$HOME\.config\ai-trading"
+Copy-Item .env.example "$HOME\.config\ai-trading\app.env"
+$env:APP_ENV_FILE = "$HOME\.config\ai-trading\app.env"
+```
+
+Do not create a runtime `.env` in the workspace. `.env.example` remains a safe schema/template and must never contain real credentials. NestJS host runs read `APP_ENV_FILE` directly. Docker Compose uses the same path for the API container.
 
 Required settings are validated when NestJS starts:
 
@@ -251,10 +280,10 @@ Use a strong local password instead of the example value when the database is ex
 
 ## Full Docker workflow
 
-With `.env` copied from `.env.example`:
+Pass the external file to Compose as well as setting `APP_ENV_FILE`. The `--env-file` option supplies values needed while Compose resolves PostgreSQL credentials, published ports, and other substitutions; the service-level `env_file` injects those values into NestJS at runtime.
 
 ```bash
-docker compose up --build
+docker compose --env-file "$APP_ENV_FILE" up --build
 ```
 
 Compose waits for PostgreSQL and Redis health checks, runs Flyway successfully, and then starts NestJS in watch mode. The API source is bind-mounted at `/app`, while Docker maintains Linux dependencies in the `api_node_modules` volume. Changes to TypeScript source, configuration, and migrations are synchronized into the container automatically; NestJS reloads after source changes without rebuilding the image.
@@ -262,7 +291,7 @@ Compose waits for PostgreSQL and Redis health checks, runs Flyway successfully, 
 Rebuild only when dependencies or the Dockerfile change:
 
 ```bash
-docker compose up -d --build api
+docker compose --env-file "$APP_ENV_FILE" up -d --build api
 ```
 
 The API is available on port `APP_PORT` (3000 by default).
@@ -270,18 +299,18 @@ The API is available on port `APP_PORT` (3000 by default).
 Stop the stack with:
 
 ```bash
-docker compose down
+docker compose --env-file "$APP_ENV_FILE" down
 ```
 
 Named volumes preserve PostgreSQL and Redis data between runs.
 
 ## Local API with Docker dependencies
 
-When NestJS runs on the host, set `DATABASE_HOST=localhost` and `REDIS_HOST=localhost` in `.env`. Then run:
+When NestJS runs on the host, set `DATABASE_HOST=localhost` and `REDIS_HOST=localhost` in the external file. Keep `APP_ENV_FILE` exported, then run:
 
 ```bash
-docker compose up -d postgres redis
-docker compose run --rm flyway migrate
+docker compose --env-file "$APP_ENV_FILE" up -d postgres redis
+docker compose --env-file "$APP_ENV_FILE" run --rm flyway migrate
 npm install
 npm run start:dev
 ```
@@ -293,22 +322,22 @@ The Docker services still use the Compose service names internally; only the hos
 Migrations live in `database/migrations` and use Flyway versioned names such as `V1__create_app_metadata.sql`.
 
 ```bash
-docker compose run --rm flyway info
-docker compose run --rm flyway validate
-docker compose run --rm flyway migrate
+docker compose --env-file "$APP_ENV_FILE" run --rm flyway info
+docker compose --env-file "$APP_ENV_FILE" run --rm flyway validate
+docker compose --env-file "$APP_ENV_FILE" run --rm flyway migrate
 ```
 
 `repair` is available for deliberate recovery work:
 
 ```bash
-docker compose run --rm flyway repair
+docker compose --env-file "$APP_ENV_FILE" run --rm flyway repair
 ```
 
 Flyway `clean` is not part of the standard workflow because it is destructive.
 
 ## Trading profile / risk configuration
 
-`TradingProfileModule` stores personal capital and risk settings in PostgreSQL, keeping business settings persistent and separate from infrastructure `.env` configuration. This profile defines deterministic risk limits and is not controlled by AI.
+`TradingProfileModule` stores personal capital and risk settings in PostgreSQL, keeping business settings persistent and separate from infrastructure environment configuration. This profile defines deterministic risk limits and is not controlled by AI.
 
 - `GET /api/settings/trading-profile` returns the active persisted profile, or HTTP 404 when not configured. No defaults are fabricated.
 - `PUT /api/settings/trading-profile` accepts the full settings payload and returns HTTP 200 with the persisted profile. The first PUT creates it; subsequent PUTs update the same UUID.
@@ -340,7 +369,7 @@ After applying migrations and starting the API, verify against a development dat
 node scripts/verify-trading-profile.cjs
 ```
 
-The script uses `.env` database credentials and the local published PostgreSQL port, tests the real API and database (including concurrent updates and precision), and restores the original active profile afterward. Run it only against a development database. Optional `VERIFY_API_URL` (default `http://localhost:3000/api`) and `VERIFY_DATABASE_HOST` (default `localhost`) select the verification targets.
+The script uses database credentials loaded through `APP_ENV_FILE` and the local published PostgreSQL port, tests the real API and database (including concurrent updates and precision), and restores the original active profile afterward. Run it only against a development database. Optional `VERIFY_API_URL` (default `http://localhost:3000/api`) and `VERIFY_DATABASE_HOST` (default `localhost`) select the verification targets.
 
 ## Health endpoint
 
@@ -383,10 +412,10 @@ Prices are positive decimal strings with at most 14 integer digits and 4 fractio
 Apply V2 and rebuild the API before using the endpoints:
 
 ```bash
-docker compose run --rm flyway migrate
-docker compose run --rm flyway validate
-docker compose run --rm flyway info
-docker compose up -d --build
+docker compose --env-file "$APP_ENV_FILE" run --rm flyway migrate
+docker compose --env-file "$APP_ENV_FILE" run --rm flyway validate
+docker compose --env-file "$APP_ENV_FILE" run --rm flyway info
+docker compose --env-file "$APP_ENV_FILE" up -d --build
 ```
 
 Flyway validate reports pending migrations before their first application; rerun it after migrate.
@@ -414,7 +443,7 @@ curl http://localhost:3000/api/candidates/CANDIDATE_ID/events
 
 The BUY example records initial risk of 1370.0000, with both stops copied as 2850.0000. It sends no broker order.
 
-The repeatable verification script exercises actual REST requests, concurrent decisions, exact decimal calculations, and transaction rollback after an injected journal failure. It also checks the unique trade constraint directly through TypeORM. Run from the repository root against the local development stack. For its separate NestJS application context, set DATABASE_HOST=localhost and REDIS_HOST=localhost in .env. It leaves clearly labeled VERIFY-* records for inspection.
+The repeatable verification script exercises actual REST requests, concurrent decisions, exact decimal calculations, and transaction rollback after an injected journal failure. It also checks the unique trade constraint directly through TypeORM. Run from the repository root against the local development stack. For its separate NestJS application context, set `DATABASE_HOST=localhost` and `REDIS_HOST=localhost` in the external environment file. It leaves clearly labeled VERIFY-* records for inspection.
 
 ```bash
 npm install
@@ -439,14 +468,16 @@ MARKET_DATA_UNIVERSE=DEVELOPMENT
 
 `MarketDataProvider` defines normalized instrument metadata, daily bars, and calendar sessions. `MarketDataModule` centrally selects either the fixture or Upstox adapter; application services never import Upstox DTOs or its client.
 
-Upstox is the V1 live market-data provider. Create an Upstox application, complete its OAuth authorization-code flow outside this application, and place the resulting access token in the local environment. The current adapter only consumes a manually supplied token; it does not exchange authorization codes, refresh tokens, or persist OAuth state.
+Upstox is the V1 live market-data provider. The application uses Upstox's semi-automated access-token request API: it requests a token, the account holder explicitly approves it in Upstox, and Upstox delivers the token to this application's notifier webhook. The integration does not assume refresh tokens and does not place broker orders.
 
 ```env
 MARKET_DATA_PROVIDER=upstox
 UPSTOX_CLIENT_ID=
 UPSTOX_CLIENT_SECRET=
-UPSTOX_REDIRECT_URI=
-UPSTOX_ACCESS_TOKEN=replace_with_local_token
+CREDENTIAL_ENCRYPTION_KEY=replace_with_32_byte_base64_key
+
+# Optional local fallback only; not recommended for normal runtime use.
+UPSTOX_ACCESS_TOKEN=
 UPSTOX_API_BASE_URL=https://api.upstox.com
 UPSTOX_INSTRUMENT_FILE_URL=https://assets.upstox.com/market-quote/instruments/exchange/NSE.json.gz
 UPSTOX_HTTP_TIMEOUT_MS=10000
@@ -454,7 +485,38 @@ UPSTOX_MAX_RETRIES=2
 UPSTOX_RETRY_BASE_DELAY_MS=500
 ```
 
-The token and authorization headers are never logged. A missing token produces a provider authentication error when an authenticated operation is requested. `CLIENT_ID`, `CLIENT_SECRET`, and `REDIRECT_URI` are reserved for a later OAuth flow and are not sent by the current adapter.
+Generate a 32-byte encryption key with `node -e "console.log(require('node:crypto').randomBytes(32).toString('base64'))"`. Store it only in the local environment or secret manager. Changing or losing the key makes an existing runtime token unreadable. The access token, client secret, encryption key, ciphertext, and authorization headers are never logged.
+
+### Upstox Runtime Authentication
+
+`UPSTOX_CLIENT_ID` and `UPSTOX_CLIENT_SECRET` are required only when initiating the semi-automated approval request. `CREDENTIAL_ENCRYPTION_KEY` is required when accepting or reading a runtime token. `UPSTOX_ACCESS_TOKEN` remains an optional development fallback and is never required during application startup.
+
+Configure the Upstox app's Notifier Webhook Endpoint as:
+
+```text
+https://YOUR_PUBLIC_HOST/api/webhooks/upstox/access-token
+```
+
+The operational flow is:
+
+1. Start the application and call `GET /api/upstox/auth/status`.
+2. If unauthenticated, call `POST /api/upstox/auth/request-token` once.
+3. Approve the request in Upstox mobile/web or through the Upstox notification.
+4. Upstox sends the approved token to `POST /api/webhooks/upstox/access-token`.
+5. Call the status endpoint again; `authenticated=true` and `source=RUNTIME` indicate readiness.
+6. Market-data calls and scheduled provider stages can proceed.
+
+The request endpoint calls Upstox `POST /v3/login/auth/token/request/:client_id` with the configured secret. A persisted `PENDING` state and Upstox's returned authorization expiry suppress duplicate requests while approval is outstanding. The webhook validates the documented `client_id`, `message_type=access_token`, `token_type=Bearer`, token presence, and issued/expiry timestamps. Upstox documents this notifier as an unauthenticated endpoint and does not publish a callback-signature mechanism, so no unsupported signature check is invented.
+
+Runtime tokens are encrypted with AES-256-GCM using a fresh 96-bit IV and authentication tag, then upserted into the single `provider_credentials` row for `UPSTOX`/`ACCESS_TOKEN`. Replayed notifier callbacks update that row and cannot create duplicates. The database token is resolved first; an unexpired database token reports `source=RUNTIME`, otherwise the optional environment token reports `source=ENV_FALLBACK`. A known expired runtime token is never sent to Upstox. If neither source is available, authenticated calls fail with `UPSTOX_ACCESS_TOKEN_UNAVAILABLE` without affecting application startup.
+
+Upstox HTTP 401/403 responses invalidate the runtime credential and surface `UPSTOX_AUTHENTICATION_FAILED`; the client does not retry them. Market-data refresh workers, the post-market pipeline, and scheduled trade monitoring return `UPSTOX_AUTH_REQUIRED` without creating candidates when live Upstox mode lacks a valid token. Health remains UP for this operational state and exposes safe `configured`, `authenticated`, and `source` fields.
+
+| Method | Path                              | Purpose                                              |
+| ------ | --------------------------------- | ---------------------------------------------------- |
+| GET    | /api/upstox/auth/status           | Safe token source, expiry, and pending-request state |
+| POST   | /api/upstox/auth/request-token    | Initiate or reuse a pending user-approval request    |
+| POST   | /api/webhooks/upstox/access-token | Receive the documented Upstox notifier payload       |
 
 Instrument discovery downloads Upstox's NSE BOD JSON file and imports only `NSE_EQ`/`EQ` equities and `NSE_INDEX`/`INDEX` indices. `instrument_key` is stored as the generic provider instrument ID; other source fields stay in provider metadata. Sector and industry remain null because the BOD file does not supply them. Index symbols are normalized for the application's symbol rules, while Upstox's trading symbol and instrument key are preserved.
 
@@ -467,8 +529,8 @@ The fixture is deliberately synthetic. It contains RELIANCE, TCS, and NIFTY50, w
 No records are seeded at startup. To explicitly populate the development universe idempotently:
 
 ```bash
-docker compose run --rm flyway migrate
-docker compose up -d --build
+docker compose --env-file "$APP_ENV_FILE" run --rm flyway migrate
+docker compose --env-file "$APP_ENV_FILE" up -d --build
 node scripts/seed-market-data.cjs
 ```
 
@@ -511,7 +573,7 @@ curl 'http://localhost:3000/api/market-data/instruments/INSTRUMENT_ID/candles?fr
 curl 'http://localhost:3000/api/market-data/instruments/INSTRUMENT_ID/quality?from=2026-09-07&to=2026-09-13'
 ```
 
-After importing instruments, create or select a universe and add the desired instrument IDs through the existing universe membership endpoint before running a universe refresh. Upstox access tokens are short-lived according to the account authorization lifecycle, so replace the local token when authentication fails. This integration is market-data-only: it contains no order, position, holding, funds, or broker-execution calls.
+After importing instruments, create or select a universe and add the desired instrument IDs through the existing universe membership endpoint before running a universe refresh. Upstox access tokens expire at the provider-supplied time; repeat the approval flow after expiry or authentication failure. This integration is market-data-only: it contains no order, position, holding, funds, or broker-execution calls.
 
 Refreshes run on the market-data BullMQ queue with two concurrent workers in the API process, three attempts, and exponential backoff. The most recent 1,000 completed and 1,000 failed jobs are retained. Each requested refresh gets a job; idempotence is enforced in PostgreSQL rather than by permanently suppressing repeated refresh jobs.
 
@@ -534,14 +596,14 @@ A nonempty, complete range of structurally valid bars sets dataAvailable=true. r
 
 ### Verification
 
-With the local stack running and DATABASE_HOST=localhost / REDIS_HOST=localhost in .env:
+With the local stack running and `DATABASE_HOST=localhost` / `REDIS_HOST=localhost` in the external environment file:
 
 ```bash
 npm run build
 node scripts/verify-market-data.cjs
 node scripts/verify-vertical-slice.cjs
-docker compose run --rm flyway validate
-docker compose run --rm flyway info
+docker compose --env-file "$APP_ENV_FILE" run --rm flyway validate
+docker compose --env-file "$APP_ENV_FILE" run --rm flyway info
 ```
 
 The market-data script verifies equity/index refresh, repeated and concurrent upserts, stable candle IDs, exact numeric storage, provider failure handling, atomic rejection of malformed data, missing/stale/unknown reports, session-close behavior, and database constraints. It restores modified fixture values and active status, and leaves the demo universe and candles plus a clearly named unsupported VERIFY-* instrument for inspection.
@@ -571,7 +633,7 @@ It checks SMA `1..5 = 3`, deterministic EMA, rising/falling/flat RSI, gap-aware 
 
 `MarketRegimeModule` classifies the current broader market as `BULLISH`, `NEUTRAL`, `BEARISH`, or `RISK_OFF`. It is deterministic, provider-neutral, independent of AI and stock-level strategy decisions, and identified by the reproducible version `market-regime-v1`.
 
-The V1 score combines five explainable components on a normalized -100 to +100 scale: NIFTY trend 35%, NIFTY momentum 20%, volatility 20%, configured-universe breadth 15%, and sector participation 10%. Trend compares the NIFTY close with EMA20, EMA50, and SMA200, plus EMA20/EMA50 and EMA50/SMA200 ordering. Momentum combines configured RSI14 and ROC20/50 bands. Volatility combines configured India VIX bands with NIFTY normalized ATR bands. All weights, bands, confidence rules, and classification thresholds live together in `market-regime-v1.config.ts`, rather than `.env` or scattered branches.
+The V1 score combines five explainable components on a normalized -100 to +100 scale: NIFTY trend 35%, NIFTY momentum 20%, volatility 20%, configured-universe breadth 15%, and sector participation 10%. Trend compares the NIFTY close with EMA20, EMA50, and SMA200, plus EMA20/EMA50 and EMA50/SMA200 ordering. Momentum combines configured RSI14 and ROC20/50 bands. Volatility combines configured India VIX bands with NIFTY normalized ATR bands. All weights, bands, confidence rules, and classification thresholds live together in `market-regime-v1.config.ts`, rather than environment variables or scattered branches.
 
 Scores at or above 30 are bullish; scores at or below -25 are bearish. `RISK_OFF` requires a score at or below -60 plus confirmation from strongly negative trend, materially elevated volatility, and poor breadth or sector participation. This prevents one volatile observation from creating a risk-off classification. Other scores are neutral.
 
@@ -671,9 +733,9 @@ Because rejected strategy hypotheses are intentionally not persisted, `qualified
 ```bash
 npm run build
 node scripts/verify-scanner.cjs
-docker compose run --rm flyway validate
-docker compose run --rm flyway migrate
-docker compose run --rm flyway info
+docker compose --env-file "$APP_ENV_FILE" run --rm flyway validate
+docker compose --env-file "$APP_ENV_FILE" run --rm flyway migrate
+docker compose --env-file "$APP_ENV_FILE" run --rm flyway info
 ```
 
 ## Deterministic risk planning
@@ -892,9 +954,9 @@ Run the database-backed decision suite after applying Flyway migration `V11`:
 
 ```bash
 npm run build
-docker compose run --rm flyway validate
-docker compose run --rm flyway migrate
-docker compose run --rm flyway info
+docker compose --env-file "$APP_ENV_FILE" run --rm flyway validate
+docker compose --env-file "$APP_ENV_FILE" run --rm flyway migrate
+docker compose --env-file "$APP_ENV_FILE" run --rm flyway info
 node scripts/verify-candidate-decision.cjs
 ```
 
@@ -928,9 +990,9 @@ Run the database-backed fake-provider verification after applying Flyway migrati
 
 ```bash
 npm run build
-docker compose run --rm flyway validate
-docker compose run --rm flyway migrate
-docker compose run --rm flyway info
+docker compose --env-file "$APP_ENV_FILE" run --rm flyway validate
+docker compose --env-file "$APP_ENV_FILE" run --rm flyway migrate
+docker compose --env-file "$APP_ENV_FILE" run --rm flyway info
 node scripts/verify-whatsapp-candidate-flow.cjs
 ```
 
@@ -964,9 +1026,9 @@ Apply Flyway migration `V13` and run the database-backed verification:
 
 ```bash
 npm run build
-docker compose run --rm flyway validate
-docker compose run --rm flyway migrate
-docker compose run --rm flyway info
+docker compose --env-file "$APP_ENV_FILE" run --rm flyway validate
+docker compose --env-file "$APP_ENV_FILE" run --rm flyway migrate
+docker compose --env-file "$APP_ENV_FILE" run --rm flyway info
 node scripts/verify-trade-monitor.cjs
 ```
 
@@ -1018,9 +1080,9 @@ Apply Flyway migration `V14` before enabling the scheduler:
 
 ```bash
 npm run build
-docker compose run --rm flyway validate
-docker compose run --rm flyway migrate
-docker compose run --rm flyway info
+docker compose --env-file "$APP_ENV_FILE" run --rm flyway validate
+docker compose --env-file "$APP_ENV_FILE" run --rm flyway migrate
+docker compose --env-file "$APP_ENV_FILE" run --rm flyway info
 node scripts/verify-scheduling.cjs
 ```
 
@@ -1053,8 +1115,45 @@ Apply Flyway migration `V15` and verify the behavior:
 
 ```bash
 npm run build
-docker compose run --rm flyway validate
-docker compose run --rm flyway migrate
-docker compose run --rm flyway info
+docker compose --env-file "$APP_ENV_FILE" run --rm flyway validate
+docker compose --env-file "$APP_ENV_FILE" run --rm flyway migrate
+docker compose --env-file "$APP_ENV_FILE" run --rm flyway info
 node scripts/verify-daily-summary.cjs
+```
+
+## Analytics
+
+`AnalyticsModule` provides read-only `analytics-v1` decision-support metrics from persisted trades, trade events, candidate snapshots, scanner results, and monitoring state. It does not refresh market data, call AI, reinterpret a strategy, or mutate candidate/trade state.
+
+All endpoints accept optional inclusive `from` and `to` dates. Date boundaries use `Asia/Kolkata`; omitting both returns all available history.
+
+```http
+GET /api/analytics/overview
+GET /api/analytics/strategies
+GET /api/analytics/regimes
+GET /api/analytics/sectors
+GET /api/analytics/score-buckets
+GET /api/analytics/accepted-vs-skipped
+GET /api/analytics/funnel
+```
+
+Primary performance metrics include terminal `CLOSED` and `STOPPED_OUT` trades with an actual close timestamp. Realized P&L first sums every recorded `TRADE_CLOSED` portion as `(actual exit price - actual entry price) * actual exit quantity`; this correctly handles multiple partial exits. If complete exit events are unavailable, the response uses the persisted trade-level realized P&L and reports that fallback in coverage metadata.
+
+Realized R is `total realized P&L / immutable initial risk amount`. Initial risk uses the persisted value when valid, or derives it from `(actual entry - initial stop) * initial quantity`. Trades without valid positive initial risk remain in currency P&L metrics and are excluded from R metrics. Decimal values are serialized as four-decimal strings.
+
+Win rate is `wins / (wins + losses)`, so breakeven trades are counted separately and excluded from the denominator. Expectancy R and average R are the arithmetic mean of realized R for trades with valid risk. Profit factor is `gross profit / gross loss`, with gross loss reported as a positive magnitude; it is `null` when no losses exist. Average loser remains a negative currency value.
+
+Maximum drawdown is calculated from chronological cumulative realized P&L and returned as a positive peak-to-trough loss magnitude. Drawdown percent is `null` in V1 because current profile capital is not a reliable historical capital base. Holding-period metrics use elapsed wall-clock hours.
+
+MFE and MAE use persisted trade-monitor values only. Missing excursion values are excluded rather than treated as zero, and coverage/sample-size fields show how many trades support each metric. Strategy groups use strategy plus strategy version; regime uses the decision-time candidate snapshot; sector uses the persisted candidate sector and maps missing values to `UNKNOWN`.
+
+Quant-score buckets are centralized in `analytics-v1.config.ts`: `<60`, `60-69.99`, `70-79.99`, `80-89.99`, and `90-100`, with `UNKNOWN` for invalid/missing values. The accepted-vs-skipped report uses persisted `TRADE_OPENED` and `CANDIDATE_SKIPPED` events. Accepted candidates include actual closed-trade outcomes; skipped outcome P&L is deliberately unavailable because V1 does not persist a reliable counterfactual path.
+
+The funnel reports persisted scan results, shortlisted results, risk-approved candidates, and unique qualified, notified, accepted, and skipped candidate events. Date filters apply to each fact's own persisted timestamp: trade close time for realized performance, candidate detection time for score populations, event time for lifecycle counts, and scanner-result creation time for scan counts.
+
+Every response exposes its sample size or coverage. Small samples are factual summaries only and do not imply statistical significance. Verify the deterministic calculation scenarios after building:
+
+```bash
+npm run build
+npm run analytics:verify
 ```

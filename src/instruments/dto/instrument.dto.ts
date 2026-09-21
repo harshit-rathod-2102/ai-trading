@@ -8,23 +8,42 @@ import {
   MaxLength,
   ValidateIf,
 } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { InstrumentType } from '../../common/enums/instrument-type.enum';
 
 export class CreateInstrumentDto {
-  @IsString() @Matches(/^[A-Z0-9][A-Z0-9&._-]*$/) @MaxLength(32) symbol!: string;
+  @ApiProperty({ example: 'RELIANCE' })
+  @IsString()
+  @Matches(/^[A-Z0-9][A-Z0-9&._-]*$/)
+  @MaxLength(32)
+  symbol!: string;
 
-  @IsIn(['NSE']) exchange!: string;
+  @ApiProperty({ example: 'NSE', enum: ['NSE'] })
+  @IsIn(['NSE'])
+  exchange!: string;
 
-  @IsString() @Matches(/\S/) @MaxLength(160) name!: string;
+  @ApiProperty({ example: 'Reliance Industries Limited' })
+  @IsString()
+  @Matches(/\S/)
+  @MaxLength(160)
+  name!: string;
 
-  @IsEnum(InstrumentType) type!: InstrumentType;
+  @ApiProperty({ enum: InstrumentType, example: InstrumentType.EQUITY })
+  @IsEnum(InstrumentType)
+  type!: InstrumentType;
 
+  @ApiPropertyOptional({ type: String, example: 'Energy', nullable: true })
   @ValidateIf((_o, value: unknown) => value !== undefined && value !== null)
   @IsString()
   @Matches(/\S/)
   @MaxLength(100)
   sector?: string | null;
 
+  @ApiPropertyOptional({
+    type: String,
+    example: 'Oil, Gas & Consumable Fuels',
+    nullable: true,
+  })
   @ValidateIf((_o, value: unknown) => value !== undefined && value !== null)
   @IsString()
   @Matches(/\S/)
@@ -33,24 +52,29 @@ export class CreateInstrumentDto {
 }
 
 export class ListInstrumentsDto {
+  @ApiPropertyOptional({ example: 'RELIANCE' })
   @ValidateIf((_o, value: unknown) => value !== undefined)
   @IsString()
   @Matches(/^[A-Z0-9][A-Z0-9&._-]*$/)
   @MaxLength(32)
   symbol?: string;
 
+  @ApiPropertyOptional({ enum: InstrumentType })
   @ValidateIf((_o, value: unknown) => value !== undefined)
   @IsEnum(InstrumentType)
   type?: InstrumentType;
 
+  @ApiPropertyOptional({ enum: ['NSE'] })
   @ValidateIf((_o, value: unknown) => value !== undefined)
   @IsIn(['NSE'])
   exchange?: string;
 
+  @ApiPropertyOptional({ enum: ['true', 'false'] })
   @ValidateIf((_o, value: unknown) => value !== undefined)
   @IsIn(['true', 'false'])
   active?: string;
 
+  @ApiPropertyOptional({ example: 'DEVELOPMENT' })
   @ValidateIf((_o, value: unknown) => value !== undefined)
   @IsString()
   @Matches(/^[A-Z0-9_-]{1,32}$/)
@@ -58,19 +82,33 @@ export class ListInstrumentsDto {
 }
 
 export class SetInstrumentActivityDto {
-  @IsBoolean() isActive!: boolean;
+  @ApiProperty({ example: true })
+  @IsBoolean()
+  isActive!: boolean;
 }
 
 export class CreateUniverseDto {
-  @IsString() @Matches(/^[A-Z0-9_-]{1,32}$/) code!: string;
+  @ApiProperty({ example: 'DEVELOPMENT' })
+  @IsString()
+  @Matches(/^[A-Z0-9_-]{1,32}$/)
+  code!: string;
 
-  @IsString() @Matches(/\S/) @MaxLength(160) name!: string;
+  @ApiProperty({ example: 'Development Universe' })
+  @IsString()
+  @Matches(/\S/)
+  @MaxLength(160)
+  name!: string;
 }
 
 export class UniverseCodeDto {
-  @IsString() @Matches(/^[A-Z0-9_-]{1,32}$/) code!: string;
+  @ApiProperty({ example: 'DEVELOPMENT' })
+  @IsString()
+  @Matches(/^[A-Z0-9_-]{1,32}$/)
+  code!: string;
 }
 
 export class UniverseMemberParamsDto extends UniverseCodeDto {
-  @IsUUID() id!: string;
+  @ApiProperty({ format: 'uuid' })
+  @IsUUID()
+  id!: string;
 }

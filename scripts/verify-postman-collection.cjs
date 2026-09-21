@@ -20,6 +20,8 @@ const actual = new Set(requests.map(request => {
 }));
 const expected = new Set([
   'GET /health',
+  'GET /upstox/auth/status', 'POST /upstox/auth/request-token',
+  'POST /webhooks/upstox/access-token',
   'GET /settings/trading-profile', 'PUT /settings/trading-profile',
   'GET /instruments', 'POST /instruments', 'GET /instruments/{{instrumentId}}',
   'PATCH /instruments/{{createdInstrumentId}}/activity',
@@ -47,18 +49,24 @@ const expected = new Set([
   'POST /trade-monitor/run', 'POST /trade-monitor/trades/{{tradeId}}',
   'POST /jobs/trade-monitor/run', 'POST /jobs/post-market/run', 'POST /jobs/evening/run',
   'GET /daily-summary/{{summaryMarketDate}}', 'POST /daily-summary/{{summaryMarketDate}}/send',
+  'GET /analytics/overview', 'GET /analytics/strategies', 'GET /analytics/regimes',
+  'GET /analytics/sectors', 'GET /analytics/score-buckets',
+  'GET /analytics/accepted-vs-skipped', 'GET /analytics/funnel',
   'GET /news/search', 'POST /ai-analysis/candidate', 'POST /messaging/test',
   'GET /ai-evaluation/fixtures', 'POST /ai-evaluation/fixtures/clean-strong/run',
   'POST /ai-evaluation/run',
   'GET /webhooks/whatsapp', 'POST /webhooks/whatsapp',
 ]);
 assert.deepEqual([...actual].sort(), [...expected].sort());
-assert.equal(actual.size, 55);
-assert.equal(requests.length, 58);
+assert.equal(actual.size, 65);
+assert.equal(requests.length, 68);
 assert.equal(collection.info.schema, 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json');
 const variables = new Map(collection.variable.map(variable => [variable.key, variable.value]));
 assert.equal(variables.get('baseUrl'), 'http://localhost:3000/api');
+assert.equal(variables.get('upstoxClientId'), '');
 assert.equal(variables.get('metaWhatsappAppSecret'), '');
 assert.equal(variables.get('whatsappVerifyToken'), '');
 assert.equal(variables.get('summaryMarketDate'), '2026-09-19');
-console.log('PASS: valid Postman Collection v2.1 JSON with 58 requests covering all 55 unique API routes.');
+assert.equal(variables.get('analyticsFrom'), '2026-01-01');
+assert.equal(variables.get('analyticsTo'), '2026-09-20');
+console.log('PASS: valid Postman Collection v2.1 JSON with 68 requests covering all 65 unique API routes.');

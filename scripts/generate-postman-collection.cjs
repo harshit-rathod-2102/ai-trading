@@ -55,6 +55,7 @@ const collection = {
   },
   variable: [
     { key: 'baseUrl', value: 'http://localhost:3000/api', type: 'string' },
+    { key: 'upstoxClientId', value: '', type: 'string', description: 'Must match UPSTOX_CLIENT_ID for webhook testing.' },
     { key: 'instrumentId', value: '', type: 'string', description: 'List Instruments captures RELIANCE when available.' },
     { key: 'createdInstrumentId', value: '', type: 'string' },
     { key: 'newInstrumentSymbol', value: '', type: 'string' },
@@ -69,6 +70,8 @@ const collection = {
     { key: 'skipCandidateId', value: '', type: 'string' },
     { key: 'tradeId', value: '', type: 'string' },
     { key: 'summaryMarketDate', value: '2026-09-19', type: 'string', description: 'Explicit NSE market date in YYYY-MM-DD format.' },
+    { key: 'analyticsFrom', value: '2026-01-01', type: 'string' },
+    { key: 'analyticsTo', value: '2026-09-20', type: 'string' },
     { key: 'newsFrom', value: '2026-09-01T00:00:00.000Z', type: 'string' },
     { key: 'newsTo', value: '2026-09-14T23:59:59.999Z', type: 'string' },
     { key: 'messageRecipient', value: '919999999999', type: 'string' },
@@ -80,6 +83,26 @@ const collection = {
   item: [
     folder('Health', 'Infrastructure readiness.', [
       request('Health Check', 'GET', '/health', { description: 'Checks PostgreSQL and Redis connectivity.' }),
+    ]),
+    folder('Upstox Auth', 'Semi-automated access-token approval and safe runtime status.', [
+      request('Get Upstox Auth Status', 'GET', '/upstox/auth/status', {
+        description: 'Returns readiness, source, expiry, and pending state without exposing credentials.',
+      }),
+      request('Request Upstox Access Token', 'POST', '/upstox/auth/request-token', {
+        description: 'Calls the Upstox request API once; repeated calls reuse an unexpired pending request.',
+      }),
+      request('Receive Upstox Access Token Webhook', 'POST', '/webhooks/upstox/access-token', {
+        description: 'Development replay of the documented notifier payload. Set upstoxClientId to UPSTOX_CLIENT_ID.',
+        body: {
+          client_id: '{{upstoxClientId}}', user_id: 'POSTMAN_USER', access_token: 'POSTMAN_RUNTIME_TOKEN',
+          token_type: 'Bearer', expires_at: '{{upstoxExpiresAt}}', issued_at: '{{upstoxIssuedAt}}',
+          message_type: 'access_token',
+        },
+        events: [preRequest([
+          "pm.collectionVariables.set('upstoxIssuedAt', String(Date.now()));",
+          "pm.collectionVariables.set('upstoxExpiresAt', String(Date.now() + 60 * 60 * 1000));",
+        ])],
+      }),
     ]),
     folder('Trading Profile', 'Persistent V1 account and risk configuration.', [
       request('Get Active Trading Profile', 'GET', '/settings/trading-profile'),
@@ -244,6 +267,19 @@ const collection = {
       request('Send Daily Summary', 'POST', '/daily-summary/{{summaryMarketDate}}/send', {
         description: 'Sends via MessagingProvider. A SENT market-date/version record is reused; FAILED delivery retries the preserved snapshot.',
       }),
+    ]),
+    folder('Analytics', 'Read-only analytics-v1 metrics derived from persisted factual history.', [
+      request('Get Analytics Overview', 'GET', '/analytics/overview?from={{analyticsFrom}}&to={{analyticsTo}}', {
+        description: 'Realized P&L, R, expectancy, win rate, profit factor, drawdown, holding period, MFE/MAE, and coverage metadata.',
+      }),
+      request('Get Strategy Performance', 'GET', '/analytics/strategies?from={{analyticsFrom}}&to={{analyticsTo}}'),
+      request('Get Regime Performance', 'GET', '/analytics/regimes?from={{analyticsFrom}}&to={{analyticsTo}}'),
+      request('Get Sector Performance', 'GET', '/analytics/sectors?from={{analyticsFrom}}&to={{analyticsTo}}'),
+      request('Get Score-Bucket Performance', 'GET', '/analytics/score-buckets?from={{analyticsFrom}}&to={{analyticsTo}}'),
+      request('Get Accepted vs Skipped', 'GET', '/analytics/accepted-vs-skipped?from={{analyticsFrom}}&to={{analyticsTo}}', {
+        description: 'Accepted candidates use factual closed outcomes. Skipped counterfactual P&L remains unavailable in V1.',
+      }),
+      request('Get Candidate Funnel', 'GET', '/analytics/funnel?from={{analyticsFrom}}&to={{analyticsTo}}'),
     ]),
     folder('News (Development Only)', 'Requires NEWS_PROVIDER=gnews and GNEWS_API_KEY; route is hidden in production.', [
       request('Search News', 'GET', '/news/search?q=%22Reliance%20Industries%22&from={{newsFrom}}&to={{newsTo}}&language=en&country=in&limit=10&sortBy=publishedAt&page=1'),

@@ -1,11 +1,14 @@
 import { IsEnum, IsString, Matches, MaxLength, ValidateIf } from 'class-validator';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { TradeStatus } from '../../common/enums/trade-status.enum';
 
 export class ListTradesDto {
+  @ApiPropertyOptional({ enum: TradeStatus })
   @ValidateIf((_object, value: unknown) => value !== undefined)
   @IsEnum(TradeStatus)
   status?: TradeStatus;
 
+  @ApiPropertyOptional({ example: 'RELIANCE' })
   @ValidateIf((_object, value: unknown) => value !== undefined)
   @IsString()
   @Matches(/^[A-Z0-9][A-Z0-9&._-]*$/)

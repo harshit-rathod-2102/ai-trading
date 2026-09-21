@@ -22,6 +22,8 @@ import { MessagingModule } from './messaging/messaging.module';
 import { LoggingModule } from './logging/logging.module';
 import { TradeMonitorModule } from './trade-monitor/trade-monitor.module';
 import { DailySummaryModule } from './daily-summary/daily-summary.module';
+import { AnalyticsModule } from './analytics/analytics.module';
+import { UpstoxAuthModule } from './providers/upstox/auth/upstox-auth.module';
 
 @Module({
   imports: [
@@ -34,6 +36,7 @@ import { DailySummaryModule } from './daily-summary/daily-summary.module';
     AppConfigModule,
     LoggingModule,
     ProvidersModule,
+    UpstoxAuthModule,
     DatabaseModule,
     RedisModule,
     JobsModule,
@@ -48,6 +51,7 @@ import { DailySummaryModule } from './daily-summary/daily-summary.module';
     MessagingModule,
     TradeMonitorModule,
     DailySummaryModule,
+    AnalyticsModule,
   ],
 })
 export class AppModule {}

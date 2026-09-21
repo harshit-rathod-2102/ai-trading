@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
+import { ApiParam, ApiTags } from '@nestjs/swagger';
 import { InstrumentsService } from './instruments.service';
 import {
   CreateInstrumentDto,
@@ -6,6 +7,7 @@ import {
   SetInstrumentActivityDto,
 } from './dto/instrument.dto';
 
+@ApiTags('Instruments')
 @Controller('instruments')
 export class InstrumentsController {
   constructor(private readonly instruments: InstrumentsService) {}
@@ -18,14 +20,15 @@ export class InstrumentsController {
     return this.instruments.list(query);
   }
 
-  @Get(':id') get(@Param('id', ParseUUIDPipe) id: string) {
+  @Get(':id')
+  @ApiParam({ name: 'id', format: 'uuid' })
+  get(@Param('id', ParseUUIDPipe) id: string) {
     return this.instruments.get(id);
   }
 
-  @Patch(':id/activity') activity(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() input: SetInstrumentActivityDto,
-  ) {
+  @Patch(':id/activity')
+  @ApiParam({ name: 'id', format: 'uuid' })
+  activity(@Param('id', ParseUUIDPipe) id: string, @Body() input: SetInstrumentActivityDto) {
     return this.instruments.setActivity(id, input.isActive);
   }
 }

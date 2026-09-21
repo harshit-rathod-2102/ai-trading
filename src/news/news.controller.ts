@@ -1,8 +1,10 @@
 import { Controller, Get, NotFoundException, Query } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { ApiTags } from '@nestjs/swagger';
 import { NewsSearchDto } from './dto/news-search.dto';
 import { NewsService } from './news.service';
 
+@ApiTags('News')
 @Controller('news')
 export class NewsController {
   constructor(

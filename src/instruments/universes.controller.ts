@@ -1,7 +1,9 @@
 import { Body, Controller, Get, Param, Post, Put } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { InstrumentsService } from './instruments.service';
 import { CreateUniverseDto, UniverseCodeDto, UniverseMemberParamsDto } from './dto/instrument.dto';
 
+@ApiTags('Universes')
 @Controller('universes')
 export class UniversesController {
   constructor(private readonly instruments: InstrumentsService) {}

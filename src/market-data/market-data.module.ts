@@ -7,10 +7,9 @@ import { DailyCandle } from './entities/daily-candle.entity';
 import { MARKET_DATA_PROVIDER } from '../providers/market-data/market-data-provider.token';
 import { FixtureMarketDataProvider } from './providers/fixture-market-data.provider';
 import { MarketDataProvider } from '../providers/market-data/market-data-provider.interface';
-import { UpstoxAuthService } from '../providers/market-data/upstox/upstox-auth.service';
 import { UpstoxClient } from '../providers/market-data/upstox/upstox-client';
 import { UpstoxMarketDataProvider } from '../providers/market-data/upstox/upstox-market-data.provider';
-import { UPSTOX_CONFIG, createUpstoxConfig } from '../providers/market-data/upstox/upstox.config';
+import { UpstoxAuthModule } from '../providers/upstox/auth/upstox-auth.module';
 import { MarketDataService } from './market-data.service';
 import { DataQualityService } from './data-quality.service';
 import { MarketDataController } from './market-data.controller';
@@ -19,14 +18,13 @@ import { MARKET_DATA_QUEUE, MarketDataJobs, MarketDataWorker } from './market-da
 @Module({
   imports: [
     InstrumentsModule,
+    UpstoxAuthModule,
     TypeOrmModule.forFeature([DailyCandle]),
     BullModule.registerQueue({ name: MARKET_DATA_QUEUE }),
   ],
   controllers: [MarketDataController],
   providers: [
     FixtureMarketDataProvider,
-    { provide: UPSTOX_CONFIG, inject: [ConfigService], useFactory: createUpstoxConfig },
-    UpstoxAuthService,
     UpstoxClient,
     UpstoxMarketDataProvider,
     {
@@ -53,6 +51,6 @@ import { MARKET_DATA_QUEUE, MarketDataJobs, MarketDataWorker } from './market-da
     MarketDataJobs,
     MarketDataWorker,
   ],
-  exports: [MarketDataService],
+  exports: [MarketDataService, UpstoxAuthModule],
 })
 export class MarketDataModule {}

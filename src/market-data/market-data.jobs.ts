@@ -12,6 +12,7 @@ import { InstrumentsService } from '../instruments/instruments.service';
 import { MarketDataService } from './market-data.service';
 import { assertRange } from './market-data.validation';
 import { elapsedMilliseconds, structuredError } from '../logging/logging.utils';
+import { UpstoxTokenService } from '../providers/upstox/auth/upstox-token.service';
 
 export const MARKET_DATA_QUEUE = 'market-data';
 export interface RefreshCommand {
@@ -99,7 +100,11 @@ export class MarketDataJobs {
 export class MarketDataWorker extends WorkerHost {
   private readonly logger = new Logger(MarketDataWorker.name);
 
-  constructor(private readonly marketData: MarketDataService) {
+  constructor(
+    private readonly marketData: MarketDataService,
+    private readonly config: ConfigService,
+    private readonly upstoxTokens: UpstoxTokenService,
+  ) {
     super();
   }
 
@@ -124,6 +129,23 @@ export class MarketDataWorker extends WorkerHost {
     );
     try {
       if (job.name !== 'refresh-daily') throw new Error('Unsupported market-data job');
+      if (this.config.getOrThrow<string>('providers.marketData') === 'upstox') {
+        const auth = await this.upstoxTokens.getStatus();
+        if (!auth.authenticated) {
+          this.logger.warn(
+            {
+              event: 'job.skipped',
+              module: MarketDataWorker.name,
+              operation: 'process',
+              ...fields,
+              reason: 'UPSTOX_AUTH_REQUIRED',
+              status: 'skipped',
+            },
+            'Market-data job skipped because Upstox authentication is required',
+          );
+          return { status: 'UPSTOX_AUTH_REQUIRED', instrumentId: job.data.instrumentId };
+        }
+      }
       const result = await this.marketData.refresh(
         job.data.instrumentId,
         job.data.from,

@@ -1,9 +1,11 @@
 import { Body, Controller, NotFoundException, Post } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { MessageType } from '../providers/messaging/models/message.enums';
 import { MessagingService } from './messaging.service';
 import { TestMessageDto } from './dto/test-message.dto';
 
+@ApiTags('Messaging')
 @Controller('messaging')
 export class MessagingController {
   constructor(
@@ -12,6 +14,7 @@ export class MessagingController {
   ) {}
 
   @Post('test')
+  @ApiOperation({ summary: 'Send a provider test message (development only)' })
   sendTest(@Body() message: TestMessageDto) {
     if (this.config.getOrThrow<string>('app.nodeEnv') === 'production') {
       throw new NotFoundException();

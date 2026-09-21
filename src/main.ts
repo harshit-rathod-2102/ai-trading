@@ -1,6 +1,7 @@
 import { Logger as NestLogger, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { Logger } from 'nestjs-pino';
 import { AppModule } from './app.module';
 
@@ -18,6 +19,19 @@ async function bootstrap(): Promise<void> {
       forbidNonWhitelisted: true,
     }),
   );
+
+  if (configService.getOrThrow<boolean>('swagger.enabled')) {
+    const swaggerConfig = new DocumentBuilder()
+      .setTitle('Swing Trading System API')
+      .setDescription('Backend API for the personal AI-assisted swing trading system.')
+      .setVersion('1.0')
+      .build();
+    const document = SwaggerModule.createDocument(app, swaggerConfig);
+    SwaggerModule.setup('api/docs', app, document, {
+      jsonDocumentUrl: 'api/docs-json',
+      swaggerOptions: { persistAuthorization: true },
+    });
+  }
 
   const port = configService.getOrThrow<number>('app.port');
   await app.listen(port);

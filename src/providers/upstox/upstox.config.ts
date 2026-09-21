@@ -5,7 +5,6 @@ export const UPSTOX_CONFIG = Symbol('UPSTOX_CONFIG');
 export interface UpstoxConfig {
   readonly clientId: string | null;
   readonly clientSecret: string | null;
-  readonly redirectUri: string | null;
   readonly accessToken: string | null;
   readonly apiBaseUrl: string;
   readonly instrumentFileUrl: string;
@@ -18,7 +17,6 @@ export function createUpstoxConfig(config: ConfigService): UpstoxConfig {
   return {
     clientId: config.get<string>('upstox.clientId') || null,
     clientSecret: config.get<string>('upstox.clientSecret') || null,
-    redirectUri: config.get<string>('upstox.redirectUri') || null,
     accessToken: config.get<string>('upstox.accessToken') || null,
     apiBaseUrl: config.getOrThrow<string>('upstox.apiBaseUrl').replace(/\/$/, ''),
     instrumentFileUrl: config.getOrThrow<string>('upstox.instrumentFileUrl'),

@@ -13,6 +13,7 @@ import { subtractCalendarDays } from '../../common/utils/market-time';
 import { InstrumentsService } from '../../instruments/instruments.service';
 import { elapsedMilliseconds, structuredError } from '../../logging/logging.utils';
 import { MarketDataService } from '../../market-data/market-data.service';
+import { UpstoxTokenService } from '../../providers/upstox/auth/upstox-token.service';
 import { MARKET_REGIME_V1_CONFIG } from '../../market-regime/config/market-regime-v1.config';
 import { ScannerService } from '../../scanner/scanner.service';
 import { DailyPipelineRun } from '../entities/daily-pipeline-run.entity';
@@ -47,6 +48,7 @@ export class DailyPipelineService {
     private readonly config: ConfigService,
     private readonly instruments: InstrumentsService,
     private readonly marketData: MarketDataService,
+    private readonly upstoxTokens: UpstoxTokenService,
     private readonly tradingDays: TradingDayService,
     private readonly scanner: ScannerService,
     private readonly candidateOrchestration: CandidateOrchestrationService,
@@ -56,6 +58,22 @@ export class DailyPipelineService {
 
   async run(data: PostMarketJobData, job?: Job): Promise<Record<string, unknown>> {
     const marketDate = data.marketDate as string;
+    if (this.config.getOrThrow<string>('providers.marketData') === 'upstox') {
+      const auth = await this.upstoxTokens.getStatus();
+      if (!auth.authenticated) {
+        this.logger.warn(
+          {
+            event: 'job.skipped',
+            operation: 'postMarketPipeline',
+            marketDate,
+            reason: 'UPSTOX_AUTH_REQUIRED',
+            triggerSource: data.triggerSource,
+          },
+          'Post-market pipeline skipped because Upstox authentication is required',
+        );
+        return { status: 'UPSTOX_AUTH_REQUIRED', marketDate };
+      }
+    }
     if (!(await this.tradingDays.isTradingDay(marketDate))) {
       this.logger.log(
         {

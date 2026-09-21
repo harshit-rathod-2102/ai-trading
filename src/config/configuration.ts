@@ -6,10 +6,10 @@ export interface ApplicationConfiguration {
     messaging: string | null;
   };
   marketData: { universe: string };
+  security: { credentialEncryptionKey: string | null };
   upstox: {
     clientId: string | null;
     clientSecret: string | null;
-    redirectUri: string | null;
     accessToken: string | null;
     apiBaseUrl: string;
     instrumentFileUrl: string;
@@ -69,6 +69,7 @@ export interface ApplicationConfiguration {
     logLevel: string;
     logPretty: boolean;
   };
+  swagger: { enabled: boolean };
   database: {
     host: string;
     port: number;
@@ -112,10 +113,12 @@ export default (): ApplicationConfiguration => ({
   marketData: {
     universe: process.env.MARKET_DATA_UNIVERSE ?? 'DEVELOPMENT',
   },
+  security: {
+    credentialEncryptionKey: process.env.CREDENTIAL_ENCRYPTION_KEY || null,
+  },
   upstox: {
     clientId: process.env.UPSTOX_CLIENT_ID || null,
     clientSecret: process.env.UPSTOX_CLIENT_SECRET || null,
-    redirectUri: process.env.UPSTOX_REDIRECT_URI || null,
     accessToken: process.env.UPSTOX_ACCESS_TOKEN || null,
     apiBaseUrl: process.env.UPSTOX_API_BASE_URL ?? 'https://api.upstox.com',
     instrumentFileUrl:
@@ -177,6 +180,12 @@ export default (): ApplicationConfiguration => ({
     port: Number.parseInt(process.env.APP_PORT ?? '3000', 10),
     logLevel: process.env.LOG_LEVEL ?? 'log',
     logPretty: process.env.LOG_PRETTY === 'true',
+  },
+  swagger: {
+    enabled:
+      process.env.SWAGGER_ENABLED === undefined
+        ? process.env.NODE_ENV !== 'production'
+        : process.env.SWAGGER_ENABLED === 'true',
   },
   database: {
     host: process.env.DATABASE_HOST as string,
