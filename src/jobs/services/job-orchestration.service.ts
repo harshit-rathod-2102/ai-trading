@@ -6,6 +6,7 @@ import { marketClock } from '../../common/utils/market-time';
 import { EVENING_SUMMARY, POST_MARKET_PIPELINE, TRADE_MONITOR_RUN } from '../job-names';
 import { JobTriggerSource, MarketJobData, PostMarketJobData } from '../models/job-data.model';
 import { EVENING_QUEUE, MARKET_MONITORING_QUEUE, POST_MARKET_QUEUE } from '../queues';
+import { TradingDayService } from './trading-day.service';
 
 @Injectable()
 export class JobOrchestrationService {
@@ -14,6 +15,7 @@ export class JobOrchestrationService {
     @InjectQueue(MARKET_MONITORING_QUEUE) private readonly monitoringQueue: Queue<MarketJobData>,
     @InjectQueue(POST_MARKET_QUEUE) private readonly postMarketQueue: Queue<PostMarketJobData>,
     @InjectQueue(EVENING_QUEUE) private readonly eveningQueue: Queue<MarketJobData>,
+    private readonly tradingDays: TradingDayService,
   ) {}
 
   async enqueueTradeMonitor(triggerSource = JobTriggerSource.MANUAL, now = new Date()) {
@@ -48,7 +50,13 @@ export class JobOrchestrationService {
       removeOnComplete: { count: 400 },
       removeOnFail: false,
     });
-    return this.jobResponse(job, data, triggerSource);
+    return { ...(await this.jobResponse(job, data, triggerSource)), marketDate: date };
+  }
+
+  async enqueueLatestCompletedPipeline(triggerSource = JobTriggerSource.MANUAL, now = new Date()) {
+    const timezone = this.config.getOrThrow<string>('scheduler.timezone');
+    const marketDate = await this.tradingDays.latestCompletedSession(now, timezone);
+    return this.enqueuePostMarket(triggerSource, marketDate, now);
   }
 
   async enqueueEvening(triggerSource = JobTriggerSource.MANUAL, now = new Date()) {

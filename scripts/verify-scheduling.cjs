@@ -9,6 +9,7 @@ async function main() {
   const { TradingDayScheduler } = require('../dist/jobs/schedulers/trading-day.scheduler');
   const { CandidateAnalysisService } = require('../dist/jobs/services/candidate-analysis.service');
   const { DailyPipelineService } = require('../dist/jobs/services/daily-pipeline.service');
+  const { TradingDayService } = require('../dist/jobs/services/trading-day.service');
   const { CandidateStageError } = require('../dist/jobs/models/candidate-stage.error');
   const { CandidateStatus } = require('../dist/common/enums/candidate-status.enum');
 
@@ -21,6 +22,7 @@ async function main() {
     'scheduler.eveningRunTime': '19:00',
     'scheduler.catchUpCutoffTime': '21:00',
     'scheduler.tradeMonitorIntervalMinutes': 15,
+    'providers.marketData': 'fixture',
   };
   const config = { getOrThrow: key => {
     assert.ok(key in values, `Missing fake config ${key}`);
@@ -33,6 +35,20 @@ async function main() {
   });
   assert.equal(isWithinTimeRange('09:15', '09:15', '15:30'), true);
   assert.equal(isWithinTimeRange('15:31', '09:15', '15:30'), false);
+
+  const completedSessions = new TradingDayService({
+    tradingCalendar: async () => ({
+      sessions: [
+        { date: '2026-09-18', closeAt: '2026-09-18T10:00:00.000Z' },
+        { date: '2026-09-21', closeAt: '2026-09-21T10:00:00.000Z' },
+      ],
+    }),
+  });
+  assert.equal(await completedSessions.latestCompletedSession(monday), '2026-09-18');
+  assert.equal(
+    await completedSessions.latestCompletedSession(new Date('2026-09-21T10:01:00.000Z')),
+    '2026-09-21',
+  );
 
   let monitorCalls = 0;
   const tradingDays = {
@@ -148,16 +164,17 @@ async function main() {
   ];
   const pipelineConfig = { getOrThrow: key => ({
     'marketData.universe': 'VERIFY', 'scheduler.marketDataLookbackDays': 10,
+    'providers.marketData': 'fixture',
   })[key] };
   const marketData = {
     syncInstruments: async () => { order.push('market-data-sync'); },
     refresh: async id => { order.push(`refresh-${id}`); },
     quality: async id => {
       order.push(`quality-${id}`);
-      return stale ? { freshness: 'STALE', validity: 'VALID', completeness: 'COMPLETE',
-        latestExpectedSession: '2026-09-20' } :
+      return stale ? { freshness: 'STALE', validity: 'VALID', completeness: 'MISSING',
+        dataAvailable: false, lastStoredSession: '2026-09-20' } :
         { freshness: 'CURRENT', validity: 'VALID', completeness: 'COMPLETE',
-          latestExpectedSession: '2026-09-21' };
+          dataAvailable: true, lastStoredSession: '2026-09-21' };
     },
   };
   let scannerCalls = 0;
@@ -178,8 +195,8 @@ async function main() {
     order.push('candidate-enqueue'); queuedCandidates.push({ data, opts }); return { id: opts.jobId };
   } };
   const dailyPipeline = new DailyPipelineService(dataSource, runRepository, pipelineConfig,
-    { list: async () => instruments }, marketData, { isTradingDay: async () => true },
-    scanner, candidateOrchestration, candidateQueue);
+    { list: async () => instruments }, marketData, { getStatus: async () => ({ authenticated: true }) },
+    { isTradingDay: async () => true }, scanner, candidateOrchestration, candidateQueue);
   const firstRun = await dailyPipeline.run({ triggerSource: 'MANUAL', marketDate: '2026-09-21' },
     { updateProgress: async () => undefined });
   assert.equal(firstRun.status, 'CANDIDATE_ANALYSIS_ENQUEUED');
@@ -198,8 +215,8 @@ async function main() {
   stale = true;
   marketData.quality = async id => {
     order.push(`quality-${id}`);
-    return { freshness: 'STALE', validity: 'VALID', completeness: 'COMPLETE',
-      latestExpectedSession: '2026-09-21' };
+    return { freshness: 'STALE', validity: 'VALID', completeness: 'MISSING',
+      dataAvailable: false, lastStoredSession: '2026-09-20' };
   };
   const scannerCallsBeforeFailure = scannerCalls;
   await assert.rejects(() => dailyPipeline.run({ triggerSource: 'MANUAL', marketDate: '2026-09-22' }));
@@ -225,7 +242,12 @@ async function main() {
   assert.match(migration, /UNIQUE \(market_date, version\)/);
   assert.match(migration, /'STARTED', 'SUCCESS', 'PARTIAL', 'FAILED'/);
   const jobsController = readFileSync('src/jobs/jobs.controller.ts', 'utf8');
-  for (const route of ['trade-monitor/run', 'post-market/run', 'evening/run']) {
+  for (const route of [
+    'trade-monitor/run',
+    'post-market/run',
+    'run-now',
+    'evening/run',
+  ]) {
     assert.ok(jobsController.includes(route));
   }
   console.log('PASS: scheduler guards, stable registration, disablement, catch-up, candidate flow, and persistence constraints verified.');

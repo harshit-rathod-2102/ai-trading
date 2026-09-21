@@ -162,13 +162,19 @@ function confidenceString(value: unknown): string {
 function optionalUsage(value: unknown): JsonObject | undefined {
   if (value === undefined || value === null) return undefined;
   const usage = record(value as OpenRouterUsageDto, 'usage');
+  const inputTokens = optionalTokenCount(usage.prompt_tokens, 'prompt_tokens');
+  const outputTokens = optionalTokenCount(usage.completion_tokens, 'completion_tokens');
   const result: Record<string, number> = {};
-  for (const [key, raw] of Object.entries(usage)) {
-    if (!Number.isInteger(raw) || Number(raw) < 0)
-      throw invalid(`OpenRouter usage.${key} is invalid`);
-    result[key] = Number(raw);
-  }
-  return result;
+  if (inputTokens !== undefined) result.inputTokens = inputTokens;
+  if (outputTokens !== undefined) result.outputTokens = outputTokens;
+  return Object.keys(result).length === 0 ? undefined : result;
+}
+
+function optionalTokenCount(value: unknown, field: string): number | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (!Number.isInteger(value) || (value as number) < 0)
+    throw invalid(`OpenRouter usage.${field} is invalid`);
+  return value as number;
 }
 
 function invalid(message: string): ProviderError {

@@ -9,6 +9,7 @@ import {
   LatestPriceRequest,
   TradingCalendar,
   TradingCalendarRequest,
+  TradingSession,
 } from '../models/market-data-request';
 import { ProviderCandle } from '../models/provider-candle';
 import { ProviderInstrument, ProviderInstrumentReference } from '../models/provider-instrument';
@@ -27,9 +28,15 @@ import {
   UpstoxLatestPriceResponse,
 } from './dto/upstox-latest-price-response';
 import { mapUpstoxLatestPrice } from './mappers/upstox-latest-price.mapper';
+import { subtractCalendarDays } from '../../../common/utils/market-time';
 
 const NIFTY_50_KEY = 'NSE_INDEX|Nifty 50';
 const INSTRUMENT_CACHE_MS = 15 * 60 * 1000;
+
+interface UpstoxMarketTimingsResponse {
+  readonly status?: unknown;
+  readonly data?: unknown;
+}
 
 @Injectable()
 export class UpstoxMarketDataProvider implements MarketDataProvider {
@@ -254,7 +261,9 @@ export class UpstoxMarketDataProvider implements MarketDataProvider {
     const today = marketDate(new Date());
     const from = request.from ?? `${today.slice(0, 4)}-01-01`;
     const to = request.to ?? today;
-    const windows = splitDailyRange(from, to);
+    splitDailyRange(from, to);
+    const historicalTo = to < today ? to : subtractCalendarDays(today, 1);
+    const windows = from <= historicalTo ? splitDailyRange(from, historicalTo) : [];
     const candles = new Map<string, ProviderCandle>();
     for (const window of windows) {
       for (const candle of await this.fetchHistoricalWindow(
@@ -266,11 +275,44 @@ export class UpstoxMarketDataProvider implements MarketDataProvider {
         candles.set(candle.sessionDate, candle);
       }
     }
-    const sessions = [...candles.keys()].sort().map((date) => ({
+    const sessions: TradingSession[] = [...candles.keys()].sort().map((date) => ({
       date,
       closeAt: new Date(`${date}T15:30:00+05:30`).toISOString(),
     }));
+    if (from <= today && today <= to) {
+      const currentSession = await this.getNseSession(today, context);
+      if (currentSession) sessions.push(currentSession);
+    }
+    sessions.sort((left, right) => left.date.localeCompare(right.date));
     return { source: this.id, isSynthetic: false, coverageFrom: from, coverageTo: to, sessions };
+  }
+
+  private async getNseSession(
+    date: string,
+    context?: ProviderRequestContext,
+  ): Promise<TradingSession | null> {
+    const response = await this.client.getJson<UpstoxMarketTimingsResponse>(
+      `/v2/market/timings/${date}`,
+      context,
+    );
+    if (response.status !== 'success' || !Array.isArray(response.data)) {
+      throw this.invalidResponse('Upstox market-timings response is missing data');
+    }
+    const timing = response.data.find(
+      (value) => isRecord(value) && value.exchange === Exchange.NSE,
+    );
+    if (!isRecord(timing)) return null;
+    const startTime = timing.start_time;
+    const endTime = timing.end_time;
+    if (
+      !Number.isSafeInteger(startTime) ||
+      !Number.isSafeInteger(endTime) ||
+      Number(startTime) < 0 ||
+      Number(endTime) <= Number(startTime)
+    ) {
+      throw this.invalidResponse('Upstox NSE market timing is invalid');
+    }
+    return { date, closeAt: new Date(Number(endTime)).toISOString() };
   }
 
   private async loadInstrumentCatalog(

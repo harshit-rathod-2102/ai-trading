@@ -1,5 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { Exchange } from '../../common/enums/exchange.enum';
+import { marketClock, subtractCalendarDays } from '../../common/utils/market-time';
 import { MarketDataService } from '../../market-data/market-data.service';
 
 @Injectable()
@@ -26,5 +27,28 @@ export class TradingDayService {
       });
     this.cache.set(marketDate, check);
     return check;
+  }
+
+  async latestCompletedSession(now = new Date(), timezone = 'Asia/Kolkata'): Promise<string> {
+    const today = marketClock(now, timezone).marketDate;
+    const calendar = await this.marketData.tradingCalendar(
+      Exchange.NSE,
+      subtractCalendarDays(today, 31),
+      today,
+    );
+    const completed = calendar.sessions
+      .filter((session) => {
+        const closeAt = Date.parse(session.closeAt);
+        return Number.isFinite(closeAt) && closeAt <= now.getTime();
+      })
+      .sort((left, right) => left.date.localeCompare(right.date))
+      .at(-1);
+    if (!completed) {
+      throw new ServiceUnavailableException({
+        code: 'COMPLETED_TRADING_SESSION_UNAVAILABLE',
+        message: 'No completed NSE trading session is available for a run-now pipeline',
+      });
+    }
+    return completed.date;
   }
 }

@@ -55,7 +55,7 @@ Swagger is enabled by default when `NODE_ENV` is not `production`. Production do
 
 ## Postman collection
 
-Import [`postman/AI-Trading-Backend.postman_collection.json`](postman/AI-Trading-Backend.postman_collection.json) into Postman to inspect or exercise every API currently exposed by the backend. The collection follows Postman Collection v2.1 and contains 65 requests covering all 62 unique routes across health, profiles, instruments, universes, market data, regime, scanner, risk, candidates, trades, trade monitoring, scheduling, daily summary, analytics, news, AI analysis/evaluation, messaging, and WhatsApp webhooks.
+Import [`postman/AI-Trading-Backend.postman_collection.json`](postman/AI-Trading-Backend.postman_collection.json) into Postman to inspect or exercise every API currently exposed by the backend. The collection follows Postman Collection v2.1 and contains 69 requests covering all 66 unique routes across health, profiles, instruments, universes, market data, regime, scanner, risk, candidates, trades, trade monitoring, scheduling, daily summary, analytics, news, AI analysis/evaluation, messaging, and WhatsApp webhooks.
 
 The collection is self-contained: `baseUrl` defaults to `http://localhost:3000/api`, so a separate environment import is optional. Test scripts capture instrument, job, scan, candidate, and trade IDs for later requests. Review the active-profile update before sending it. News, AI, and messaging calls need their configured providers; those inspection routes are unavailable in production. The fixture's limited NIFTY history makes market-regime and scanner requests return the documented 503 until current persisted history is configured.
 
@@ -1071,8 +1071,20 @@ Manual triggers return HTTP 202 and enqueue the same processors with `triggerSou
 ```http
 POST /api/jobs/trade-monitor/run
 POST /api/jobs/post-market/run
+POST /api/jobs/run-now
 POST /api/jobs/evening/run
 ```
+
+`POST /api/jobs/run-now` may be invoked at any time. It resolves the latest NSE
+session whose exchange close has passed and queues the idempotent pipeline for that date. During
+market hours this means the previous completed trading session; after close it means today once
+the session has completed. It never treats an unfinished intraday candle as finalized daily data.
+
+`POST /api/trade-monitor/run` is the immediate, synchronous monitoring endpoint. It fetches a
+current quote for every internally tracked `OPEN` trade, persists monitoring metrics and factual
+events, and sends configured milestone/risk alerts. It does not apply the scheduler's market-hour
+or trading-day guards and never places or closes a broker order. The queued
+`POST /api/jobs/trade-monitor/run` endpoint applies those operating-cycle guards.
 
 No operating-cycle job imports or calls a broker order API. Upstox remains market-data only; BUY/SELL execution remains manual.
 

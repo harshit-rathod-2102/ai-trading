@@ -273,7 +273,7 @@ async function main() {
     const adapterBodies = [];
     const adapter = new OpenRouterAiProvider({ createChatCompletion: async body => {
       adapterBodies.push(body);
-      return { id: 'fast-request', model: 'resolved/fast-model', usage: { prompt_tokens: 10 },
+      return { id: 'fast-request', model: 'resolved/fast-model', usage: { prompt_tokens: 10, is_byok: false },
         choices: [{ finish_reason: 'stop', message: { content: validFastContent } }] };
     } }, adapterConfig);
     const adapterResult = await adapter.triageCandidate(adapterInput, {

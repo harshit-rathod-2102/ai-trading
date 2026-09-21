@@ -351,7 +351,7 @@ async function main() {
     const bodies = [];
     const adapter = new OpenRouterAiProvider({ createChatCompletion: async body => {
       bodies.push(body);
-      return { id: 'deep', model: 'nvidia/nemotron-3-ultra:free', usage: { prompt_tokens: 20 },
+      return { id: 'deep', model: 'nvidia/nemotron-3-ultra:free', usage: { prompt_tokens: 20, is_byok: false },
         choices: [{ finish_reason: 'stop', message: { content: validContent } }] };
     } }, adapterConfig);
     const adapterResult = await adapter.reviewCandidate(injectionInput, {

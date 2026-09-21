@@ -256,6 +256,9 @@ const collection = {
       request('Enqueue Post-Market Pipeline', 'POST', '/jobs/post-market/run', {
         description: 'Queues today\'s idempotent daily-pipeline-v1 run and returns HTTP 202.',
       }),
+      request('Run Latest Completed-Session Pipeline', 'POST', '/jobs/run-now', {
+        description: 'Queues the idempotent pipeline for the latest NSE session whose market close has passed. Safe to invoke before, during, or after market hours.',
+      }),
       request('Enqueue Evening Summary', 'POST', '/jobs/evening/run', {
         description: 'Queues notification retry housekeeping followed by the idempotent daily-summary-v1 delivery.',
       }),

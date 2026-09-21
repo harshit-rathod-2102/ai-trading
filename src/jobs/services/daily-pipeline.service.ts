@@ -305,13 +305,13 @@ export class DailyPipelineService {
     for (const instrument of required) {
       const quality = await this.marketData.quality(instrument.id, marketDate, marketDate);
       if (
-        quality.freshness !== 'CURRENT' ||
         quality.validity !== 'VALID' ||
         quality.completeness !== 'COMPLETE' ||
-        quality.latestExpectedSession !== marketDate
+        !quality.dataAvailable ||
+        quality.lastStoredSession !== marketDate
       ) {
         throw new Error(
-          `Required benchmark ${instrument.symbol} is not current and valid for ${marketDate}`,
+          `Required benchmark ${instrument.symbol} is not complete and valid for ${marketDate}`,
         );
       }
     }

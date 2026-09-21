@@ -1018,6 +1018,15 @@
           }
         },
         {
+          "name": "Run Latest Completed-Session Pipeline",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/jobs/run-now",
+            "description": "Queues the idempotent pipeline for the latest NSE session whose market close has passed. Safe to invoke before, during, or after market hours."
+          }
+        },
+        {
           "name": "Enqueue Evening Summary",
           "request": {
             "method": "POST",

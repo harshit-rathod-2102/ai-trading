@@ -24,6 +24,14 @@ export class JobsController {
     return this.jobs.enqueuePostMarket(JobTriggerSource.MANUAL);
   }
 
+  @Post('run-now')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ApiOperation({ summary: 'Queue the pipeline for the latest completed NSE session' })
+  @ApiResponse({ status: 202, description: 'Latest completed-session job accepted by BullMQ.' })
+  runLatestCompletedPipeline() {
+    return this.jobs.enqueueLatestCompletedPipeline(JobTriggerSource.MANUAL);
+  }
+
   @Post('evening/run')
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({ summary: 'Queue the evening summary job' })

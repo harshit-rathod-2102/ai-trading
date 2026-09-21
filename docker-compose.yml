@@ -59,8 +59,11 @@ services:
     environment:
       DATABASE_HOST: postgres
       DATABASE_PORT: 5432
+      NODE_OPTIONS: '--dns-result-order=ipv4first --no-network-family-autoselection'
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      TSC_WATCHDIRECTORY: DynamicPriorityPolling
+      TSC_WATCHFILE: DynamicPriorityPolling
     ports:
       - '${APP_PORT:-3000}:3000'
     depends_on:

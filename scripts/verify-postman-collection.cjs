@@ -47,7 +47,8 @@ const expected = new Set([
   'POST /candidates/{{skipCandidateId}}/skip',
   'GET /trades', 'GET /trades/{{tradeId}}', 'GET /trades/{{tradeId}}/events',
   'POST /trade-monitor/run', 'POST /trade-monitor/trades/{{tradeId}}',
-  'POST /jobs/trade-monitor/run', 'POST /jobs/post-market/run', 'POST /jobs/evening/run',
+  'POST /jobs/trade-monitor/run', 'POST /jobs/post-market/run',
+  'POST /jobs/run-now', 'POST /jobs/evening/run',
   'GET /daily-summary/{{summaryMarketDate}}', 'POST /daily-summary/{{summaryMarketDate}}/send',
   'GET /analytics/overview', 'GET /analytics/strategies', 'GET /analytics/regimes',
   'GET /analytics/sectors', 'GET /analytics/score-buckets',
@@ -58,8 +59,8 @@ const expected = new Set([
   'GET /webhooks/whatsapp', 'POST /webhooks/whatsapp',
 ]);
 assert.deepEqual([...actual].sort(), [...expected].sort());
-assert.equal(actual.size, 65);
-assert.equal(requests.length, 68);
+assert.equal(actual.size, 66);
+assert.equal(requests.length, 69);
 assert.equal(collection.info.schema, 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json');
 const variables = new Map(collection.variable.map(variable => [variable.key, variable.value]));
 assert.equal(variables.get('baseUrl'), 'http://localhost:3000/api');
@@ -69,4 +70,4 @@ assert.equal(variables.get('whatsappVerifyToken'), '');
 assert.equal(variables.get('summaryMarketDate'), '2026-09-19');
 assert.equal(variables.get('analyticsFrom'), '2026-01-01');
 assert.equal(variables.get('analyticsTo'), '2026-09-20');
-console.log('PASS: valid Postman Collection v2.1 JSON with 68 requests covering all 65 unique API routes.');
+console.log('PASS: valid Postman Collection v2.1 JSON with 69 requests covering all 66 unique API routes.');
