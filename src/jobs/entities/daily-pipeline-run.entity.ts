@@ -9,6 +9,10 @@ export class DailyPipelineRun {
 
   @Column({ type: 'varchar', length: 64 }) version!: string;
 
+  @Column({ name: 'universe_code', type: 'varchar', length: 32 }) universeCode!: string;
+
+  @Column({ name: 'execution_key', type: 'varchar', length: 255 }) executionKey!: string;
+
   @Column({ type: 'varchar', length: 16 }) status!: DailyPipelineStatus;
 
   @Column({ name: 'trigger_source', type: 'varchar', length: 16 }) triggerSource!: JobTriggerSource;

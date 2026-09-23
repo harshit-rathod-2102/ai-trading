@@ -32,7 +32,7 @@ async function main() {
   const config = context.get(ConfigService);
   const candidates = dataSource.getRepository(TradeCandidate);
   const instruments = dataSource.getRepository(Instrument);
-  assert.equal(config.get('openrouter.deepModel'), 'nvidia/nemotron-3-ultra:free');
+  assert.equal(config.get('openrouter.deepModel'), 'nvidia/nemotron-3-ultra-550b-a55b:free');
   assert.equal(config.get('aiRouting.topRankThreshold'), 3);
   const runId = randomUUID();
   const candidateIds = [];
@@ -266,7 +266,7 @@ async function main() {
     const adapterConfig = {
       apiKey: 'verification-key', baseUrl: 'https://openrouter.example/api/v1',
       model: 'legacy/model', fastModel: 'verification/fast-model',
-      deepModel: 'nvidia/nemotron-3-ultra:free', httpTimeoutMs: 1000,
+      deepModel: 'nvidia/nemotron-3-ultra-550b-a55b:free', httpTimeoutMs: 1000,
       appName: 'verification', siteUrl: null, maxRetries: 0,
       retryBaseDelayMs: 1, cacheTtlMs: 0,
     };

@@ -1,4 +1,7 @@
 import {
+  ArrayMaxSize,
+  ArrayMinSize,
+  ArrayUnique,
   IsBoolean,
   IsEnum,
   IsIn,
@@ -111,4 +114,17 @@ export class UniverseMemberParamsDto extends UniverseCodeDto {
   @ApiProperty({ format: 'uuid' })
   @IsUUID()
   id!: string;
+}
+
+export class ReplaceUniverseMembersDto {
+  @ApiProperty({
+    type: [String],
+    description: 'Complete desired set of instrument UUIDs for the universe',
+    example: ['8b9a1a00-0000-4000-8000-000000000001'],
+  })
+  @ArrayMinSize(1)
+  @ArrayMaxSize(1000)
+  @ArrayUnique()
+  @IsUUID('4', { each: true })
+  instrumentIds!: string[];
 }

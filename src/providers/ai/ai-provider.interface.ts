@@ -10,6 +10,7 @@ import {
   DeepReviewInput,
   DeepReviewResult,
 } from '../../ai-analysis/models/deep-review-result.model';
+import { PipelineJobSummaryInput, PipelineJobSummaryResult } from './models/pipeline-job-summary';
 
 export interface AiProvider {
   analyzeCandidate(
@@ -28,4 +29,9 @@ export interface AiProvider {
     options: AiAnalysisOptions,
     context?: ProviderRequestContext,
   ): Promise<DeepReviewResult>;
+
+  summarizePipelineJob(
+    input: PipelineJobSummaryInput,
+    context?: ProviderRequestContext,
+  ): Promise<PipelineJobSummaryResult>;
 }

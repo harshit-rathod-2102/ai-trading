@@ -90,6 +90,21 @@ export function expectedSessions(
     .sort();
 }
 
+/**
+ * An instrument can be listed after a requested historical range starts. Once the provider
+ * returns its first completed session, dates before that session are pre-listing rather than
+ * missing data. Dates after it remain mandatory, so an internal history gap still fails.
+ */
+export function expectedSessionsSinceFirstAvailable(
+  expected: readonly string[],
+  availableDates: ReadonlySet<string>,
+): string[] {
+  const firstAvailableSession = expected.find((date) => availableDates.has(date));
+  return firstAvailableSession
+    ? expected.filter((date) => date >= firstAvailableSession)
+    : [...expected];
+}
+
 type OhlcvBar = Pick<ProviderCandle, 'sessionDate' | 'open' | 'high' | 'low' | 'close' | 'volume'>;
 
 export function barIssues(bar: OhlcvBar, type: InstrumentType): string[] {

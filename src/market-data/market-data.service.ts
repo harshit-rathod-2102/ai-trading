@@ -23,6 +23,7 @@ import {
   barIssues,
   calendarIssues,
   expectedSessions,
+  expectedSessionsSinceFirstAvailable,
   marketDate,
 } from './market-data.validation';
 import { DataQualityService } from './data-quality.service';
@@ -253,7 +254,8 @@ export class MarketDataService {
           if (bar) seen.add(bar.sessionDate);
           if (errors.length) issues.push({ sessionDate: bar?.sessionDate ?? null, issues: errors });
         }
-        const missing = expected.filter((date) => !seen.has(date));
+        const expectedSinceListing = expectedSessionsSinceFirstAvailable(expected, seen);
+        const missing = expectedSinceListing.filter((date) => !seen.has(date));
         if (issues.length || missing.length) {
           this.logger.warn(
             {
@@ -265,6 +267,7 @@ export class MarketDataService {
               instrumentId,
               rejectedCount: issues.length,
               missingSessionCount: missing.length,
+              firstAvailableSession: expectedSinceListing[0] ?? null,
               durationMs: elapsedMilliseconds(startedAt),
             },
             'Candle data failed validation',

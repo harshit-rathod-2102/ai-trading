@@ -103,6 +103,16 @@ export interface ApplicationConfiguration {
   };
 }
 
+const LEGACY_OPENROUTER_DEEP_MODEL = 'nvidia/nemotron-3-ultra:free';
+const DEFAULT_OPENROUTER_DEEP_MODEL = 'nvidia/nemotron-3-ultra-550b-a55b:free';
+
+function configuredDeepModel(): string {
+  const model = process.env.OPENROUTER_DEEP_MODEL?.trim();
+  // OpenRouter retired the unversioned alias. Preserve existing external env files
+  // while routing them to the currently available model identifier.
+  return !model || model === LEGACY_OPENROUTER_DEEP_MODEL ? DEFAULT_OPENROUTER_DEEP_MODEL : model;
+}
+
 export default (): ApplicationConfiguration => ({
   providers: {
     marketData: process.env.MARKET_DATA_PROVIDER ?? 'fixture',
@@ -145,7 +155,7 @@ export default (): ApplicationConfiguration => ({
     model: process.env.OPENROUTER_MODEL ?? 'openrouter/free',
     fastModel:
       process.env.OPENROUTER_FAST_MODEL ?? process.env.OPENROUTER_MODEL ?? 'openrouter/free',
-    deepModel: process.env.OPENROUTER_DEEP_MODEL ?? 'nvidia/nemotron-3-ultra:free',
+    deepModel: configuredDeepModel(),
     httpTimeoutMs: Number.parseInt(process.env.OPENROUTER_HTTP_TIMEOUT_MS ?? '30000', 10),
     appName: process.env.OPENROUTER_APP_NAME ?? 'swing-trading-assistant',
     siteUrl: process.env.OPENROUTER_SITE_URL || null,
@@ -215,7 +225,10 @@ export default (): ApplicationConfiguration => ({
       process.env.CANDIDATE_ANALYSIS_CONCURRENCY ?? '2',
       10,
     ),
-    marketDataLookbackDays: Number.parseInt(process.env.POST_MARKET_SYNC_LOOKBACK_DAYS ?? '10', 10),
+    marketDataLookbackDays: Number.parseInt(
+      process.env.POST_MARKET_SYNC_LOOKBACK_DAYS ?? '365',
+      10,
+    ),
   },
   dailySummary: {
     maxCandidates: Number.parseInt(process.env.DAILY_SUMMARY_MAX_CANDIDATES ?? '5', 10),

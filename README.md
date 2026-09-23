@@ -144,7 +144,7 @@ OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
 # Legacy/default model; FAST falls back to this when OPENROUTER_FAST_MODEL is omitted.
 OPENROUTER_MODEL=openrouter/free
 OPENROUTER_FAST_MODEL=openrouter/free
-OPENROUTER_DEEP_MODEL=nvidia/nemotron-3-ultra:free
+OPENROUTER_DEEP_MODEL=nvidia/nemotron-3-ultra-550b-a55b:free
 AI_ROUTING_TOP_RANK_THRESHOLD=3
 OPENROUTER_HTTP_TIMEOUT_MS=30000
 OPENROUTER_APP_NAME=swing-trading-assistant
@@ -286,7 +286,7 @@ Pass the external file to Compose as well as setting `APP_ENV_FILE`. The `--env-
 docker compose --env-file "$APP_ENV_FILE" up --build
 ```
 
-Compose waits for PostgreSQL and Redis health checks, runs Flyway successfully, and then starts NestJS in watch mode. The API source is bind-mounted at `/app`, while Docker maintains Linux dependencies in the `api_node_modules` volume. Changes to TypeScript source, configuration, and migrations are synchronized into the container automatically; NestJS reloads after source changes without rebuilding the image.
+Compose waits for PostgreSQL and Redis health checks, runs Flyway successfully, and then starts NestJS in watch mode. The API source is bind-mounted at `/app`, while Docker maintains Linux dependencies in the `api_node_modules` volume and container-compiled output in the `api_dist` volume. Keeping `/app/dist` container-local prevents a host `npm run build` from racing with the container watcher. Changes to TypeScript source, configuration, and migrations are synchronized into the container automatically; NestJS reloads after source changes without rebuilding the image.
 
 Rebuild only when dependencies or the Dockerfile change:
 
@@ -518,7 +518,7 @@ Upstox HTTP 401/403 responses invalidate the runtime credential and surface `UPS
 | POST   | /api/upstox/auth/request-token    | Initiate or reuse a pending user-approval request    |
 | POST   | /api/webhooks/upstox/access-token | Receive the documented Upstox notifier payload       |
 
-Instrument discovery downloads Upstox's NSE BOD JSON file and imports only `NSE_EQ`/`EQ` equities and `NSE_INDEX`/`INDEX` indices. `instrument_key` is stored as the generic provider instrument ID; other source fields stay in provider metadata. Sector and industry remain null because the BOD file does not supply them. Index symbols are normalized for the application's symbol rules, while Upstox's trading symbol and instrument key are preserved.
+Instrument discovery downloads Upstox's NSE BOD JSON file and imports tradeable `NSE_EQ` equity series (`EQ` and `BE`) plus `NSE_INDEX`/`INDEX` indices. `instrument_key` is stored as the generic provider instrument ID; other source fields stay in provider metadata. Sector and industry remain null because the BOD file does not supply them. Index symbols are normalized for the application's symbol rules, while Upstox's trading symbol and instrument key are preserved.
 
 Historical sync uses `GET /v3/historical-candle/:instrument_key/days/1/:to_date/:from_date`. Daily is the only supported timeframe. Ranges longer than ten years are split into non-overlapping windows, merged by NSE session date, de-duplicated, and sorted chronologically. The NIFTY 50 daily series supplies exact session dates for validation. Latest OHLC uses `GET /v3/market-quote/ohlc?instrument_key=...&interval=1d`; no WebSocket is used.
 
@@ -557,6 +557,26 @@ The seed script uses the provider's advertised catalog and preserves existing in
 | GET        | /api/market-data/instruments/:id/quality | Quality assessment; required from/to query dates                                              |
 
 All date ranges are inclusive, contain real YYYY-MM-DD dates, span at most 366 days, and cannot end after today in Asia/Kolkata. Missing instruments return 404; malformed input returns 400; duplicate instrument/universe creation and inactive refresh requests return 409. Unsupported provider requests appear as failed jobs; inspect the job status rather than treating HTTP 202 as successful ingestion.
+
+### Nifty 500 universe
+
+`npm run nifty500:sync` downloads the current official Nifty 500 constituent CSV, synchronizes the
+Upstox NSE catalog, and atomically replaces the `NIFTY500` universe membership. It matches each
+constituent by ISIN first and symbol second, rejects an incomplete match, and includes the active
+`NIFTY50` and `INDIAVIX` benchmark instruments in addition to the 500 equities. Non-tradeable
+placeholder rows in the official file are excluded by their non-`INE` ISIN. The scanner and
+market-data refresh always read persisted universe membership; no constituent list is hardcoded.
+
+After a successful import, set the following in the external application environment file and
+recreate the API container so Nest loads the changed setting:
+
+```env
+MARKET_DATA_UNIVERSE=NIFTY500
+```
+
+The constituent source defaults to the official Nifty Indices CSV. `NIFTY500_CONSTITUENTS_URL`
+can override it for a controlled recovery input. Run `npm run nifty500:verify` to verify CSV
+parsing and ISIN/symbol matching without calling external services.
 
 Example commands (POSIX quoting; use curl.exe or Invoke-RestMethod with appropriate JSON quoting on Windows):
 
@@ -800,7 +820,7 @@ A successful provider response with no relevant recent articles persists a valid
 
 `POST /api/candidates/:id/ai/triage` runs the first qualitative review stage for an orchestrated candidate that is still `NEW` and has complete technical, regime, strategy, ranking, risk, and news snapshots. A successful zero-article news snapshot is valid input. A failed or absent news enrichment is not. Candidate detail responses expose the persisted result through `aiAnalysis`.
 
-V1 defines `FAST` and `DEEP` analysis tiers behind the single existing `AiProvider` SPI. `OPENROUTER_FAST_MODEL` selects the FAST model and falls back to the backward-compatible `OPENROUTER_MODEL` setting when omitted. `OPENROUTER_DEEP_MODEL` defaults to `nvidia/nemotron-3-ultra:free`; only the DEEP review service invokes it after deterministic routing selects DEEP.
+V1 defines `FAST` and `DEEP` analysis tiers behind the single existing `AiProvider` SPI. `OPENROUTER_FAST_MODEL` selects the FAST model and falls back to the backward-compatible `OPENROUTER_MODEL` setting when omitted. `OPENROUTER_DEEP_MODEL` defaults to `nvidia/nemotron-3-ultra-550b-a55b:free`; only the DEEP review service invokes it after deterministic routing selects DEEP.
 
 The versioned `candidate-fast-triage-v1` prompt sends only persisted candidate evidence: symbol/company, strategy identity and scores, ranks, regime, technical and risk snapshots, and the completed news snapshot. It tells the model to use no external facts, avoid trading advice and deterministic parameter changes, and treat news titles and descriptions as untrusted evidence. Instructions embedded in article text must be ignored. Temperature is centralized at `0.1`.
 
@@ -850,7 +870,7 @@ node scripts/verify-ai-triage.cjs
 
 The service also recomputes the FAST evidence hash before DEEP execution. If news, technical, regime, strategy, ranking, risk, company identity, or score evidence changed after FAST routing, DEEP is blocked with `MISSING_DEEP_REVIEW_EVIDENCE`; FAST must analyze and route the new snapshot first. DEEP never refreshes market data or news itself.
 
-The versioned `candidate-deep-review-v1` prompt sends the complete persisted candidate evidence, FAST analysis, and routing decision to the configured `OPENROUTER_DEEP_MODEL`. The default is `nvidia/nemotron-3-ultra:free`. Temperature is `0.1` and output is bounded to 2,800 tokens. The adapter does not fall back to another model when Nemotron is unavailable.
+The versioned `candidate-deep-review-v1` prompt sends the complete persisted candidate evidence, FAST analysis, and routing decision to the configured `OPENROUTER_DEEP_MODEL`. The default is `nvidia/nemotron-3-ultra-550b-a55b:free`. Temperature is `0.1` and output is bounded to 2,800 tokens. The adapter does not fall back to another model when Nemotron is unavailable.
 
 The system prompt treats article text, titles, descriptions, metadata, and other external content as untrusted evidence. Embedded commands, role changes, system prompts, and tool requests must be ignored. The model may use only supplied facts and must list unavailable information in `missingEvidence`; it may not invent event dates or company, regulatory, legal, guidance, or management facts.
 
@@ -884,8 +904,8 @@ The DEEP evidence hash covers candidate identity and scores, technical/regime/st
     "evidenceHash": "...",
     "modelMetadata": {
       "provider": "openrouter",
-      "requestedModel": "nvidia/nemotron-3-ultra:free",
-      "resolvedModel": "nvidia/nemotron-3-ultra:free",
+      "requestedModel": "nvidia/nemotron-3-ultra-550b-a55b:free",
+      "resolvedModel": "nvidia/nemotron-3-ultra-550b-a55b:free",
       "promptVersion": "candidate-deep-review-v1",
       "routingVersion": "ai-routing-v1",
       "analyzedAt": "2026-09-17T00:00:00.000Z"
@@ -1046,7 +1066,7 @@ EVENING_RUN_TIME=19:00
 POST_MARKET_CATCH_UP_CUTOFF_TIME=21:00
 TRADE_MONITOR_INTERVAL_MINUTES=15
 CANDIDATE_ANALYSIS_CONCURRENCY=2
-POST_MARKET_SYNC_LOOKBACK_DAYS=10
+POST_MARKET_SYNC_LOOKBACK_DAYS=365
 ```
 
 The `market-monitoring` queue runs `TRADE_MONITOR_RUN` every 15 minutes in the configured market-hour range on weekdays. The processor also checks the current IST time and provider trading calendar before calling `TradeMonitorService.monitorOpenTrades()`. Firings outside the session return `SKIPPED_OUTSIDE_MARKET_HOURS`; weekends and provider-calendar holidays return `SKIPPED_NON_TRADING_DAY`. Missed intraday slots are never replayed.
@@ -1076,9 +1096,14 @@ POST /api/jobs/evening/run
 ```
 
 `POST /api/jobs/run-now` may be invoked at any time. It resolves the latest NSE
-session whose exchange close has passed and queues the idempotent pipeline for that date. During
-market hours this means the previous completed trading session; after close it means today once
+session whose exchange close has passed and queues a fresh non-idempotent pipeline execution for
+that date. Every call refreshes market data, calculates the regime, scans the configured universe,
+and sends a new job summary. Scheduled and catch-up jobs remain idempotent per market date and
+configured universe. During market hours this means the previous completed trading session; after close it means today once
 the session has completed. It never treats an unfinished intraday candle as finalized daily data.
+For the current date after the official NSE close, the Upstox adapter merges the provider's V3
+intraday daily candle with archived historical candles. Before the close, it excludes that live
+candle and the completeness validator continues to require only finalized sessions.
 
 `POST /api/trade-monitor/run` is the immediate, synchronous monitoring endpoint. It fetches a
 current quote for every internally tracked `OPEN` trade, persists monitoring metrics and factual
@@ -1096,6 +1121,28 @@ docker compose --env-file "$APP_ENV_FILE" run --rm flyway validate
 docker compose --env-file "$APP_ENV_FILE" run --rm flyway migrate
 docker compose --env-file "$APP_ENV_FILE" run --rm flyway info
 node scripts/verify-scheduling.cjs
+```
+
+Every completed daily scan pipeline (`SUCCESS` or `PARTIAL`) sends a separate WhatsApp execution
+summary for manual, scheduled, and catch-up triggers. The message contains the job time and trigger,
+market session, regime and score, the benchmark indices used by the regime calculation (NIFTY 50
+and India VIX), universe/eligible/evaluated counts, qualified and shortlisted counts, and a short
+AI-generated factual summary. AI uses the provider-neutral `AiProvider`; when AI is unavailable, the
+same factual metrics are sent with a labeled deterministic fallback.
+
+The exact snapshot, message, AI metadata, delivery attempt, and provider message ID are stored in
+`pipeline_job_summaries`. The unique pipeline-run and BullMQ-job identity prevents a retry of the
+same dispatch from sending twice, while every later manual, scheduled, or catch-up dispatch gets
+its own summary even when it reuses completed market-data and scanner work. A failed delivery
+retries the persisted message for that dispatch. Summary generation or delivery failures are logged
+but do not change a valid pipeline result into a trading failure.
+
+Apply Flyway migrations through `V18` before running another daily scan:
+
+```bash
+npm run build
+docker compose --env-file "$APP_ENV_FILE" run --rm flyway migrate
+npm run job-summary:verify
 ```
 
 ## Daily Summary

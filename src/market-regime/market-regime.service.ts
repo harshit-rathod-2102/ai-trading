@@ -120,7 +120,7 @@ export class MarketRegimeService {
         sectorParticipation: calculateSectorParticipationSnapshot(observations),
         warnings,
       });
-      await this.persist(result);
+      await this.persist(result, universeCode);
       this.logger.log(
         {
           event: 'market_regime.calculated',
@@ -130,6 +130,7 @@ export class MarketRegimeService {
           score: result.score,
           confidence: result.confidence,
           version: result.version,
+          universeCode,
           marketDate: result.marketDate,
           durationMs: elapsedMilliseconds(startedAt),
           status: 'completed',
@@ -142,6 +143,7 @@ export class MarketRegimeService {
           module: MarketRegimeService.name,
           marketDate: result.marketDate,
           version: result.version,
+          universeCode,
           ...result.components,
         },
         'Market regime components calculated',
@@ -196,13 +198,14 @@ export class MarketRegimeService {
     }));
   }
 
-  private async persist(result: MarketRegimeResult): Promise<void> {
+  private async persist(result: MarketRegimeResult, universeCode: string): Promise<void> {
     await this.dataSource.transaction(async (manager) => {
       await manager.query('LOCK TABLE market_regime_snapshots IN SHARE ROW EXCLUSIVE MODE');
       const repository = manager.getRepository(MarketRegimeSnapshot);
       const current = await repository.findOneBy({
         marketDate: result.marketDate,
         version: result.version,
+        universeCode,
       });
       const snapshot = repository.create({
         id: current?.id ?? randomUUID(),
@@ -211,6 +214,7 @@ export class MarketRegimeService {
         score: result.score,
         confidence: result.confidence,
         version: result.version,
+        universeCode,
         components: result.components,
         reasons: [...result.reasons],
         warnings: [...result.warnings],

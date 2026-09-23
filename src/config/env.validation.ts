@@ -37,7 +37,10 @@ export const environmentValidationSchema = Joi.object({
     .default('https://openrouter.ai/api/v1'),
   OPENROUTER_MODEL: Joi.string().trim().min(1).default('openrouter/free'),
   OPENROUTER_FAST_MODEL: Joi.string().trim().min(1),
-  OPENROUTER_DEEP_MODEL: Joi.string().trim().min(1).default('nvidia/nemotron-3-ultra:free'),
+  OPENROUTER_DEEP_MODEL: Joi.string()
+    .trim()
+    .min(1)
+    .default('nvidia/nemotron-3-ultra-550b-a55b:free'),
   OPENROUTER_HTTP_TIMEOUT_MS: Joi.number().integer().min(1000).max(120000).default(30000),
   OPENROUTER_APP_NAME: Joi.string().trim().min(1).max(100).default('swing-trading-assistant'),
   OPENROUTER_SITE_URL: Joi.string()
@@ -99,7 +102,7 @@ export const environmentValidationSchema = Joi.object({
     .default('21:00'),
   TRADE_MONITOR_INTERVAL_MINUTES: Joi.number().integer().valid(5, 10, 15, 20, 30).default(15),
   CANDIDATE_ANALYSIS_CONCURRENCY: Joi.number().integer().min(1).max(5).default(2),
-  POST_MARKET_SYNC_LOOKBACK_DAYS: Joi.number().integer().min(1).max(365).default(10),
+  POST_MARKET_SYNC_LOOKBACK_DAYS: Joi.number().integer().min(1).max(365).default(365),
   DAILY_SUMMARY_MAX_CANDIDATES: Joi.number().integer().min(1).max(10).default(5),
   DAILY_SUMMARY_MAX_TRADES: Joi.number().integer().min(1).max(20).default(8),
   DAILY_SUMMARY_PRICE_STALE_MINUTES: Joi.number().integer().min(30).max(2880).default(360),

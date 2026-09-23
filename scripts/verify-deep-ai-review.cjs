@@ -47,7 +47,7 @@ async function main() {
   let providerCalls = 0;
   const inputBySymbol = new Map();
 
-  assert.equal(config.get('openrouter.deepModel'), 'nvidia/nemotron-3-ultra:free');
+  assert.equal(config.get('openrouter.deepModel'), 'nvidia/nemotron-3-ultra-550b-a55b:free');
 
   const mockProvider = {
     analyzeCandidate: async () => { throw new Error('Legacy analysis is outside this verification'); },
@@ -56,7 +56,7 @@ async function main() {
       providerCalls += 1;
       inputBySymbol.set(input.symbol, input);
       assert.equal(options.tier, AiAnalysisTier.DEEP);
-      assert.equal(options.requestedModel, 'nvidia/nemotron-3-ultra:free');
+      assert.equal(options.requestedModel, 'nvidia/nemotron-3-ultra-550b-a55b:free');
       assert.equal(options.promptVersion, 'candidate-deep-review-v1');
       if (input.symbol.startsWith('TIME')) throw new ProviderTimeoutError('verification');
       if (input.symbol.startsWith('MALFORM')) {
@@ -108,7 +108,7 @@ async function main() {
           analysisTier: AiAnalysisTier.DEEP,
           provider: 'verification',
           requestedModel: options.requestedModel,
-          resolvedModel: 'nvidia/nemotron-3-ultra:free',
+          resolvedModel: 'nvidia/nemotron-3-ultra-550b-a55b:free',
           promptVersion: options.promptVersion,
           routingVersion: input.routingDecision.version,
           analyzedAt: new Date().toISOString(),
@@ -237,7 +237,7 @@ async function main() {
     const reviewed = await service.reviewCandidate(routed.id);
     assert.equal(reviewed.success, true);
     assert.equal(reviewed.deepAnalysis.tier, 'DEEP');
-    assert.equal(reviewed.deepAnalysis.modelMetadata.requestedModel, 'nvidia/nemotron-3-ultra:free');
+    assert.equal(reviewed.deepAnalysis.modelMetadata.requestedModel, 'nvidia/nemotron-3-ultra-550b-a55b:free');
     const routedPersisted = await candidates.findOneByOrFail({ id: routed.id });
     assert.deepEqual(routedPersisted.aiAnalysis.fast.bullishFactors, routed.fast.bullishFactors);
     assert.deepEqual(routedPersisted.aiAnalysis.routing.reasons, routed.routing.reasons);
@@ -275,7 +275,7 @@ async function main() {
     assert.match(injectionResult.deepAnalysis.summary, /ignored/i);
 
     // G: malformed JSON and missing required fields fail strict runtime mapping.
-    const mapperContext = { requestedModel: 'nvidia/nemotron-3-ultra:free',
+    const mapperContext = { requestedModel: 'nvidia/nemotron-3-ultra-550b-a55b:free',
       promptVersion: 'candidate-deep-review-v1', routingVersion: 'ai-routing-v1',
       analyzedAt: new Date().toISOString(), structuredOutput: true };
     assert.throws(() => mapOpenRouterDeepReview({ model: 'resolved', choices: [{ finish_reason: 'stop',
@@ -344,21 +344,21 @@ async function main() {
     });
     const adapterConfig = {
       apiKey: 'verification-key', baseUrl: 'https://openrouter.example/api/v1', model: 'legacy/model',
-      fastModel: 'verification/fast', deepModel: 'nvidia/nemotron-3-ultra:free',
+      fastModel: 'verification/fast', deepModel: 'nvidia/nemotron-3-ultra-550b-a55b:free',
       httpTimeoutMs: 1000, appName: 'verification', siteUrl: null, maxRetries: 0,
       retryBaseDelayMs: 1, cacheTtlMs: 0,
     };
     const bodies = [];
     const adapter = new OpenRouterAiProvider({ createChatCompletion: async body => {
       bodies.push(body);
-      return { id: 'deep', model: 'nvidia/nemotron-3-ultra:free', usage: { prompt_tokens: 20, is_byok: false },
+      return { id: 'deep', model: 'nvidia/nemotron-3-ultra-550b-a55b:free', usage: { prompt_tokens: 20, is_byok: false },
         choices: [{ finish_reason: 'stop', message: { content: validContent } }] };
     } }, adapterConfig);
     const adapterResult = await adapter.reviewCandidate(injectionInput, {
       tier: AiAnalysisTier.DEEP, promptVersion: 'candidate-deep-review-v1',
       requestedModel: adapterConfig.deepModel,
     });
-    assert.equal(bodies[0].model, 'nvidia/nemotron-3-ultra:free');
+    assert.equal(bodies[0].model, 'nvidia/nemotron-3-ultra-550b-a55b:free');
     assert.equal(bodies[0].temperature, 0.1);
     assert.equal(bodies[0].max_tokens, 2800);
     assert.equal(bodies[0].response_format.json_schema.strict, true);

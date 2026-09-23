@@ -53,6 +53,10 @@ export class UpstoxMarketDataProvider implements MarketDataProvider {
     readonly instruments: readonly ProviderInstrument[];
   };
 
+  private readonly sessionCache = new Map<string, Promise<TradingSession | null>>();
+
+  private readonly now = (): Date => new Date();
+
   constructor(private readonly client: UpstoxClient) {}
 
   async getInstruments(
@@ -130,6 +134,28 @@ export class UpstoxMarketDataProvider implements MarketDataProvider {
         'Upstox historical candle chunk completed',
       );
       for (const candle of rows) candles.set(candle.sessionDate, candle);
+    }
+    const now = this.now();
+    const today = marketDate(now);
+    if (request.from <= today && today <= request.to) {
+      const session = await this.getCachedNseSession(today, context);
+      if (session && Date.parse(session.closeAt) <= now.getTime()) {
+        const rows = await this.fetchIntradayDaily(instrumentKey, context);
+        this.logger.debug(
+          {
+            event: 'provider.request.chunk.completed',
+            module: UpstoxMarketDataProvider.name,
+            provider: this.id,
+            operation: 'getHistoricalCandles',
+            source: 'intraday-daily',
+            symbol: request.instrument.symbol,
+            sessionDate: today,
+            resultCount: rows.length,
+          },
+          'Upstox completed current-session candle fetched',
+        );
+        for (const candle of rows) candles.set(candle.sessionDate, candle);
+      }
     }
     const result = [...candles.values()].sort((left, right) =>
       left.sessionDate.localeCompare(right.sessionDate),
@@ -258,7 +284,7 @@ export class UpstoxMarketDataProvider implements MarketDataProvider {
         retryable: false,
       });
     }
-    const today = marketDate(new Date());
+    const today = marketDate(this.now());
     const from = request.from ?? `${today.slice(0, 4)}-01-01`;
     const to = request.to ?? today;
     splitDailyRange(from, to);
@@ -280,7 +306,7 @@ export class UpstoxMarketDataProvider implements MarketDataProvider {
       closeAt: new Date(`${date}T15:30:00+05:30`).toISOString(),
     }));
     if (from <= today && today <= to) {
-      const currentSession = await this.getNseSession(today, context);
+      const currentSession = await this.getCachedNseSession(today, context);
       if (currentSession) sessions.push(currentSession);
     }
     sessions.sort((left, right) => left.date.localeCompare(right.date));
@@ -313,6 +339,20 @@ export class UpstoxMarketDataProvider implements MarketDataProvider {
       throw this.invalidResponse('Upstox NSE market timing is invalid');
     }
     return { date, closeAt: new Date(Number(endTime)).toISOString() };
+  }
+
+  private getCachedNseSession(
+    date: string,
+    context?: ProviderRequestContext,
+  ): Promise<TradingSession | null> {
+    const cached = this.sessionCache.get(date);
+    if (cached) return cached;
+    const pending = this.getNseSession(date, context).catch((error: unknown) => {
+      this.sessionCache.delete(date);
+      throw error;
+    });
+    this.sessionCache.set(date, pending);
+    return pending;
   }
 
   private async loadInstrumentCatalog(
@@ -376,6 +416,25 @@ export class UpstoxMarketDataProvider implements MarketDataProvider {
     return response.data.candles.map((value) => {
       if (!Array.isArray(value))
         throw this.invalidResponse('Upstox historical candle is not an array');
+      return mapUpstoxCandle(value);
+    });
+  }
+
+  private async fetchIntradayDaily(
+    instrumentKey: string,
+    context?: ProviderRequestContext,
+  ): Promise<readonly ProviderCandle[]> {
+    const response = await this.client.getJson<UpstoxHistoricalResponse>(
+      `/v3/historical-candle/intraday/${encodeURIComponent(instrumentKey)}/days/1`,
+      context,
+    );
+    if (response.status !== 'success' || !response.data || !Array.isArray(response.data.candles)) {
+      throw this.invalidResponse('Upstox intraday daily response is missing candles');
+    }
+    return response.data.candles.map((value) => {
+      if (!Array.isArray(value)) {
+        throw this.invalidResponse('Upstox intraday daily candle is not an array');
+      }
       return mapUpstoxCandle(value);
     });
   }

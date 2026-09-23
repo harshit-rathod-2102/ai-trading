@@ -1,7 +1,7 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'node:crypto';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Instrument } from './entities/instrument.entity';
 import { Universe } from './entities/universe.entity';
 import { UniverseMembership } from './entities/universe-membership.entity';
@@ -79,9 +79,11 @@ export class InstrumentsService {
     provider: string,
     catalog: readonly ProviderInstrument[],
   ): Promise<{ provider: string; discovered: number; upserted: number }> {
+    const catalogByProviderIdentity = this.indexCatalogByProviderIdentity(provider, catalog);
     const chunkSize = 500;
     await this.instruments.manager.transaction(async (manager) => {
       const repository = manager.getRepository(Instrument);
+      await this.applyProviderIdentityRenames(repository, provider, catalogByProviderIdentity);
       for (let offset = 0; offset < catalog.length; offset += chunkSize) {
         const values = catalog.slice(offset, offset + chunkSize).map((item) =>
           repository.create({
@@ -123,6 +125,65 @@ export class InstrumentsService {
     return { provider, discovered: catalog.length, upserted: catalog.length };
   }
 
+  /**
+   * Provider instrument keys are stable across an exchange-symbol rename. Move the existing local
+   * record to the provider's current market identity before the symbol-based catalog upsert runs.
+   */
+  private async applyProviderIdentityRenames(
+    repository: Repository<Instrument>,
+    provider: string,
+    catalogByProviderIdentity: ReadonlyMap<string, ProviderInstrument>,
+  ): Promise<void> {
+    if (catalogByProviderIdentity.size === 0) return;
+    const providerInstrumentIds = [...catalogByProviderIdentity.keys()];
+    const storedInstruments = await repository.findBy({
+      provider,
+      providerInstrumentId: In(providerInstrumentIds),
+    });
+    for (const stored of storedInstruments) {
+      const incoming = catalogByProviderIdentity.get(stored.providerInstrumentId!);
+      if (
+        !incoming ||
+        (stored.exchange === incoming.exchange && stored.symbol === incoming.symbol)
+      ) {
+        continue;
+      }
+      const target = await repository.findOneBy({
+        exchange: incoming.exchange,
+        symbol: incoming.symbol,
+      });
+      if (target && target.id !== stored.id) {
+        throw new ConflictException(
+          `Provider identity ${provider}:${incoming.providerInstrumentId} cannot be moved to ${incoming.exchange}:${incoming.symbol}; that market identity is already assigned to another instrument`,
+        );
+      }
+      await repository.update(stored.id, {
+        exchange: incoming.exchange,
+        symbol: incoming.symbol,
+      });
+    }
+  }
+
+  private indexCatalogByProviderIdentity(
+    provider: string,
+    catalog: readonly ProviderInstrument[],
+  ): ReadonlyMap<string, ProviderInstrument> {
+    const indexed = new Map<string, ProviderInstrument>();
+    for (const instrument of catalog) {
+      const previous = indexed.get(instrument.providerInstrumentId);
+      if (
+        previous &&
+        (previous.exchange !== instrument.exchange || previous.symbol !== instrument.symbol)
+      ) {
+        throw new ConflictException(
+          `Provider catalog contains conflicting market identities for ${provider}:${instrument.providerInstrumentId}`,
+        );
+      }
+      indexed.set(instrument.providerInstrumentId, instrument);
+    }
+    return indexed;
+  }
+
   async createUniverse(input: CreateUniverseDto): Promise<Universe> {
     try {
       // insert avoids overwriting an existing universe when the same code is submitted.
@@ -154,6 +215,33 @@ export class InstrumentsService {
       .orIgnore()
       .execute();
     return this.memberships.findOneByOrFail({ universeCode: code, instrumentId });
+  }
+
+  async replaceMembers(
+    code: string,
+    instrumentIds: readonly string[],
+  ): Promise<{ universeCode: string; memberCount: number }> {
+    const uniqueIds = [...new Set(instrumentIds)];
+    return this.instruments.manager.transaction(async (manager) => {
+      const universe = await manager.getRepository(Universe).findOne({
+        where: { code },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!universe) throw new NotFoundException('Universe not found');
+
+      const instruments = await manager.getRepository(Instrument).findBy({ id: In(uniqueIds) });
+      if (instruments.length !== uniqueIds.length)
+        throw new NotFoundException('One or more instruments were not found');
+
+      const memberships = manager.getRepository(UniverseMembership);
+      await memberships.delete({ universeCode: code });
+      await memberships
+        .createQueryBuilder()
+        .insert()
+        .values(uniqueIds.map((instrumentId) => ({ universeCode: code, instrumentId })))
+        .execute();
+      return { universeCode: code, memberCount: uniqueIds.length };
+    });
   }
 
   private isDuplicate(error: unknown): boolean {

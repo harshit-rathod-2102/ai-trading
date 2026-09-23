@@ -210,6 +210,7 @@ async function verifySchedulerGuards(DailyPipelineService, MarketDataWorker) {
     shouldNotRun,
     shouldNotRun,
     shouldNotRun,
+    shouldNotRun,
   );
   const pipelineResult = await pipeline.run({
     marketDate: '2026-09-21',

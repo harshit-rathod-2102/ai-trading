@@ -29,9 +29,12 @@ import {
 } from '../models/job-data.model';
 import { CANDIDATE_ANALYSIS_QUEUE } from '../queues';
 import { TradingDayService } from './trading-day.service';
+import { PipelineJobSummaryService } from './pipeline-job-summary.service';
+import { PipelineJobSummaryDispatch } from '../models/pipeline-job-summary.model';
 
 interface PipelineMetadata extends Record<string, unknown> {
   activeJobId?: string;
+  activeRequestedAt?: string;
   processedCandidateIds?: string[];
   failedCandidateIds?: string[];
   orchestrationFailures?: Array<{ scanResultId: string; message: string }>;
@@ -54,10 +57,12 @@ export class DailyPipelineService {
     private readonly candidateOrchestration: CandidateOrchestrationService,
     @InjectQueue(CANDIDATE_ANALYSIS_QUEUE)
     private readonly candidateQueue: Queue<CandidateAnalysisJobData>,
+    private readonly pipelineJobSummary: PipelineJobSummaryService,
   ) {}
 
   async run(data: PostMarketJobData, job?: Job): Promise<Record<string, unknown>> {
     const marketDate = data.marketDate as string;
+    const universeCode = this.config.getOrThrow<string>('marketData.universe');
     if (this.config.getOrThrow<string>('providers.marketData') === 'upstox') {
       const auth = await this.upstoxTokens.getStatus();
       if (!auth.authenticated) {
@@ -88,13 +93,25 @@ export class DailyPipelineService {
       return { status: 'SKIPPED_NON_TRADING_DAY', marketDate };
     }
 
+    const dispatch = this.dispatch(data, job, marketDate);
+    const executionKey = data.forceRun ? dispatch.jobId : 'daily';
     const claim = await this.claim(
       marketDate,
+      universeCode,
+      executionKey,
       data.triggerSource,
-      job?.id === undefined ? undefined : String(job.id),
+      dispatch,
+      job?.id !== undefined,
     );
-    if (claim.reused)
+    if (claim.reused) {
+      if (
+        claim.run.status === DailyPipelineStatus.SUCCESS ||
+        claim.run.status === DailyPipelineStatus.PARTIAL
+      ) {
+        await this.sendJobSummary(claim.run.id, dispatch);
+      }
       return { status: claim.run.status, pipelineRunId: claim.run.id, reused: true };
+    }
     const run = claim.run;
     const startedAt = performance.now();
     this.logger.log(
@@ -125,7 +142,7 @@ export class DailyPipelineService {
       );
 
       await job?.updateProgress(25);
-      const scan = await this.scanner.runDailyScan(new Date());
+      const scan = await this.scanner.runDailyScan(new Date(), run.executionKey);
       if (scan.run.marketDate !== marketDate) {
         throw new Error(`Scanner resolved ${scan.run.marketDate}; expected ${marketDate}`);
       }
@@ -245,6 +262,8 @@ export class DailyPipelineService {
     return this.runs.existsBy({
       marketDate,
       version: DAILY_PIPELINE_VERSION,
+      universeCode: this.config.getOrThrow<string>('marketData.universe'),
+      executionKey: 'daily',
       status: DailyPipelineStatus.SUCCESS,
     });
   }
@@ -324,11 +343,23 @@ export class DailyPipelineService {
     };
   }
 
-  private async claim(marketDate: string, triggerSource: JobTriggerSource, activeJobId?: string) {
+  private async claim(
+    marketDate: string,
+    universeCode: string,
+    executionKey: string,
+    triggerSource: JobTriggerSource,
+    dispatch: PipelineJobSummaryDispatch,
+    allowResume: boolean,
+  ) {
     return this.dataSource.transaction(async (manager) => {
       await manager.query('LOCK TABLE daily_pipeline_runs IN SHARE ROW EXCLUSIVE MODE');
       const repository = manager.getRepository(DailyPipelineRun);
-      const existing = await repository.findOneBy({ marketDate, version: DAILY_PIPELINE_VERSION });
+      const existing = await repository.findOneBy({
+        marketDate,
+        version: DAILY_PIPELINE_VERSION,
+        universeCode,
+        executionKey,
+      });
       if (
         existing?.status === DailyPipelineStatus.SUCCESS ||
         existing?.status === DailyPipelineStatus.PARTIAL
@@ -336,10 +367,12 @@ export class DailyPipelineService {
         return { run: existing, reused: true };
       if (existing?.status === DailyPipelineStatus.STARTED) {
         const owner = (existing.metadata as PipelineMetadata).activeJobId;
-        if (!activeJobId || owner !== activeJobId) return { run: existing, reused: true };
+        if (!allowResume || owner !== dispatch.jobId) return { run: existing, reused: true };
       }
       if (existing) {
-        Object.assign(existing, this.initialValues(triggerSource, activeJobId), {
+        Object.assign(existing, this.initialValues(triggerSource, dispatch), {
+          universeCode,
+          executionKey,
           startedAt: new Date(),
         });
         return { run: await repository.save(existing), reused: false };
@@ -348,14 +381,16 @@ export class DailyPipelineService {
         id: randomUUID(),
         marketDate,
         version: DAILY_PIPELINE_VERSION,
-        ...this.initialValues(triggerSource, activeJobId),
+        universeCode,
+        executionKey,
+        ...this.initialValues(triggerSource, dispatch),
         startedAt: new Date(),
       });
       return { run: await repository.save(run), reused: false };
     });
   }
 
-  private initialValues(triggerSource: JobTriggerSource, activeJobId?: string) {
+  private initialValues(triggerSource: JobTriggerSource, dispatch: PipelineJobSummaryDispatch) {
     return {
       status: DailyPipelineStatus.STARTED,
       triggerSource,
@@ -378,8 +413,23 @@ export class DailyPipelineService {
       aiFailures: 0,
       notificationFailures: 0,
       errorMessage: null,
-      metadata: activeJobId ? { activeJobId } : {},
+      metadata: {
+        activeJobId: dispatch.jobId,
+        activeRequestedAt: dispatch.requestedAt,
+      },
     } as const;
+  }
+
+  private dispatch(
+    data: PostMarketJobData,
+    job: Job | undefined,
+    marketDate: string,
+  ): PipelineJobSummaryDispatch {
+    return {
+      jobId: job?.id === undefined ? `direct-${marketDate}` : String(job.id),
+      triggerSource: data.triggerSource,
+      requestedAt: data.requestedAt ?? new Date().toISOString(),
+    };
   }
 
   private async recordCandidate(
@@ -387,16 +437,16 @@ export class DailyPipelineService {
     candidateId: string,
     update: (run: DailyPipelineRun) => void,
   ): Promise<void> {
-    await this.dataSource.transaction(async (manager) => {
+    const completed = await this.dataSource.transaction(async (manager) => {
       const repository = manager.getRepository(DailyPipelineRun);
       const run = await repository.findOne({
         where: { id: runId },
         lock: { mode: 'pessimistic_write' },
       });
-      if (!run || run.status === DailyPipelineStatus.FAILED) return;
+      if (!run || run.status === DailyPipelineStatus.FAILED) return false;
       const metadata = run.metadata as PipelineMetadata;
       const processed = metadata.processedCandidateIds ?? [];
-      if (processed.includes(candidateId)) return;
+      if (processed.includes(candidateId)) return Boolean(run.completedAt);
       update(run);
       run.candidatesProcessed += 1;
       run.metadata = { ...run.metadata, processedCandidateIds: [...processed, candidateId] };
@@ -409,14 +459,16 @@ export class DailyPipelineService {
       }
       await repository.save(run);
       if (run.completedAt) this.logCompletion(run);
+      return Boolean(run.completedAt);
     });
+    if (completed) await this.sendJobSummary(runId);
   }
 
   private async recoverCandidateFailure(
     runId: string,
     summary: CandidateAnalysisSummary,
   ): Promise<boolean> {
-    return this.dataSource.transaction(async (manager) => {
+    const recovered = await this.dataSource.transaction(async (manager) => {
       const repository = manager.getRepository(DailyPipelineRun);
       const run = await repository.findOne({
         where: { id: runId },
@@ -449,6 +501,8 @@ export class DailyPipelineService {
       this.logCompletion(run);
       return true;
     });
+    if (recovered) await this.sendJobSummary(runId);
+    return recovered;
   }
 
   private addSummary(run: DailyPipelineRun, summary: CandidateAnalysisSummary): void {
@@ -468,6 +522,36 @@ export class DailyPipelineService {
     run.completedAt = new Date();
     await this.runs.save(run);
     this.logCompletion(run);
+    await this.sendJobSummary(run.id);
+  }
+
+  private async sendJobSummary(
+    runId: string,
+    dispatch?: PipelineJobSummaryDispatch,
+  ): Promise<void> {
+    try {
+      const summaryDispatch = dispatch ?? (await this.dispatchForRun(runId));
+      await this.pipelineJobSummary.sendForRun(runId, summaryDispatch);
+    } catch (error: unknown) {
+      this.logger.error(
+        {
+          event: 'daily_pipeline.job_summary.failed',
+          pipelineRunId: runId,
+          ...structuredError(error),
+        },
+        'Daily pipeline completed but its WhatsApp job summary failed',
+      );
+    }
+  }
+
+  private async dispatchForRun(runId: string): Promise<PipelineJobSummaryDispatch> {
+    const run = await this.runs.findOneByOrFail({ id: runId });
+    const metadata = run.metadata as PipelineMetadata;
+    return {
+      jobId: metadata.activeJobId ?? `pipeline-${run.id}`,
+      triggerSource: run.triggerSource,
+      requestedAt: metadata.activeRequestedAt ?? run.startedAt.toISOString(),
+    };
   }
 
   private async fail(runId: string, error: unknown): Promise<void> {

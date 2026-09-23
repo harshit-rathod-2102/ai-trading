@@ -3,7 +3,12 @@ import { Instrument } from '../instruments/entities/instrument.entity';
 import { InstrumentType } from '../common/enums/instrument-type.enum';
 import { DailyCandle } from './entities/daily-candle.entity';
 import { TradingCalendar } from '../providers/market-data/models/market-data-request';
-import { barIssues, expectedSessions, marketDate } from './market-data.validation';
+import {
+  barIssues,
+  expectedSessions,
+  expectedSessionsSinceFirstAvailable,
+  marketDate,
+} from './market-data.validation';
 
 @Injectable()
 export class DataQualityService {
@@ -17,8 +22,9 @@ export class DataQualityService {
     now = new Date(),
   ) {
     const covered = from >= calendar.coverageFrom && to <= calendar.coverageTo;
-    const expected = expectedSessions(calendar, from, to, now);
+    const completedExpected = expectedSessions(calendar, from, to, now);
     const dates = new Set(rows.map((row) => row.sessionDate));
+    const expected = expectedSessionsSinceFirstAvailable(completedExpected, dates);
     const missingSessions = expected.filter((date) => !dates.has(date));
     const calendarDates = new Map(calendar.sessions.map((session) => [session.date, session]));
     const invalidRows: { sessionDate: string; issues: string[] }[] = [];

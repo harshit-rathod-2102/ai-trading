@@ -11,6 +11,10 @@ export class ScanRun {
 
   @Column({ name: 'scanner_version', type: 'varchar', length: 64 }) scannerVersion!: string;
 
+  @Column({ name: 'universe_code', type: 'varchar', length: 32 }) universeCode!: string;
+
+  @Column({ name: 'execution_key', type: 'varchar', length: 255 }) executionKey!: string;
+
   @Column({ type: 'varchar', length: 16 }) status!: ScanStatus;
 
   @Column({ name: 'market_regime_snapshot', type: 'jsonb', nullable: true })

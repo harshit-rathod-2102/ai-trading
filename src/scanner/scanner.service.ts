@@ -46,11 +46,12 @@ export class ScannerService {
     @InjectRepository(ScanResultRecord) private readonly results: Repository<ScanResultRecord>,
   ) {}
 
-  async runDailyScan(now = new Date()) {
+  async runDailyScan(now = new Date(), executionKey = 'daily') {
     // Regime is an essential preflight input. If it fails, no empty or misleading
     // scan run is created because a trustworthy market-date identity is unavailable.
+    const universeCode = this.config.getOrThrow<string>('marketData.universe');
     const regime = await this.marketRegime.calculateCurrentRegime(now);
-    const claim = await this.claimRun(regime, now);
+    const claim = await this.claimRun(regime, now, universeCode, executionKey);
     if (claim.reused) {
       this.logger.log(
         {
@@ -60,6 +61,8 @@ export class ScannerService {
           scanRunId: claim.run.id,
           marketDate: regime.marketDate,
           scannerVersion: scannerConfig.version,
+          universeCode,
+          executionKey,
           marketRegime: regime.regime,
           status: 'reused',
         },
@@ -70,7 +73,6 @@ export class ScannerService {
     const run = claim.run;
     const startedAt = performance.now();
     try {
-      const universeCode = this.config.getOrThrow<string>('marketData.universe');
       const universe = await this.instruments.list({ universe: universeCode });
       const equityUniverse = universe.filter(
         (instrument) =>
@@ -86,6 +88,8 @@ export class ScannerService {
           scanRunId: run.id,
           marketDate: regime.marketDate,
           scannerVersion: scannerConfig.version,
+          universeCode,
+          executionKey,
           universeSize: equityUniverse.length,
           marketRegime: regime.regime,
           status: 'started',
@@ -138,6 +142,8 @@ export class ScannerService {
           scanRunId: run.id,
           marketDate: regime.marketDate,
           scannerVersion: scannerConfig.version,
+          universeCode,
+          executionKey,
           universeSize: equityUniverse.length,
           evaluatedSymbols: evaluation.evaluatedSymbols,
           excludedSymbols: evaluation.exclusions.length + excludedInactive,
@@ -161,6 +167,8 @@ export class ScannerService {
           scanRunId: run.id,
           marketDate: regime.marketDate,
           scannerVersion: scannerConfig.version,
+          universeCode,
+          executionKey,
           durationMs: elapsedMilliseconds(startedAt),
           status: 'failed',
           ...structuredError(error),
@@ -211,10 +219,14 @@ export class ScannerService {
   private async claimRun(
     regime: MarketRegimeResult,
     startedAt: Date,
+    universeCode: string,
+    executionKey: string,
   ): Promise<{ run: ScanRun; reused: boolean }> {
     const current = await this.runs.findOneBy({
       marketDate: regime.marketDate,
       scannerVersion: scannerConfig.version,
+      universeCode,
+      executionKey,
     });
     if (current?.status === ScanStatus.SUCCESS) return { run: current, reused: true };
     if (current?.status === ScanStatus.STARTED) {
@@ -254,6 +266,8 @@ export class ScannerService {
       id: randomUUID(),
       marketDate: regime.marketDate,
       scannerVersion: scannerConfig.version,
+      universeCode,
+      executionKey,
       status: ScanStatus.STARTED,
       marketRegimeSnapshot: regime,
       totalUniverse: 0,
@@ -275,7 +289,7 @@ export class ScannerService {
     } catch (error: unknown) {
       if (!this.isDuplicate(error)) throw error;
       // The database uniqueness constraint is the final concurrency guard.
-      return this.claimRun(regime, startedAt);
+      return this.claimRun(regime, startedAt, universeCode, executionKey);
     }
   }
 

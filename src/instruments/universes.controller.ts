@@ -1,7 +1,12 @@
 import { Body, Controller, Get, Param, Post, Put } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { InstrumentsService } from './instruments.service';
-import { CreateUniverseDto, UniverseCodeDto, UniverseMemberParamsDto } from './dto/instrument.dto';
+import {
+  CreateUniverseDto,
+  ReplaceUniverseMembersDto,
+  UniverseCodeDto,
+  UniverseMemberParamsDto,
+} from './dto/instrument.dto';
 
 @ApiTags('Universes')
 @Controller('universes')
@@ -25,5 +30,10 @@ export class UniversesController {
   @Put(':code/instruments/:id')
   add(@Param() params: UniverseMemberParamsDto) {
     return this.instruments.addMember(params.code, params.id);
+  }
+
+  @Put(':code/instruments')
+  replace(@Param() params: UniverseCodeDto, @Body() body: ReplaceUniverseMembersDto) {
+    return this.instruments.replaceMembers(params.code, body.instrumentIds);
   }
 }

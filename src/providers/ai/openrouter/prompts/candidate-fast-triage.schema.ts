@@ -1,11 +1,12 @@
 import { AiAnalysisTier } from '../../../../ai-analysis/models/ai-analysis-tier.enum';
 import { TriageRiskLevel } from '../../../../ai-analysis/models/fast-triage-result.model';
 
-const text = { type: 'string', minLength: 1, maxLength: 1200 } as const;
+// FAST triage must fit its bounded output token budget. Detailed evidence belongs in DEEP review.
+const text = { type: 'string', minLength: 1, maxLength: 240 } as const;
 const textList = {
   type: 'array',
-  items: { type: 'string', minLength: 1, maxLength: 500 },
-  maxItems: 12,
+  items: { type: 'string', minLength: 1, maxLength: 120 },
+  maxItems: 2,
 } as const;
 
 export const CANDIDATE_FAST_TRIAGE_SCHEMA = {

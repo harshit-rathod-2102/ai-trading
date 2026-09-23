@@ -20,6 +20,7 @@ export interface MarketJobData {
 
 export interface PostMarketJobData extends MarketJobData {
   readonly marketDate?: string;
+  readonly forceRun?: boolean;
 }
 
 export interface CandidateAnalysisJobData {

@@ -622,7 +622,14 @@ There is no broker execution integration in V1.
 
 WhatsApp is the primary user interface for V1.
 
-The system sends candidate alerts and trade updates.
+The system sends candidate alerts, trade updates, and a completion summary for every finished
+daily scan pipeline, whether it was started manually, by the scheduler, or by catch-up recovery.
+The pipeline summary reports the job time and trigger, regime and score, benchmark indices,
+universe/eligibility/evaluation counts, qualified and shortlisted counts, and a short AI-generated
+factual summary. Its delivery is persisted and idempotent per individual job dispatch, so a retry
+of the same BullMQ job does not duplicate a message while a later manual run receives its own
+summary even when it reuses completed pipeline data. If AI summarization is
+unavailable, the factual metrics are still sent with a clearly labeled deterministic fallback.
 
 Example:
 

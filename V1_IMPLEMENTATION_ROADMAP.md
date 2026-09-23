@@ -362,7 +362,7 @@ Responsibilities:
 V1 default deep model:
 
 ```text
-nvidia/nemotron-3-ultra:free
+nvidia/nemotron-3-ultra-550b-a55b:free
 ```
 
 Use through OpenRouter.
@@ -609,6 +609,12 @@ AI analysis
     ↓
 candidate generation
 ```
+
+After the complete pipeline reaches `SUCCESS` or `PARTIAL`, send one idempotent WhatsApp execution
+summary for manual, scheduled, and catch-up triggers. Include job time, trigger, regime and score,
+the NIFTY 50 and India VIX inputs, universe/eligible/evaluated counts, qualified/shortlisted counts,
+and a short AI-generated factual summary. Persist the exact message and delivery state per pipeline
+run, and send a deterministic factual fallback if AI summarization is unavailable.
 
 ### Evening
 

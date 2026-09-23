@@ -12,6 +12,7 @@ import { ScannerModule } from '../scanner/scanner.module';
 import { TradeMonitorModule } from '../trade-monitor/trade-monitor.module';
 import { DailySummaryModule } from '../daily-summary/daily-summary.module';
 import { DailyPipelineRun } from './entities/daily-pipeline-run.entity';
+import { PipelineJobSummaryRecord } from './entities/pipeline-job-summary.entity';
 import { JobsController } from './jobs.controller';
 import { CandidateAnalysisProcessor } from './processors/candidate-analysis.processor';
 import { EveningProcessor } from './processors/evening.processor';
@@ -29,6 +30,8 @@ import { DailyPipelineService } from './services/daily-pipeline.service';
 import { EveningService } from './services/evening.service';
 import { JobOrchestrationService } from './services/job-orchestration.service';
 import { TradingDayService } from './services/trading-day.service';
+import { PipelineJobSummaryService } from './services/pipeline-job-summary.service';
+import { ScanRun } from '../scanner/entities/scan-run.entity';
 
 export const SYSTEM_QUEUE = 'system';
 
@@ -50,7 +53,7 @@ export const SYSTEM_QUEUE = 'system';
       { name: CANDIDATE_ANALYSIS_QUEUE },
       { name: EVENING_QUEUE },
     ),
-    TypeOrmModule.forFeature([DailyPipelineRun]),
+    TypeOrmModule.forFeature([DailyPipelineRun, PipelineJobSummaryRecord, ScanRun]),
     InstrumentsModule,
     MarketDataModule,
     ScannerModule,
@@ -66,6 +69,7 @@ export const SYSTEM_QUEUE = 'system';
     TradingDayService,
     JobOrchestrationService,
     DailyPipelineService,
+    PipelineJobSummaryService,
     CandidateAnalysisService,
     EveningService,
     TradingDayScheduler,

@@ -38,13 +38,19 @@ export class JobOrchestrationService {
     triggerSource = JobTriggerSource.MANUAL,
     marketDate?: string,
     now = new Date(),
+    jobId?: string,
   ) {
     const date =
       marketDate ??
       marketClock(now, this.config.getOrThrow<string>('scheduler.timezone')).marketDate;
-    const data = { triggerSource, marketDate: date, requestedAt: now.toISOString() };
+    const data = {
+      triggerSource,
+      marketDate: date,
+      requestedAt: now.toISOString(),
+      forceRun: jobId?.startsWith('run-now-') ?? false,
+    };
     const job = await this.postMarketQueue.add(POST_MARKET_PIPELINE, data, {
-      jobId: `post-market-${date}`,
+      jobId: jobId ?? `post-market-${date}`,
       attempts: 3,
       backoff: { type: 'exponential', delay: 60_000 },
       removeOnComplete: { count: 400 },
@@ -56,7 +62,12 @@ export class JobOrchestrationService {
   async enqueueLatestCompletedPipeline(triggerSource = JobTriggerSource.MANUAL, now = new Date()) {
     const timezone = this.config.getOrThrow<string>('scheduler.timezone');
     const marketDate = await this.tradingDays.latestCompletedSession(now, timezone);
-    return this.enqueuePostMarket(triggerSource, marketDate, now);
+    return this.enqueuePostMarket(
+      triggerSource,
+      marketDate,
+      now,
+      `run-now-${marketDate}-${now.getTime()}`,
+    );
   }
 
   async enqueueEvening(triggerSource = JobTriggerSource.MANUAL, now = new Date()) {

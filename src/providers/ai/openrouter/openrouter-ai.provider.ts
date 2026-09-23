@@ -43,6 +43,15 @@ import {
   candidateDeepReviewUserPrompt,
 } from './prompts/candidate-deep-review-v1';
 import { CANDIDATE_DEEP_REVIEW_SCHEMA } from './prompts/candidate-deep-review.schema';
+import { PipelineJobSummaryInput, PipelineJobSummaryResult } from '../models/pipeline-job-summary';
+import {
+  PIPELINE_JOB_SUMMARY_MAX_OUTPUT_TOKENS,
+  PIPELINE_JOB_SUMMARY_PROMPT_VERSION,
+  PIPELINE_JOB_SUMMARY_SYSTEM_PROMPT,
+  pipelineJobSummaryUserPrompt,
+} from './prompts/pipeline-job-summary-v1';
+import { PIPELINE_JOB_SUMMARY_SCHEMA } from './prompts/pipeline-job-summary.schema';
+import { mapOpenRouterPipelineJobSummary } from './mappers/openrouter-pipeline-job-summary.mapper';
 
 interface CachedAnalysis {
   readonly expiresAt: number;
@@ -420,6 +429,45 @@ export class OpenRouterAiProvider implements AiProvider {
     }
   }
 
+  async summarizePipelineJob(
+    input: PipelineJobSummaryInput,
+    context?: ProviderRequestContext,
+  ): Promise<PipelineJobSummaryResult> {
+    const requestedModel = this.config.fastModel;
+    let response;
+    let structuredOutput = true;
+    try {
+      response = await this.client.createChatCompletion(
+        this.pipelineSummaryRequest(input, requestedModel, true),
+        context,
+      );
+    } catch (error: unknown) {
+      if (!(error instanceof OpenRouterStructuredOutputUnsupportedError)) throw error;
+      structuredOutput = false;
+      response = await this.client.createChatCompletion(
+        this.pipelineSummaryRequest(input, requestedModel, false),
+        context,
+      );
+    }
+    const result = mapOpenRouterPipelineJobSummary(response, {
+      requestedModel,
+      promptVersion: PIPELINE_JOB_SUMMARY_PROMPT_VERSION,
+    });
+    this.logger.debug(
+      {
+        event: 'provider.request.completed',
+        provider: 'openrouter',
+        operation: 'summarizePipelineJob',
+        marketDate: input.marketDate,
+        requestedModel,
+        resolvedModel: result.resolvedModel,
+        structuredOutput,
+      },
+      'OpenRouter pipeline job summary completed',
+    );
+    return result;
+  }
+
   private request(
     input: CandidateAnalysisInput,
     structured: boolean,
@@ -498,6 +546,35 @@ export class OpenRouterAiProvider implements AiProvider {
           name: 'candidate_deep_review',
           strict: true,
           schema: CANDIDATE_DEEP_REVIEW_SCHEMA,
+        },
+      };
+      body.provider = { require_parameters: true };
+    }
+    return body;
+  }
+
+  private pipelineSummaryRequest(
+    input: PipelineJobSummaryInput,
+    requestedModel: string,
+    structured: boolean,
+  ): Readonly<Record<string, unknown>> {
+    const body: Record<string, unknown> = {
+      model: requestedModel,
+      stream: false,
+      temperature: 0,
+      max_tokens: PIPELINE_JOB_SUMMARY_MAX_OUTPUT_TOKENS,
+      messages: [
+        { role: 'system', content: PIPELINE_JOB_SUMMARY_SYSTEM_PROMPT },
+        { role: 'user', content: pipelineJobSummaryUserPrompt(input, !structured) },
+      ],
+    };
+    if (structured) {
+      body.response_format = {
+        type: 'json_schema',
+        json_schema: {
+          name: 'pipeline_job_summary',
+          strict: true,
+          schema: PIPELINE_JOB_SUMMARY_SCHEMA,
         },
       };
       body.provider = { require_parameters: true };

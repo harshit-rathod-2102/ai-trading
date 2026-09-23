@@ -5,7 +5,7 @@ import { ProviderError, ProviderErrorCode } from '../../../provider-error';
 import { ProviderInstrument } from '../../models/provider-instrument';
 import { UpstoxInstrumentRecord } from '../dto/upstox-instrument';
 
-const EQUITY_TYPES = new Set(['EQ']);
+const EQUITY_TYPES = new Set(['EQ', 'BE']);
 
 export function mapUpstoxInstrument(record: UpstoxInstrumentRecord): ProviderInstrument | null {
   const segment = stringValue(record.segment);

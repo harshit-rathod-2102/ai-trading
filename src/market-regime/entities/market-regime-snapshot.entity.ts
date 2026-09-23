@@ -16,6 +16,8 @@ export class MarketRegimeSnapshot {
 
   @Column({ type: 'varchar', length: 64 }) version!: string;
 
+  @Column({ name: 'universe_code', type: 'varchar', length: 32 }) universeCode!: string;
+
   @Column({ type: 'jsonb' }) components!: MarketRegimeComponents;
 
   @Column({ type: 'jsonb' }) reasons!: string[];
