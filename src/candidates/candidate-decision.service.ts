@@ -1,7 +1,6 @@
 import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import { buildFastTriageInput, validNewsSnapshot } from '../ai-analysis/ai-evidence-builder';
-import { deepEvidenceHash, fastEvidenceHash } from '../ai-analysis/ai-evidence-hash';
+import { validNewsSnapshot } from '../ai-analysis/ai-evidence-builder';
 import { AI_ROUTING_V1_CONFIG } from '../ai-analysis/config/ai-routing-v1.config';
 import { AiAnalysisTier } from '../ai-analysis/models/ai-analysis-tier.enum';
 import { AiRoutingDecision } from '../ai-analysis/models/ai-routing-decision.model';
@@ -112,20 +111,12 @@ export class CandidateDecisionService {
           );
         }
 
-        if (!candidate.scanResultId || !isNonEmptyRecord(candidate.riskSnapshot)) {
+        if (!hasCompleteDeterministicEvidence(candidate)) {
           return incomplete(
             candidate,
             CandidateDecisionFailureCode.CANDIDATE_NOT_ELIGIBLE,
             false,
             'Completed deterministic candidate and risk evidence are required',
-          );
-        }
-        if (!candidate.newsEnrichedAt || !validNewsSnapshot(candidate.newsSnapshot)) {
-          return incomplete(
-            candidate,
-            CandidateDecisionFailureCode.NEWS_ENRICHMENT_REQUIRED,
-            true,
-            'A successful completed news snapshot is required',
           );
         }
         const instrument = await manager.getRepository(Instrument).findOneBy({
@@ -140,139 +131,34 @@ export class CandidateDecisionService {
             'Candidate instrument company metadata is required',
           );
         }
-        try {
-          buildFastTriageInput(candidate, instrument.name);
-        } catch {
-          return incomplete(
-            candidate,
-            CandidateDecisionFailureCode.CANDIDATE_NOT_ELIGIBLE,
-            false,
-            'Persisted deterministic candidate evidence is incomplete',
-          );
-        }
-
         const parsed = parsePersistedAiEvidence(candidate.aiAnalysis);
-        if (!parsed) {
-          const hasFast = isRecord(candidate.aiAnalysis) && candidate.aiAnalysis.fast != null;
-          return incomplete(
-            candidate,
-            hasFast
-              ? CandidateDecisionFailureCode.AI_ANALYSIS_INCOMPLETE
-              : CandidateDecisionFailureCode.FAST_ANALYSIS_REQUIRED,
-            true,
-            hasFast
-              ? 'Persisted FAST analysis or routing is invalid'
-              : 'Completed FAST analysis is required',
-          );
-        }
-        const expectedFastHash = fastEvidenceHash(
-          candidate,
-          instrument.name,
-          CANDIDATE_FAST_TRIAGE_PROMPT_VERSION,
-        );
-        if (parsed.fastEvidenceHash !== expectedFastHash) {
-          return incomplete(
-            candidate,
-            CandidateDecisionFailureCode.AI_ANALYSIS_INCOMPLETE,
-            true,
-            'Candidate evidence changed after FAST analysis',
-          );
-        }
-
-        const inconsistencies = routingInconsistencies(candidate, parsed.fast, parsed.routing);
-        if (inconsistencies.length) {
-          return incomplete(
-            candidate,
-            CandidateDecisionFailureCode.POLICY_INCONSISTENCY,
-            true,
-            inconsistencies.join('; '),
-          );
-        }
-
-        let outcome: CandidateDecisionOutcome;
-        let status: CandidateDecisionSnapshot['status'];
-        let sourceTier: AiAnalysisTier;
-        let reasons: readonly string[];
-        let aiRecommendation: DeepReviewRecommendation | undefined;
-        let usedDeepHash: string | undefined;
-
-        if (parsed.routing.escalate) {
-          if (!parsed.deep || !parsed.deepEvidenceHash) {
-            return incomplete(
-              candidate,
-              CandidateDecisionFailureCode.DEEP_REVIEW_REQUIRED,
-              true,
-              'Deterministic routing requires a completed DEEP review',
-            );
-          }
-          const expectedDeepHash = deepEvidenceHash(
-            candidate,
-            instrument.name,
-            parsed.fast,
-            parsed.routing,
-            CANDIDATE_DEEP_REVIEW_PROMPT_VERSION,
-          );
-          if (parsed.deepEvidenceHash !== expectedDeepHash) {
-            return incomplete(
-              candidate,
-              CandidateDecisionFailureCode.AI_ANALYSIS_INCOMPLETE,
-              true,
-              'Candidate, FAST, or routing evidence changed after DEEP review',
-            );
-          }
-          ({ outcome, status } = mapDeepRecommendation(parsed.deep.recommendation));
-          sourceTier = AiAnalysisTier.DEEP;
-          reasons = parsed.deep.recommendationReasons;
-          aiRecommendation = parsed.deep.recommendation;
-          usedDeepHash = parsed.deepEvidenceHash;
-        } else {
-          if (
-            parsed.fast.eventRisk !== TriageRiskLevel.LOW ||
-            parsed.fast.uncertainty === TriageRiskLevel.HIGH ||
-            parsed.fast.contradictions.length ||
-            parsed.fast.missingEvidence.length ||
-            parsed.fast.redFlags.length ||
-            parsed.fast.requiresDeepReviewSuggested
-          ) {
-            return incomplete(
-              candidate,
-              CandidateDecisionFailureCode.POLICY_INCONSISTENCY,
-              true,
-              'FAST-only evidence contains unresolved risk that cannot be qualified safely',
-            );
-          }
-          outcome = CandidateDecisionOutcome.QUALIFIED;
-          status = CandidateStatus.QUALIFIED;
-          sourceTier = AiAnalysisTier.FAST;
-          reasons = [
-            'FAST event risk is LOW',
-            'No contradictions, critical missing evidence, or red flags remain',
-            'Deterministic routing selected FAST as sufficient',
-          ];
-        }
 
         const decidedAt = new Date();
         const snapshot: CandidateDecisionSnapshot = {
           version: CANDIDATE_DECISION_VERSION,
-          outcome,
+          outcome: CandidateDecisionOutcome.QUALIFIED,
           previousStatus: CandidateStatus.NEW,
-          status,
-          sourceTier,
-          reasons,
-          warnings: [],
-          ...(aiRecommendation ? { aiRecommendation } : {}),
-          fastEvidenceHash: parsed.fastEvidenceHash,
-          ...(usedDeepHash ? { deepEvidenceHash: usedDeepHash } : {}),
-          routingVersion: parsed.routing.version,
+          status: CandidateStatus.QUALIFIED,
+          sourceTier: AiAnalysisTier.DETERMINISTIC,
+          reasons: [
+            'Deterministic strategy qualification passed',
+            'Deterministic risk controls accepted the candidate',
+            'AI and news are advisory in V1 and do not change the trade decision',
+          ],
+          warnings: qualitativeWarnings(candidate, parsed),
+          ...(parsed?.deep ? { aiRecommendation: parsed.deep.recommendation } : {}),
+          ...(parsed ? { fastEvidenceHash: parsed.fastEvidenceHash } : {}),
+          ...(parsed?.deepEvidenceHash ? { deepEvidenceHash: parsed.deepEvidenceHash } : {}),
+          ...(parsed ? { routingVersion: parsed.routing.version } : {}),
           decidedAt: decidedAt.toISOString(),
         };
-        candidate.status = status;
+        candidate.status = CandidateStatus.QUALIFIED;
         candidate.decisionSnapshot = jsonRecord(snapshot);
         candidate.decidedAt = decidedAt;
         await repository.save(candidate);
         await this.journal.record(manager, {
           candidateId,
-          eventType: decisionEventType(outcome),
+          eventType: TradeEventType.CANDIDATE_QUALIFIED,
           source: EventSource.SYSTEM,
           data: {
             decisionVersion: snapshot.version,
@@ -282,7 +168,7 @@ export class CandidateDecisionService {
             sourceTier: snapshot.sourceTier,
             routingVersion: snapshot.routingVersion,
             aiRecommendation: snapshot.aiRecommendation ?? null,
-            fastEvidenceHash: snapshot.fastEvidenceHash,
+            fastEvidenceHash: snapshot.fastEvidenceHash ?? null,
             deepEvidenceHash: snapshot.deepEvidenceHash ?? null,
           },
         });
@@ -356,6 +242,35 @@ export class CandidateDecisionService {
       );
     }
   }
+}
+
+function hasCompleteDeterministicEvidence(candidate: TradeCandidate): boolean {
+  return (
+    Boolean(candidate.scanResultId) &&
+    isNonEmptyRecord(candidate.technicalSnapshot) &&
+    isNonEmptyRecord(candidate.riskSnapshot) &&
+    isNonEmptyRecord(candidate.marketRegimeSnapshot) &&
+    isNonEmptyRecord(candidate.strategySnapshot) &&
+    isNonEmptyRecord(candidate.rankingSnapshot)
+  );
+}
+
+function qualitativeWarnings(
+  candidate: TradeCandidate,
+  analysis: PersistedAiEvidence | null,
+): readonly string[] {
+  const warnings: string[] = [];
+  if (!candidate.newsEnrichedAt || !validNewsSnapshot(candidate.newsSnapshot)) {
+    warnings.push(
+      'News enrichment was unavailable and was not used for the deterministic decision',
+    );
+  }
+  if (!analysis) {
+    warnings.push('AI review was unavailable and was not used for the deterministic decision');
+  } else if (analysis.routing.escalate && !analysis.deep) {
+    warnings.push('DEEP AI review was unavailable and was not used for the deterministic decision');
+  }
+  return warnings;
 }
 
 function parsePersistedAiEvidence(
@@ -451,64 +366,6 @@ function validDeep(value: Record<string, unknown>): boolean {
   );
 }
 
-function routingInconsistencies(
-  candidate: TradeCandidate,
-  fast: FastTriageResult,
-  routing: AiRoutingDecision,
-): readonly string[] {
-  const expected: EscalationReason[] = [];
-  if (fast.eventRisk === TriageRiskLevel.HIGH) expected.push(EscalationReason.HIGH_EVENT_RISK);
-  if (fast.uncertainty === TriageRiskLevel.HIGH) expected.push(EscalationReason.HIGH_UNCERTAINTY);
-  if (Number(fast.confidence) < AI_ROUTING_V1_CONFIG.minimumFastConfidence) {
-    expected.push(EscalationReason.LOW_MODEL_CONFIDENCE);
-  }
-  if (fast.contradictions.length) expected.push(EscalationReason.CONTRADICTORY_EVIDENCE);
-  if (fast.missingEvidence.length) expected.push(EscalationReason.MISSING_CRITICAL_EVIDENCE);
-  if (fast.requiresDeepReviewSuggested) expected.push(EscalationReason.MODEL_REQUESTED_ESCALATION);
-  if (
-    (candidate.strategyRank as number) <= routing.topRankThreshold ||
-    (candidate.globalRank as number) <= routing.topRankThreshold
-  ) {
-    expected.push(EscalationReason.TOP_RANKED_CANDIDATE);
-  }
-  const actual = [...routing.reasons];
-  const issues: string[] = [];
-  if (routing.escalate !== expected.length > 0)
-    issues.push('Routing escalation does not match FAST evidence');
-  if (
-    expected.some((reason) => !actual.includes(reason)) ||
-    actual.some((reason) => !expected.includes(reason))
-  ) {
-    issues.push('Routing reasons do not match deterministic ai-routing-v1 rules');
-  }
-  return issues;
-}
-
-function mapDeepRecommendation(recommendation: DeepReviewRecommendation): {
-  readonly outcome: CandidateDecisionOutcome;
-  readonly status: CandidateDecisionSnapshot['status'];
-} {
-  switch (recommendation) {
-    case DeepReviewRecommendation.QUALIFIED:
-      return { outcome: CandidateDecisionOutcome.QUALIFIED, status: CandidateStatus.QUALIFIED };
-    case DeepReviewRecommendation.WAIT:
-      return { outcome: CandidateDecisionOutcome.WAIT, status: CandidateStatus.WAIT };
-    case DeepReviewRecommendation.REJECT:
-      return { outcome: CandidateDecisionOutcome.REJECTED, status: CandidateStatus.REJECTED };
-  }
-}
-
-function decisionEventType(outcome: CandidateDecisionOutcome): TradeEventType {
-  switch (outcome) {
-    case CandidateDecisionOutcome.QUALIFIED:
-      return TradeEventType.CANDIDATE_QUALIFIED;
-    case CandidateDecisionOutcome.WAIT:
-      return TradeEventType.CANDIDATE_WAIT;
-    case CandidateDecisionOutcome.REJECTED:
-      return TradeEventType.CANDIDATE_REJECTED;
-  }
-}
-
 function decisionSuccess(
   candidateId: string,
   snapshot: CandidateDecisionSnapshot,
@@ -553,12 +410,12 @@ function parseDecisionSnapshot(
     !Object.values(AiAnalysisTier).includes(value.sourceTier as AiAnalysisTier) ||
     !stringArray(value.reasons) ||
     !stringArray(value.warnings) ||
-    !isSha256(value.fastEvidenceHash) ||
-    typeof value.routingVersion !== 'string' ||
     typeof value.decidedAt !== 'string' ||
     Number.isNaN(Date.parse(value.decidedAt))
   )
     return null;
+  if (value.fastEvidenceHash !== undefined && !isSha256(value.fastEvidenceHash)) return null;
+  if (value.routingVersion !== undefined && typeof value.routingVersion !== 'string') return null;
   if (value.deepEvidenceHash !== undefined && !isSha256(value.deepEvidenceHash)) return null;
   if (
     value.aiRecommendation !== undefined &&

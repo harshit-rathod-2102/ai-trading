@@ -513,6 +513,21 @@ export class DailyPipelineService {
     run.waitCount += Number(summary.wait);
     run.rejected += Number(summary.rejected);
     run.notified += Number(summary.notified);
+    if (summary.analysisIssue) {
+      run.candidateAnalysisFailures += 1;
+      if (summary.analysisIssue.stage === 'NEWS') run.newsFailures += 1;
+      if (summary.analysisIssue.stage === 'AI' || summary.analysisIssue.stage === 'DECISION') {
+        run.aiFailures += 1;
+      }
+      const metadata = run.metadata as PipelineMetadata;
+      metadata.failedCandidateIds = [...(metadata.failedCandidateIds ?? []), summary.candidateId];
+      metadata.failureStageByCandidate = {
+        ...(metadata.failureStageByCandidate ?? {}),
+        [summary.candidateId]: summary.analysisIssue.stage,
+      };
+      metadata.lastCandidateError = `${summary.analysisIssue.kind}: ${summary.analysisIssue.code}`;
+      run.metadata = metadata;
+    }
   }
 
   private async finalizeIfComplete(runId: string): Promise<void> {

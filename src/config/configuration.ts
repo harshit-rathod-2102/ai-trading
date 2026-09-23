@@ -104,13 +104,16 @@ export interface ApplicationConfiguration {
 }
 
 const LEGACY_OPENROUTER_DEEP_MODEL = 'nvidia/nemotron-3-ultra:free';
-const DEFAULT_OPENROUTER_DEEP_MODEL = 'nvidia/nemotron-3-ultra-550b-a55b:free';
+const RETIRED_OPENROUTER_DEEP_MODEL = 'nvidia/nemotron-3-ultra-550b-a55b:free';
+const DEFAULT_OPENROUTER_DEEP_MODEL = 'openrouter/free';
 
 function configuredDeepModel(): string {
   const model = process.env.OPENROUTER_DEEP_MODEL?.trim();
-  // OpenRouter retired the unversioned alias. Preserve existing external env files
-  // while routing them to the currently available model identifier.
-  return !model || model === LEGACY_OPENROUTER_DEEP_MODEL ? DEFAULT_OPENROUTER_DEEP_MODEL : model;
+  // The configured free Nemotron route returned 404 at runtime. Preserve existing external
+  // environment files while using OpenRouter's available free-model router for V1 advisory AI.
+  return !model || [LEGACY_OPENROUTER_DEEP_MODEL, RETIRED_OPENROUTER_DEEP_MODEL].includes(model)
+    ? DEFAULT_OPENROUTER_DEEP_MODEL
+    : model;
 }
 
 export default (): ApplicationConfiguration => ({

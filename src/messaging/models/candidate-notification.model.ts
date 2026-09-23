@@ -20,3 +20,18 @@ export interface CandidateNotificationResult extends CandidateNotificationSnapsh
   readonly previousStatus: CandidateStatus.QUALIFIED;
   readonly newStatus: CandidateStatus.NOTIFIED;
 }
+
+export type CandidateAnalysisIssueKind = 'NEWS' | 'FAST_AI' | 'DEEP_AI' | 'DECISION';
+
+export interface CandidateAnalysisIssue {
+  readonly kind: CandidateAnalysisIssueKind;
+  readonly code: string;
+  readonly message: string;
+}
+
+export interface CandidateAnalysisIssueNotificationResult {
+  readonly candidateId: string;
+  readonly issue: CandidateAnalysisIssue;
+  readonly providerMessageId: string;
+  readonly reusedExistingNotification: boolean;
+}

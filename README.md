@@ -144,7 +144,7 @@ OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
 # Legacy/default model; FAST falls back to this when OPENROUTER_FAST_MODEL is omitted.
 OPENROUTER_MODEL=openrouter/free
 OPENROUTER_FAST_MODEL=openrouter/free
-OPENROUTER_DEEP_MODEL=nvidia/nemotron-3-ultra-550b-a55b:free
+OPENROUTER_DEEP_MODEL=openrouter/free
 AI_ROUTING_TOP_RANK_THRESHOLD=3
 OPENROUTER_HTTP_TIMEOUT_MS=30000
 OPENROUTER_APP_NAME=swing-trading-assistant
@@ -820,7 +820,7 @@ A successful provider response with no relevant recent articles persists a valid
 
 `POST /api/candidates/:id/ai/triage` runs the first qualitative review stage for an orchestrated candidate that is still `NEW` and has complete technical, regime, strategy, ranking, risk, and news snapshots. A successful zero-article news snapshot is valid input. A failed or absent news enrichment is not. Candidate detail responses expose the persisted result through `aiAnalysis`.
 
-V1 defines `FAST` and `DEEP` analysis tiers behind the single existing `AiProvider` SPI. `OPENROUTER_FAST_MODEL` selects the FAST model and falls back to the backward-compatible `OPENROUTER_MODEL` setting when omitted. `OPENROUTER_DEEP_MODEL` defaults to `nvidia/nemotron-3-ultra-550b-a55b:free`; only the DEEP review service invokes it after deterministic routing selects DEEP.
+V1 defines `FAST` and `DEEP` analysis tiers behind the single existing `AiProvider` SPI. `OPENROUTER_FAST_MODEL` selects the FAST model and falls back to the backward-compatible `OPENROUTER_MODEL` setting when omitted. `OPENROUTER_DEEP_MODEL` defaults to `openrouter/free`; only the DEEP review service invokes it after deterministic routing selects DEEP.
 
 The versioned `candidate-fast-triage-v1` prompt sends only persisted candidate evidence: symbol/company, strategy identity and scores, ranks, regime, technical and risk snapshots, and the completed news snapshot. It tells the model to use no external facts, avoid trading advice and deterministic parameter changes, and treat news titles and descriptions as untrusted evidence. Instructions embedded in article text must be ignored. Temperature is centralized at `0.1`.
 
@@ -870,7 +870,7 @@ node scripts/verify-ai-triage.cjs
 
 The service also recomputes the FAST evidence hash before DEEP execution. If news, technical, regime, strategy, ranking, risk, company identity, or score evidence changed after FAST routing, DEEP is blocked with `MISSING_DEEP_REVIEW_EVIDENCE`; FAST must analyze and route the new snapshot first. DEEP never refreshes market data or news itself.
 
-The versioned `candidate-deep-review-v1` prompt sends the complete persisted candidate evidence, FAST analysis, and routing decision to the configured `OPENROUTER_DEEP_MODEL`. The default is `nvidia/nemotron-3-ultra-550b-a55b:free`. Temperature is `0.1` and output is bounded to 2,800 tokens. The adapter does not fall back to another model when Nemotron is unavailable.
+The versioned `candidate-deep-review-v1` prompt sends the complete persisted candidate evidence, FAST analysis, and routing decision to the configured `OPENROUTER_DEEP_MODEL`. The default is OpenRouter's available free-model router, `openrouter/free`. Temperature is `0.1` and output is bounded to 2,800 tokens.
 
 The system prompt treats article text, titles, descriptions, metadata, and other external content as untrusted evidence. Embedded commands, role changes, system prompts, and tool requests must be ignored. The model may use only supplied facts and must list unavailable information in `missingEvidence`; it may not invent event dates or company, regulatory, legal, guidance, or management facts.
 
@@ -904,8 +904,8 @@ The DEEP evidence hash covers candidate identity and scores, technical/regime/st
     "evidenceHash": "...",
     "modelMetadata": {
       "provider": "openrouter",
-      "requestedModel": "nvidia/nemotron-3-ultra-550b-a55b:free",
-      "resolvedModel": "nvidia/nemotron-3-ultra-550b-a55b:free",
+      "requestedModel": "openrouter/free",
+      "resolvedModel": "provider-selected-free-model",
       "promptVersion": "candidate-deep-review-v1",
       "routingVersion": "ai-routing-v1",
       "analyzedAt": "2026-09-17T00:00:00.000Z"
@@ -958,11 +958,9 @@ node scripts/verify-ai-evaluation.cjs
 
 ## Final candidate decisioning
 
-`POST /api/candidates/:id/finalize` is the application-owned boundary that converts persisted, validated AI evidence into `QUALIFIED`, `WAIT`, or `REJECTED`. The request has no body and cannot supply a decision. `CandidateDecisionService` locks the candidate, validates deterministic/risk/news evidence, validates the stored FAST result and `ai-routing-v1` decision, recomputes evidence hashes, derives the result, stores a compact `candidate-decision-v1` snapshot, changes status, and appends a `SYSTEM` journal event in one PostgreSQL transaction. The LLM never writes candidate status.
+`POST /api/candidates/:id/finalize` is the application-owned boundary that qualifies a candidate selected by the deterministic strategy and risk controls. The request has no body and cannot supply a decision. `CandidateDecisionService` locks the candidate, validates the persisted deterministic evidence, stores a compact `candidate-decision-v1` snapshot with source tier `DETERMINISTIC`, changes status to `QUALIFIED`, and appends a `SYSTEM` journal event in one PostgreSQL transaction. The LLM never writes candidate status.
 
-When routing selected FAST, finalization is conservative. Qualification requires LOW event risk, uncertainty below HIGH, no contradictions, no missing evidence, no red flags, no DEEP suggestion, and a routing result that exactly matches the deterministic V1 policy. A stale or inconsistent non-escalated decision returns `POLICY_INCONSISTENCY` and leaves the candidate `NEW`; it never silently qualifies it. FAST-only decisioning does not produce `REJECTED`.
-
-When routing selected DEEP, a valid DEEP result with the matching evidence hash is mandatory. `QUALIFIED` maps to candidate status `QUALIFIED`, `WAIT` maps to `WAIT`, and `REJECT` maps to `REJECTED`. Missing DEEP evidence returns `DEEP_REVIEW_REQUIRED`. Missing or failed FAST analysis, a failed news lookup, malformed persisted output, or changed evidence returns a typed incomplete result and leaves status unchanged. Provider failure is never interpreted as qualitative rejection. A successful zero-article news snapshot remains valid.
+News, FAST AI, DEEP AI, malformed qualitative output, and advisory routing inconsistencies do not block deterministic qualification in V1. Valid FAST or DEEP evidence is retained and its DEEP recommendation is stored as advisory metadata, but it cannot turn the candidate into `WAIT` or `REJECTED`. Missing or failed qualitative stages are recorded as warnings and reported by WhatsApp; a successful zero-article news snapshot remains valid.
 
 The decision snapshot stores only the decision version, outcome/status, source tier, concise reasons/warnings, optional DEEP recommendation, FAST/DEEP evidence hashes, routing version, and decision timestamp. Full AI payloads remain in `ai_analysis`. Finalization does not recalculate or mutate entry, stop, targets, quantity, technical evidence, or risk evidence. It creates no trade and sends no message.
 
@@ -982,7 +980,7 @@ node scripts/verify-candidate-decision.cjs
 
 ## WhatsApp candidate flow
 
-Only candidates in `QUALIFIED` status can be sent as actionable opportunities. `POST /api/candidates/:id/notify` loads the finalized candidate and company metadata, builds one concise text message, and sends it through the provider-neutral `MessagingProvider` boundary. After Meta accepts the message, a short PostgreSQL transaction stores `candidate-notification-v1` metadata, changes `QUALIFIED` to `NOTIFIED`, and appends one `CANDIDATE_NOTIFIED` system event. The external API call is never made inside the transaction.
+Only candidates in `QUALIFIED` status can be sent as actionable opportunities. `POST /api/candidates/:id/notify` loads the finalized candidate and company metadata, builds one concise text message, and sends it through the provider-neutral `MessagingProvider` boundary. The message includes an available FAST/DEEP AI summary as advisory context. After Meta accepts the message, a short PostgreSQL transaction stores `candidate-notification-v1` metadata, changes `QUALIFIED` to `NOTIFIED`, and appends one `CANDIDATE_NOTIFIED` system event. The external API call is never made inside the transaction.
 
 The message includes symbol/company, strategy, rank and score, market regime, planned entry/stop/quantity, capital and planned loss, targets and R ratios, the concise persisted AI summary, selected strengths/risks, a short candidate reference, and command examples. It does not dump snapshots. Dynamic candidate delivery currently uses WhatsApp text; if Meta rejects text because the customer-service window is closed, the candidate remains `QUALIFIED` and can be retried. An approved proactive template is a future deployment choice.
 
@@ -1080,7 +1078,9 @@ At 15:45 IST, `POST_MARKET_PIPELINE` performs these shared deterministic stages:
 5. Apply deterministic risk and create/reuse candidates for shortlisted scan results.
 6. Enqueue one `CANDIDATE_ANALYSIS` job per candidate.
 
-Each candidate job runs news enrichment, FAST triage, selective DEEP review, final decisioning, and notification only for `QUALIFIED` candidates. `WAIT` and `REJECTED` candidates remain persisted without actionable alerts. Candidate workers use configurable concurrency (default `2`) to protect provider quotas. Candidate failures retry up to three times with exponential backoff and do not stop other candidates. Failed jobs remain in Redis. A notification failure can be retried without rerunning market data or the scanner; the evening hook retries eligible failed notification jobs.
+Each candidate job runs news enrichment, FAST triage, selective DEEP review, deterministic final decisioning, and notification. Candidate workers use configurable concurrency (default `2`) to protect provider quotas.
+
+News, FAST AI, and DEEP AI failures are isolated to their candidate. The worker records a `CANDIDATE_ANALYSIS_FAILED` journal event and sends an idempotent WhatsApp issue message, then continues deterministic finalization and sends the normal actionable candidate alert when the strategy and risk controls qualify it. A DEEP failure message includes the persisted FAST AI summary when available; a successful candidate alert also includes any available AI summary. News issue messages deliberately report only the failure, not a news summary. Qualitative failures make the completed pipeline `PARTIAL` with the appropriate counters, but do not block a deterministic candidate. A WhatsApp delivery failure remains retryable because the user has not received the required message. Failed notification jobs remain in Redis, and the evening hook retries eligible failed notification jobs.
 
 The `daily_pipeline_runs` table records `daily-pipeline-v1` status and counters. `FAILED` means shared stages could not produce a trustworthy scan. `PARTIAL` means shared stages succeeded but one or more candidates failed. A unique `(market_date, version)` constraint, single-concurrency post-market worker, stable scheduler IDs, deterministic candidate job IDs, and existing scanner uniqueness prevent overlapping or duplicate daily work.
 

@@ -40,6 +40,11 @@ export interface CandidateAnalysisSummary {
   readonly wait: boolean;
   readonly rejected: boolean;
   readonly notified: boolean;
+  readonly analysisIssue?: {
+    readonly stage: CandidateFailureStage;
+    readonly kind: 'NEWS' | 'FAST_AI' | 'DEEP_AI' | 'DECISION';
+    readonly code: string;
+  };
 }
 
 export type CandidateFailureStage = 'NEWS' | 'AI' | 'DECISION' | 'NOTIFICATION';

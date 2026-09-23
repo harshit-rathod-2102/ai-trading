@@ -362,7 +362,7 @@ Responsibilities:
 V1 default deep model:
 
 ```text
-nvidia/nemotron-3-ultra-550b-a55b:free
+openrouter/free
 ```
 
 Use through OpenRouter.

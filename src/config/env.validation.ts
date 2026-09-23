@@ -37,10 +37,7 @@ export const environmentValidationSchema = Joi.object({
     .default('https://openrouter.ai/api/v1'),
   OPENROUTER_MODEL: Joi.string().trim().min(1).default('openrouter/free'),
   OPENROUTER_FAST_MODEL: Joi.string().trim().min(1),
-  OPENROUTER_DEEP_MODEL: Joi.string()
-    .trim()
-    .min(1)
-    .default('nvidia/nemotron-3-ultra-550b-a55b:free'),
+  OPENROUTER_DEEP_MODEL: Joi.string().trim().min(1).default('openrouter/free'),
   OPENROUTER_HTTP_TIMEOUT_MS: Joi.number().integer().min(1000).max(120000).default(30000),
   OPENROUTER_APP_NAME: Joi.string().trim().min(1).max(100).default('swing-trading-assistant'),
   OPENROUTER_SITE_URL: Joi.string()

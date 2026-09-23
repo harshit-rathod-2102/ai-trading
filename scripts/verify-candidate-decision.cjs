@@ -252,15 +252,15 @@ async function main() {
   try {
     await dataSource.query(
       `INSERT INTO scan_runs (
-        id, market_date, scanner_version, status, market_regime_snapshot,
+        id, market_date, scanner_version, universe_code, execution_key, status, market_regime_snapshot,
         total_universe, eligible_universe, evaluated_symbols, qualified_setups,
         shortlisted_setups, started_at, completed_at
-      ) VALUES ($1,CURRENT_DATE,$2,'SUCCESS',$3,30,30,30,20,20,NOW(),NOW())`,
+      ) VALUES ($1,CURRENT_DATE,$2,'DEVELOPMENT','verify','SUCCESS',$3,30,30,30,20,20,NOW(),NOW())`,
       [runId, `verify-decision-${randomUUID().slice(0, 8)}`,
         { version: 'market-regime-v1', regime: 'BULLISH' }],
     );
 
-    // A/L: clean FAST-only evidence qualifies without changing risk or trade parameters.
+    // A/L: deterministic selection qualifies without changing risk or trade parameters.
     const fastClean = await createCandidate('FASTCLEAN', { zeroNews: true });
     const beforeParameters = {
       proposedEntry: fastClean.proposedEntry,
@@ -274,7 +274,7 @@ async function main() {
     assert.equal(fastDecision.status, 200);
     assert.equal(fastDecision.body.finalized, true);
     assert.equal(fastDecision.body.outcome, 'QUALIFIED');
-    assert.equal(fastDecision.body.sourceTier, 'FAST');
+    assert.equal(fastDecision.body.sourceTier, 'DETERMINISTIC');
     const fastPersisted = await candidates.findOneByOrFail({ id: fastClean.id });
     assert.equal(fastPersisted.status, CandidateStatus.QUALIFIED);
     assert.equal(fastPersisted.decisionSnapshot.version, 'candidate-decision-v1');
@@ -287,11 +287,11 @@ async function main() {
       riskSnapshot: fastPersisted.riskSnapshot,
     }, beforeParameters);
 
-    // B-D: DEEP typed recommendations map through application code.
-    for (const [prefix, recommendation, expectedStatus, expectedEvent] of [
-      ['DEEPQUAL', DeepReviewRecommendation.QUALIFIED, CandidateStatus.QUALIFIED, 'CANDIDATE_QUALIFIED'],
-      ['DEEPWAIT', DeepReviewRecommendation.WAIT, CandidateStatus.WAIT, 'CANDIDATE_WAIT'],
-      ['DEEPREJ', DeepReviewRecommendation.REJECT, CandidateStatus.REJECTED, 'CANDIDATE_REJECTED'],
+    // B-D: DEEP recommendations are advisory and cannot override deterministic qualification.
+    for (const [prefix, recommendation] of [
+      ['DEEPQUAL', DeepReviewRecommendation.QUALIFIED],
+      ['DEEPWAIT', DeepReviewRecommendation.WAIT],
+      ['DEEPREJ', DeepReviewRecommendation.REJECT],
     ]) {
       const highEvent = recommendation !== DeepReviewRecommendation.QUALIFIED;
       const fast = fastResult({
@@ -305,46 +305,44 @@ async function main() {
       const candidate = await createCandidate(prefix, { fast, routing, deepRecommendation: recommendation });
       const response = await finalize(candidate.id);
       assert.equal(response.status, 200);
-      assert.equal(response.body.outcome, expectedStatus);
-      assert.equal(response.body.sourceTier, 'DEEP');
+      assert.equal(response.body.outcome, CandidateStatus.QUALIFIED);
+      assert.equal(response.body.sourceTier, 'DETERMINISTIC');
       const persisted = await candidates.findOneByOrFail({ id: candidate.id });
-      assert.equal(persisted.status, expectedStatus);
+      assert.equal(persisted.status, CandidateStatus.QUALIFIED);
       const events = await dataSource.query(
         'SELECT event_type, source FROM trade_events WHERE candidate_id=$1 AND event_type=$2',
-        [candidate.id, expectedEvent],
+        [candidate.id, 'CANDIDATE_QUALIFIED'],
       );
       assert.equal(events.length, 1);
       assert.equal(events[0].source, 'SYSTEM');
     }
 
-    // E: an escalated candidate cannot silently fall back to FAST.
+    // E: missing DEEP evidence is advisory and does not block deterministic qualification.
     const deepRequired = await createCandidate('DEEPREQ', {
       fast: fastResult({ eventRisk: TriageRiskLevel.HIGH }),
       routing: routingDecision(true, [EscalationReason.HIGH_EVENT_RISK]),
     });
-    const missingDeep = await finalize(deepRequired.id);
-    assert.equal(missingDeep.body.errorCode, 'DEEP_REVIEW_REQUIRED');
-    assert.equal((await candidates.findOneByOrFail({ id: deepRequired.id })).status, CandidateStatus.NEW);
+    assert.equal((await finalize(deepRequired.id)).body.outcome, CandidateStatus.QUALIFIED);
+    assert.equal((await candidates.findOneByOrFail({ id: deepRequired.id })).status, CandidateStatus.QUALIFIED);
 
-    // F-H: missing FAST, failed news, and provider failure remain retryable and never become REJECTED.
+    // F-H: missing FAST, failed news, and malformed AI evidence are advisory.
     const noFast = await createCandidate('NOFAST', { noFast: true });
-    assert.equal((await finalize(noFast.id)).body.errorCode, 'FAST_ANALYSIS_REQUIRED');
+    assert.equal((await finalize(noFast.id)).body.outcome, CandidateStatus.QUALIFIED);
     const newsFailure = await createCandidate('NEWSFAIL', { newsFailure: true });
-    assert.equal((await finalize(newsFailure.id)).body.errorCode, 'NEWS_ENRICHMENT_REQUIRED');
+    assert.equal((await finalize(newsFailure.id)).body.outcome, CandidateStatus.QUALIFIED);
     const providerFailure = await createCandidate('AIFAIL', { malformedFast: true });
-    assert.equal((await finalize(providerFailure.id)).body.errorCode, 'AI_ANALYSIS_INCOMPLETE');
+    assert.equal((await finalize(providerFailure.id)).body.outcome, CandidateStatus.QUALIFIED);
     for (const candidate of [noFast, newsFailure, providerFailure]) {
-      assert.equal((await candidates.findOneByOrFail({ id: candidate.id })).status, CandidateStatus.NEW);
+      assert.equal((await candidates.findOneByOrFail({ id: candidate.id })).status, CandidateStatus.QUALIFIED);
     }
 
-    // I: a non-escalated HIGH event-risk result fails safe without qualification.
+    // I: inconsistent qualitative routing is advisory and cannot block qualification.
     const inconsistent = await createCandidate('POLICY', {
       fast: fastResult({ eventRisk: TriageRiskLevel.HIGH }),
       routing: routingDecision(false),
     });
-    const inconsistentResult = await finalize(inconsistent.id);
-    assert.equal(inconsistentResult.body.errorCode, 'POLICY_INCONSISTENCY');
-    assert.equal((await candidates.findOneByOrFail({ id: inconsistent.id })).status, CandidateStatus.NEW);
+    assert.equal((await finalize(inconsistent.id)).body.outcome, CandidateStatus.QUALIFIED);
+    assert.equal((await candidates.findOneByOrFail({ id: inconsistent.id })).status, CandidateStatus.QUALIFIED);
 
     // J: repeated finalization returns the stored result and creates one final-decision event.
     const duplicate = await finalize(fastClean.id);

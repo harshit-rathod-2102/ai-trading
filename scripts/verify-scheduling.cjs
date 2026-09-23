@@ -201,18 +201,34 @@ async function main() {
   assert.equal((await analysis.run(candidate.id)).qualified, true);
   assert.equal(notified, 1);
   candidate.status = CandidateStatus.NEW;
+  let analysisIssue;
   const failing = new CandidateAnalysisService(
     { get: async () => candidate },
     { enrichCandidate: async () => ({ success: false, retryable: true, errorCode: 'TIMEOUT' }) },
     {},
     {},
-    {},
-    {},
+    {
+      finalizeCandidate: async () => {
+        candidate.status = CandidateStatus.QUALIFIED;
+        return { finalized: true, newStatus: CandidateStatus.QUALIFIED };
+      },
+    },
+    {
+      notifyAnalysisIssue: async (_candidateId, issue) => {
+        analysisIssue = issue;
+      },
+      notifyCandidate: async () => {
+        notified += 1;
+      },
+    },
   );
-  await assert.rejects(
-    () => failing.run(candidate.id),
-    (error) => error instanceof CandidateStageError && error.stage === 'NEWS' && error.retryable,
-  );
+  const degraded = await failing.run(candidate.id);
+  assert.equal(degraded.analysisIssue.stage, 'NEWS');
+  assert.equal(degraded.analysisIssue.kind, 'NEWS');
+  assert.equal(degraded.analysisIssue.code, 'TIMEOUT');
+  assert.equal(degraded.qualified, true);
+  assert.equal(degraded.notified, true);
+  assert.equal(analysisIssue.kind, 'NEWS');
 
   const rows = [];
   const matches = (row, where) => Object.entries(where).every(([key, value]) => row[key] === value);

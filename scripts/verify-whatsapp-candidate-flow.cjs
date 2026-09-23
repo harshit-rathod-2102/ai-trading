@@ -259,7 +259,26 @@ async function main() {
     assert.equal((await candidateRepository.findOneByOrFail({ id: deliveryFailure.id })).status,
       CandidateStatus.NOTIFIED);
 
-    // E: reply context resolves the notification and reuses transactional BUY logic.
+    // E: an analysis issue is informative, non-actionable, and idempotent.
+    const analysisIssueCandidate = await createCandidate('AIISSUE', CandidateStatus.NEW);
+    const beforeIssueNotification = outbound.length;
+    const issue = { kind: 'DEEP_AI', code: 'AI_REQUEST_REJECTED', message: 'Verification only.' };
+    const issueFirst = await notificationService.notifyAnalysisIssue(analysisIssueCandidate.id, issue);
+    const issueDuplicate = await notificationService.notifyAnalysisIssue(analysisIssueCandidate.id, issue);
+    assert.equal(issueFirst.providerMessageId, issueDuplicate.providerMessageId);
+    assert.equal(issueDuplicate.reusedExistingNotification, true);
+    assert.equal(outbound.length, beforeIssueNotification + 1);
+    assert.match(outbound.at(-1).text, /DEEP AI review: FAILED/);
+    assert.match(outbound.at(-1).text, /Deterministic strategy and risk review continues/);
+    assert.equal((await candidateRepository.findOneByOrFail({ id: analysisIssueCandidate.id })).status,
+      CandidateStatus.NEW);
+    assert.equal((await dataSource.query(
+      `SELECT COUNT(*)::int AS count FROM trade_events
+       WHERE candidate_id=$1 AND event_type='CANDIDATE_ANALYSIS_FAILED'`,
+      [analysisIssueCandidate.id],
+    ))[0].count, 1);
+
+    // F: reply context resolves the notification and reuses transactional BUY logic.
     const replyBuy = await commandService.handle(inbound('BUY 2925 20', {
       replyToProviderMessageId: notification.body.providerMessageId,
     }));

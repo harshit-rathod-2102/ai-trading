@@ -19,6 +19,8 @@ import { MessageDeliveryStatus, MessageType } from '../providers/messaging/model
 import { MessagingService } from './messaging.service';
 import {
   CANDIDATE_NOTIFICATION_VERSION,
+  CandidateAnalysisIssue,
+  CandidateAnalysisIssueNotificationResult,
   CandidateNotificationResult,
   CandidateNotificationSnapshot,
 } from './models/candidate-notification.model';
@@ -28,6 +30,11 @@ export class CandidateNotificationService {
   private readonly logger = new Logger(CandidateNotificationService.name);
 
   private readonly inFlight = new Map<string, Promise<CandidateNotificationResult>>();
+
+  private readonly analysisIssueInFlight = new Map<
+    string,
+    Promise<CandidateAnalysisIssueNotificationResult>
+  >();
 
   constructor(
     private readonly dataSource: DataSource,
@@ -48,6 +55,104 @@ export class CandidateNotificationService {
     });
     this.inFlight.set(candidateId, execution);
     return execution;
+  }
+
+  /**
+   * Delivers an analysis-availability notice without changing the candidate's decision state.
+   * A failed qualitative provider must never make a candidate actionable, but it also must not
+   * prevent the user from learning why no actionable alert was produced.
+   */
+  notifyAnalysisIssue(
+    candidateId: string,
+    issue: CandidateAnalysisIssue,
+  ): Promise<CandidateAnalysisIssueNotificationResult> {
+    const key = `${candidateId}:${issue.kind}:${issue.code}`;
+    const existing = this.analysisIssueInFlight.get(key);
+    if (existing) return existing;
+    const execution = this.executeAnalysisIssue(candidateId, issue).finally(() => {
+      if (this.analysisIssueInFlight.get(key) === execution) this.analysisIssueInFlight.delete(key);
+    });
+    this.analysisIssueInFlight.set(key, execution);
+    return execution;
+  }
+
+  private async executeAnalysisIssue(
+    candidateId: string,
+    issue: CandidateAnalysisIssue,
+  ): Promise<CandidateAnalysisIssueNotificationResult> {
+    const sent = await this.journal.forCandidate(candidateId);
+    const existing = sent.find((event) => issueNotificationMatches(event, issue));
+    const existingDelivery = issueNotificationDelivery(existing?.data);
+    if (existingDelivery?.providerMessageId) {
+      return {
+        candidateId,
+        issue,
+        providerMessageId: existingDelivery.providerMessageId,
+        reusedExistingNotification: true,
+      };
+    }
+
+    const candidate = await this.candidates.findOneBy({ id: candidateId });
+    if (!candidate) throw new NotFoundException({ code: 'CANDIDATE_NOT_FOUND', candidateId });
+    const recipient = this.config.get<string>('metaWhatsapp.allowedSender')?.trim();
+    if (!recipient) {
+      throw new ServiceUnavailableException({
+        code: 'MESSAGING_DELIVERY_FAILED',
+        message: 'META_WHATSAPP_ALLOWED_SENDER is required for candidate delivery',
+      });
+    }
+    const instrument = await this.instruments.findOneBy({
+      symbol: candidate.symbol,
+      exchange: candidate.exchange,
+    });
+    const delivery = await this.messaging.sendMessage({
+      recipient,
+      messageType: MessageType.TEXT,
+      text: buildCandidateAnalysisIssueMessage(candidate, instrument?.name ?? null, issue),
+      metadata: { candidateId, analysisIssue: issue.kind, analysisIssueCode: issue.code },
+    });
+    if (delivery.status === MessageDeliveryStatus.FAILED) {
+      throw new ServiceUnavailableException({
+        code: 'MESSAGING_DELIVERY_FAILED',
+        message: 'Messaging provider reported failed delivery',
+      });
+    }
+    await this.dataSource.transaction(async (manager) => {
+      await this.journal.record(manager, {
+        candidateId,
+        eventType: TradeEventType.CANDIDATE_ANALYSIS_FAILED,
+        source: EventSource.SYSTEM,
+        data: {
+          issue,
+          notification: {
+            provider: this.config.get<string>('providers.messaging') || 'messaging-provider',
+            providerMessageId: delivery.providerMessageId,
+            deliveryStatus: delivery.status,
+            providerSentAt: delivery.sentAt,
+            recordedAt: new Date().toISOString(),
+          },
+        },
+      });
+    });
+    this.logger.warn(
+      {
+        event: 'whatsapp.candidate.analysis_issue.sent',
+        module: CandidateNotificationService.name,
+        operation: 'notifyAnalysisIssue',
+        candidateId,
+        symbol: candidate.symbol,
+        issueKind: issue.kind,
+        issueCode: issue.code,
+        providerMessageId: delivery.providerMessageId,
+      },
+      'WhatsApp candidate analysis-issue delivery completed',
+    );
+    return {
+      candidateId,
+      issue,
+      providerMessageId: delivery.providerMessageId,
+      reusedExistingNotification: false,
+    };
   }
 
   private async execute(candidateId: string): Promise<CandidateNotificationResult> {
@@ -291,6 +396,71 @@ export function buildCandidateMessage(
     'BUY records a manually executed trade. No broker order is placed.',
   ];
   return lines.join('\n').slice(0, 4096);
+}
+
+export function buildCandidateAnalysisIssueMessage(
+  candidate: TradeCandidate,
+  companyName: string | null,
+  issue: CandidateAnalysisIssue,
+): string {
+  const fast =
+    isRecord(candidate.aiAnalysis) && isRecord(candidate.aiAnalysis.fast)
+      ? candidate.aiAnalysis.fast
+      : null;
+  const fastSummary = textValue(fast?.summary);
+  const kind = {
+    NEWS: 'News lookup',
+    FAST_AI: 'FAST AI review',
+    DEEP_AI: 'DEEP AI review',
+    DECISION: 'Candidate decision',
+  }[issue.kind];
+  return [
+    `⚠️ Candidate analysis incomplete: ${candidate.symbol}${companyName ? ` — ${companyName}` : ''}`,
+    candidate.strategy.replaceAll('_', ' '),
+    '',
+    `${kind}: FAILED`,
+    `Reason: ${humanizeIssue(issue.code)}`,
+    ...(issue.kind === 'DEEP_AI' && fastSummary
+      ? ['', 'FAST AI summary:', truncate(fastSummary, 500)]
+      : []),
+    '',
+    'Qualitative checks are advisory in V1. Deterministic strategy and risk review continues.',
+    'A separate candidate alert will be sent if the deterministic setup qualifies.',
+    'No broker order was placed.',
+    `Candidate: ${candidate.id.slice(0, 8).toUpperCase()}`,
+  ]
+    .join('\n')
+    .slice(0, 4096);
+}
+
+function issueNotificationMatches(
+  event: { eventType: TradeEventType; data: Record<string, unknown> | null },
+  issue: CandidateAnalysisIssue,
+): boolean {
+  if (event.eventType !== TradeEventType.CANDIDATE_ANALYSIS_FAILED || !isRecord(event.data)) {
+    return false;
+  }
+  const stored = event.data.issue;
+  return isRecord(stored) && stored.kind === issue.kind && stored.code === issue.code;
+}
+
+function issueNotificationDelivery(
+  value: Record<string, unknown> | null | undefined,
+): { providerMessageId: string } | null {
+  if (!isRecord(value) || !isRecord(value.notification)) return null;
+  const providerMessageId = textValue(value.notification.providerMessageId);
+  const status = textValue(value.notification.deliveryStatus);
+  return status && status !== MessageDeliveryStatus.FAILED && providerMessageId
+    ? { providerMessageId }
+    : null;
+}
+
+function humanizeIssue(code: string): string {
+  return code
+    .replace(/^AI_/, 'AI ')
+    .replace(/^NEWS_/, 'news ')
+    .replaceAll('_', ' ')
+    .toLowerCase();
 }
 
 function existingNotification(candidate: TradeCandidate): CandidateNotificationResult | null {

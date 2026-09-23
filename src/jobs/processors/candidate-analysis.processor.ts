@@ -38,6 +38,18 @@ export class CandidateAnalysisProcessor extends WorkerHost {
     try {
       const result = await this.analysis.run(job.data.candidateId);
       await this.pipeline.recordCandidateSuccess(job.data.pipelineRunId, result);
+      if (result.analysisIssue) {
+        this.logger.warn(
+          {
+            event: 'daily_pipeline.analysis.degraded',
+            ...fields,
+            failureStage: result.analysisIssue.stage,
+            issueKind: result.analysisIssue.kind,
+            issueCode: result.analysisIssue.code,
+          },
+          'Candidate analysis completed with a user-notified issue',
+        );
+      }
       this.logger.log(
         {
           event: 'daily_pipeline.analysis.completed',

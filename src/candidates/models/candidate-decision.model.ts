@@ -28,9 +28,9 @@ export interface CandidateDecisionSnapshot {
   readonly reasons: readonly string[];
   readonly warnings: readonly string[];
   readonly aiRecommendation?: DeepReviewRecommendation;
-  readonly fastEvidenceHash: string;
+  readonly fastEvidenceHash?: string;
   readonly deepEvidenceHash?: string;
-  readonly routingVersion: string;
+  readonly routingVersion?: string;
   readonly decidedAt: string;
 }
 
