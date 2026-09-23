@@ -1,0 +1,7 @@
+export enum TradeStatus {
+  OPEN = 'OPEN',
+  PARTIALLY_CLOSED = 'PARTIALLY_CLOSED',
+  CLOSED = 'CLOSED',
+  STOPPED_OUT = 'STOPPED_OUT',
+  CANCELLED = 'CANCELLED',
+}
