@@ -1,0 +1,4 @@
+export enum StrategyName {
+  MOMENTUM_BREAKOUT = 'MOMENTUM_BREAKOUT',
+  TREND_PULLBACK = 'TREND_PULLBACK',
+}

@@ -1,0 +1,11 @@
+export enum CandidateStatus {
+  NEW = 'NEW',
+  ANALYZED = 'ANALYZED',
+  QUALIFIED = 'QUALIFIED',
+  WAIT = 'WAIT',
+  NOTIFIED = 'NOTIFIED',
+  ACCEPTED = 'ACCEPTED',
+  SKIPPED = 'SKIPPED',
+  EXPIRED = 'EXPIRED',
+  REJECTED = 'REJECTED',
+}

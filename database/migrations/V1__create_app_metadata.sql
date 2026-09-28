@@ -1,0 +1,7 @@
+CREATE TABLE app_metadata (
+    id UUID PRIMARY KEY,
+    key VARCHAR(255) NOT NULL UNIQUE,
+    value TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
