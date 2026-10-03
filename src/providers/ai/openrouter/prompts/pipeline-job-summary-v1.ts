@@ -1,6 +1,6 @@
 import { PipelineJobSummaryInput } from '../../models/pipeline-job-summary';
 
-export const PIPELINE_JOB_SUMMARY_PROMPT_VERSION = 'pipeline-job-summary-v1';
+export const PIPELINE_JOB_SUMMARY_PROMPT_VERSION = 'pipeline-job-summary-v2';
 // Some routed models consume part of this budget for reasoning before emitting
 // the small schema-bounded response. Keep the response itself capped at 600
 // characters in the JSON schema while allowing enough completion headroom.
@@ -8,8 +8,10 @@ export const PIPELINE_JOB_SUMMARY_MAX_OUTPUT_TOKENS = 1200;
 
 export const PIPELINE_JOB_SUMMARY_SYSTEM_PROMPT = `You summarize a completed Indian equity swing-trading scan.
 Use only the supplied facts. Write at most two short sentences suitable for WhatsApp.
-State the market regime and the scan funnel outcome. Do not invent causes, recommendations,
-trades, returns, or facts. Return only the requested JSON object.`;
+State the market regime and the scan funnel outcome. Distinguish shortlisted scanner setups from
+risk-approved candidates. If no candidates were created, explicitly say that no candidate alerts
+were produced. Do not invent causes, recommendations, trades, returns, or facts. Return only the
+requested JSON object.`;
 
 export function pipelineJobSummaryUserPrompt(
   input: PipelineJobSummaryInput,

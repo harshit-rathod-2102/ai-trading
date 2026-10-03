@@ -9,6 +9,7 @@ import { PortfolioRiskReaderService } from './portfolio-risk-reader.service';
 import { RiskCalculatorService } from './risk-calculator.service';
 import { elapsedMilliseconds, structuredError } from '../logging/logging.utils';
 
+/** Applies the active trading profile without allowing AI to influence position sizing. */
 @Injectable()
 export class RiskService {
   private readonly logger = new Logger(RiskService.name);
@@ -28,6 +29,7 @@ export class RiskService {
     return this.buildRiskPlan(this.toRiskSetup(record), evaluatedAt);
   }
 
+  /** Builds an explainable risk plan from one deterministic scanner setup. */
   async buildRiskPlan(setup: RiskSetup, evaluatedAt = new Date()): Promise<RiskPlanResult> {
     const startedAt = performance.now();
     try {

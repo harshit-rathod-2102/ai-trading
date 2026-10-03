@@ -29,6 +29,7 @@ interface RequestClaim {
   readonly requestExpiresAt: Date | null;
 }
 
+/** Resolves persisted Upstox credentials and the optional development fallback token. */
 @Injectable()
 export class UpstoxTokenService {
   private readonly logger = new Logger(UpstoxTokenService.name);
@@ -43,6 +44,7 @@ export class UpstoxTokenService {
     private readonly encryption: CredentialEncryptionService,
   ) {}
 
+  /** Returns a non-expired runtime token without exposing its value to logs. */
   async getValidAccessToken(): Promise<string> {
     const credential = await this.current();
     if (credential?.status === ProviderCredentialStatus.ACTIVE && credential.accessTokenEncrypted) {

@@ -43,6 +43,9 @@ export class MetaWhatsAppClient {
               statusCode: response.status,
               providerErrorCode: error.code,
               providerResponseCode: details.code,
+              providerResponseSubcode: details.subcode,
+              providerResponseType: details.type,
+              providerResponseMessage: details.message,
               retryable: error.retryable,
               attempt: attempt + 1,
               maxAttempts: this.config.maxRetries + 1,
@@ -156,16 +159,27 @@ async function parseResponse(response: Response): Promise<MetaSendMessageRespons
 interface ErrorDetails {
   readonly code?: number;
   readonly subcode?: number;
+  readonly type?: string;
+  readonly message?: string;
 }
 
 async function errorDetails(response: Response): Promise<ErrorDetails> {
   const text = (await response.text()).slice(0, 2000);
   try {
-    const parsed = JSON.parse(text) as { error?: { code?: unknown; error_subcode?: unknown } };
+    const parsed = JSON.parse(text) as {
+      error?: {
+        code?: unknown;
+        error_subcode?: unknown;
+        type?: unknown;
+        message?: unknown;
+      };
+    };
     return {
       code: typeof parsed.error?.code === 'number' ? parsed.error.code : undefined,
       subcode:
         typeof parsed.error?.error_subcode === 'number' ? parsed.error.error_subcode : undefined,
+      type: safeProviderDetail(parsed.error?.type),
+      message: safeProviderDetail(parsed.error?.message),
     };
   } catch {
     return {};
@@ -196,10 +210,18 @@ function mapHttpError(response: Response, details: ErrorDetails): ProviderError 
   const providerCodes = [details.code, details.subcode]
     .filter((value) => value !== undefined)
     .join('/');
+  const providerReason = details.message ? `: ${details.message}` : '';
   return new ProviderError(
-    `Meta WhatsApp rejected the message (HTTP ${response.status}${providerCodes ? `, code ${providerCodes}` : ''})`,
+    `Meta WhatsApp rejected the message (HTTP ${response.status}${providerCodes ? `, code ${providerCodes}` : ''})${providerReason}`,
     { provider: 'meta-whatsapp', code: ProviderErrorCode.REQUEST_REJECTED, retryable: false },
   );
+}
+
+function safeProviderDetail(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const normalized = value.trim().slice(0, 500);
+  if (!normalized) return undefined;
+  return normalized.replace(/\+?\d[\d\s-]{6,}\d/g, '[redacted]');
 }
 
 function shouldRetry(status: number): boolean {

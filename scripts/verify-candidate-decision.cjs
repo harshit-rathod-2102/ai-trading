@@ -105,7 +105,7 @@ async function main() {
         provider: 'verification',
         requestedModel: 'verification/deep',
         resolvedModel: 'verification/deep',
-        promptVersion: 'candidate-deep-review-v1',
+        promptVersion: 'candidate-deep-review-v2',
         routingVersion: 'ai-routing-v1',
         analyzedAt: new Date().toISOString(),
         structuredOutput: true,
@@ -235,7 +235,7 @@ async function main() {
     if (options.deepRecommendation) {
       const deep = deepResult(options.deepRecommendation);
       const deepHash = deepEvidenceHash(
-        candidate, companyName, fast, routing, 'candidate-deep-review-v1',
+        candidate, companyName, fast, routing, 'candidate-deep-review-v2',
       );
       aiAnalysis.deep = { ...deep, evidenceHash: deepHash };
     }

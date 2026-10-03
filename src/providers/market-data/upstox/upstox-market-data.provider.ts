@@ -38,6 +38,7 @@ interface UpstoxMarketTimingsResponse {
   readonly data?: unknown;
 }
 
+/** Upstox-backed implementation of the provider-neutral market-data contract. */
 @Injectable()
 export class UpstoxMarketDataProvider implements MarketDataProvider {
   readonly id = 'upstox';

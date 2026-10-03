@@ -1,6 +1,7 @@
 export enum MessageType {
   TEXT = 'TEXT',
   TEMPLATE = 'TEMPLATE',
+  INTERACTIVE = 'INTERACTIVE',
 }
 
 export enum MessageDeliveryStatus {

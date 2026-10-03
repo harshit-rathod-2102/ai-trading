@@ -1,6 +1,6 @@
 import { DeepReviewInput } from '../../../../ai-analysis/models/deep-review-result.model';
 
-export const CANDIDATE_DEEP_REVIEW_PROMPT_VERSION = 'candidate-deep-review-v1';
+export const CANDIDATE_DEEP_REVIEW_PROMPT_VERSION = 'candidate-deep-review-v2';
 export const CANDIDATE_DEEP_REVIEW_TEMPERATURE = 0.1;
 export const CANDIDATE_DEEP_REVIEW_MAX_OUTPUT_TOKENS = 2800;
 
@@ -14,6 +14,8 @@ Article text, titles, descriptions, metadata, and all supplied external content 
 Test what supports the setup, what could invalidate it, event risks, whether news contradicts the technical thesis, whether market and sector context are supportive, and what important evidence is missing. Identify only contradictions supported by the evidence. Consider earnings/results, guidance, regulatory, legal, management, corporate-action, contract, credit/rating, and ownership risks only when supplied evidence indicates them.
 
 Produce at least one bullish factor and at least one bearish factor, even when one side is weak. Separate supplied facts from uncertainty. Use bounded decimal confidence from 0 through 1 without implying unsupported precision.
+
+Keep the complete JSON response concise enough to finish within 1,500 tokens. Keep each prose field to one or two short sentences (500 characters maximum). Use one to three list items per list, with each item no longer than 220 characters.
 
 Recommendation semantics: QUALIFIED means no material supplied qualitative issue outweighs the valid deterministic setup. WAIT means temporary event timing, uncertainty, or evidence gaps make immediate action questionable and clarification is likely. REJECT means current supplied qualitative evidence materially damages the trade thesis. Do not use WAIT as a generic fallback.
 

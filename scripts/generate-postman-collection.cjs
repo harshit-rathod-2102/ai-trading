@@ -211,7 +211,7 @@ const collection = {
         description: 'Runs candidate-fast-triage-v1 against persisted evidence or reuses an identical evidence hash, then applies deterministic ai-routing-v1. It may select DEEP but does not execute DEEP or produce a final candidate decision.',
       }),
       request('Run or Reuse Candidate DEEP AI Review', 'POST', '/candidates/{{candidateId}}/ai/deep-review', {
-        description: 'Runs candidate-deep-review-v1 with the configured Nemotron model only when persisted routing selected DEEP. Reuses matching evidence/model results and does not transition candidate status.',
+        description: 'Runs candidate-deep-review-v2 with the configured DEEP model only when persisted routing selected DEEP. Reuses matching evidence/model results and does not transition candidate status.',
       }),
       request('Finalize Candidate Decision', 'POST', '/candidates/{{candidateId}}/finalize', {
         description: 'Derives QUALIFIED, WAIT, or REJECTED from persisted validated AI evidence. The request accepts no caller-supplied decision.',

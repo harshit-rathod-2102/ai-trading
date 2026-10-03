@@ -24,13 +24,14 @@ import {
 } from './utils/webhook-signature.util';
 
 export interface MetaWebhookResult {
-  readonly textMessagesAccepted: number;
+  readonly messagesAccepted: number;
   readonly duplicatesIgnored: number;
   readonly unauthorizedIgnored: number;
   readonly unsupportedIgnored: number;
   readonly statusesObserved: number;
 }
 
+/** Validates inbound Meta messages before routing them to application commands. */
 @Injectable()
 export class MetaWhatsAppWebhookService {
   private readonly logger = new Logger(MetaWhatsAppWebhookService.name);
@@ -101,7 +102,7 @@ export class MetaWhatsAppWebhookService {
 
   async process(payload: MetaWebhookDto): Promise<MetaWebhookResult> {
     const counts = {
-      textMessagesAccepted: 0,
+      messagesAccepted: 0,
       duplicatesIgnored: 0,
       unauthorizedIgnored: 0,
       unsupportedIgnored: 0,
@@ -141,7 +142,7 @@ export class MetaWhatsAppWebhookService {
         }
         if (!Array.isArray(value.messages)) continue;
         for (const raw of value.messages) {
-          if (!isRecord(raw) || raw.type !== 'text') {
+          if (!isRecord(raw) || !isSupportedInboundType(raw.type)) {
             counts.unsupportedIgnored += 1;
             this.logger.debug(
               {
@@ -204,7 +205,7 @@ export class MetaWhatsAppWebhookService {
               await this.redis.getClient().del(key);
               throw error;
             }
-            counts.textMessagesAccepted += 1;
+            counts.messagesAccepted += 1;
           } catch (error: unknown) {
             if (error instanceof ProviderError) {
               counts.unsupportedIgnored += 1;
@@ -275,6 +276,10 @@ export class MetaWhatsAppWebhookService {
     );
     return true;
   }
+}
+
+function isSupportedInboundType(value: unknown): value is 'text' | 'interactive' {
+  return value === 'text' || value === 'interactive';
 }
 
 function optionalString(value: unknown): string | undefined {

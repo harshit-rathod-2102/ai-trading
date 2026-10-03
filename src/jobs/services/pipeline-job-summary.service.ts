@@ -151,7 +151,10 @@ export class PipelineJobSummaryService {
       eligibleEquities: scan.eligibleUniverse,
       evaluatedEquities: scan.evaluatedSymbols,
       qualifiedSetups: scan.qualifiedSetups,
-      shortlistedCandidates: scan.shortlistedSetups,
+      shortlistedSetups: scan.shortlistedSetups,
+      candidatesCreated: run.candidatesCreated,
+      candidatesRiskRejected: run.candidatesRiskRejected,
+      candidateMessagesSent: run.notified,
     };
     let ai: PipelineJobSummaryResult | null = null;
     let aiWarning: string | null = null;
@@ -277,7 +280,10 @@ function buildMessage(summary: PipelineJobSummarySnapshot): string {
     `Eligible equities: ${summary.eligibleEquities}`,
     `Evaluated equities: ${summary.evaluatedEquities}`,
     `Qualified setups: ${summary.qualifiedSetups}`,
-    `Shortlisted candidates: ${summary.shortlistedCandidates}`,
+    `Shortlisted setups: ${summary.shortlistedSetups}`,
+    `Risk-approved candidates: ${summary.candidatesCreated}`,
+    `Risk-rejected setups: ${summary.candidatesRiskRejected}`,
+    `Candidate messages sent: ${summary.candidateMessagesSent}`,
     '',
     `AI summary${summary.aiGenerated ? '' : ' (fallback)'}:`,
     summary.aiSummary,
@@ -285,7 +291,7 @@ function buildMessage(summary: PipelineJobSummarySnapshot): string {
 }
 
 function factualFallback(input: PipelineJobSummaryInput): string {
-  return `${input.regime} regime with score ${input.regimeScore}. ${input.evaluatedEquities} equities were evaluated, producing ${input.qualifiedSetups} qualified setups and ${input.shortlistedCandidates} shortlisted candidates.`;
+  return `${input.regime} regime with score ${input.regimeScore}. ${input.evaluatedEquities} equities were evaluated, producing ${input.qualifiedSetups} qualified setups, ${input.shortlistedSetups} shortlisted setups, and ${input.candidatesCreated} risk-approved candidates; ${input.candidatesRiskRejected} setups were risk-rejected and ${input.candidateMessagesSent} candidate messages were sent.`;
 }
 
 function stale(updatedAt: Date): boolean {

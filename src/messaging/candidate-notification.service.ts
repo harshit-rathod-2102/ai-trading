@@ -215,8 +215,16 @@ export class CandidateNotificationService {
       const message = buildCandidateMessage(candidate, instrument?.name ?? null);
       const delivery = await this.messaging.sendMessage({
         recipient,
-        messageType: MessageType.TEXT,
-        text: message,
+        messageType: MessageType.INTERACTIVE,
+        body: message,
+        buttons: [
+          {
+            id: `BUY ${candidate.proposedEntry} ${candidate.suggestedQuantity}`,
+            title: 'Buy',
+          },
+          { id: 'SKIP', title: 'Skip' },
+        ],
+        footer: 'Records your decision. No broker order is placed.',
         metadata: { candidateId },
       });
       if (delivery.status === MessageDeliveryStatus.FAILED) {
@@ -233,7 +241,7 @@ export class CandidateNotificationService {
         providerMessageId: delivery.providerMessageId,
         deliveryStatus: delivery.status,
         providerSentAt: delivery.sentAt,
-        messageType: MessageType.TEXT,
+        messageType: MessageType.INTERACTIVE,
         recordedAt: recordedAt.toISOString(),
       };
       const result = await this.dataSource.transaction(async (manager) => {
@@ -387,15 +395,9 @@ export function buildCandidateMessage(
     '',
     `Candidate: ${candidate.id.slice(0, 8).toUpperCase()}`,
     '',
-    'Reply:',
-    `BUY ${candidate.proposedEntry} ${candidate.suggestedQuantity}`,
-    `BUY ${candidate.symbol} ${candidate.proposedEntry} ${candidate.suggestedQuantity}`,
-    'SKIP',
-    `SKIP ${candidate.symbol}`,
-    '',
-    'BUY records a manually executed trade. No broker order is placed.',
+    'Choose Buy or Skip below.',
   ];
-  return lines.join('\n').slice(0, 4096);
+  return lines.join('\n').slice(0, 1024);
 }
 
 export function buildCandidateAnalysisIssueMessage(
@@ -471,7 +473,7 @@ function existingNotification(candidate: TradeCandidate): CandidateNotificationR
     typeof value.provider !== 'string' ||
     typeof value.providerMessageId !== 'string' ||
     !Object.values(MessageDeliveryStatus).includes(value.deliveryStatus as MessageDeliveryStatus) ||
-    value.messageType !== MessageType.TEXT ||
+    (value.messageType !== MessageType.TEXT && value.messageType !== MessageType.INTERACTIVE) ||
     typeof value.recordedAt !== 'string' ||
     Number.isNaN(Date.parse(value.recordedAt)) ||
     (value.providerSentAt !== null && typeof value.providerSentAt !== 'string') ||

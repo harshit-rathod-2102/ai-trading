@@ -18,4 +18,17 @@ export interface TemplateOutboundMessage extends OutboundMessageBase {
   readonly templateVariables?: Readonly<Record<string, JsonPrimitive>>;
 }
 
-export type OutboundMessage = TextOutboundMessage | TemplateOutboundMessage;
+export interface InteractiveButton {
+  readonly id: string;
+  readonly title: string;
+}
+
+export interface InteractiveOutboundMessage extends OutboundMessageBase {
+  readonly messageType: MessageType.INTERACTIVE;
+  readonly body: string;
+  readonly buttons: readonly InteractiveButton[];
+  readonly footer?: string;
+}
+
+export type OutboundMessage =
+  TextOutboundMessage | TemplateOutboundMessage | InteractiveOutboundMessage;

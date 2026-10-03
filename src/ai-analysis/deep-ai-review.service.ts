@@ -14,7 +14,7 @@ import { Instrument } from '../instruments/entities/instrument.entity';
 import { elapsedMilliseconds, structuredError } from '../logging/logging.utils';
 import { AiProvider } from '../providers/ai/ai-provider.interface';
 import { AI_PROVIDER } from '../providers/ai/ai-provider.token';
-import { CANDIDATE_DEEP_REVIEW_PROMPT_VERSION } from '../providers/ai/openrouter/prompts/candidate-deep-review-v1';
+import { CANDIDATE_DEEP_REVIEW_PROMPT_VERSION } from '../providers/ai/openrouter/prompts/candidate-deep-review-v2';
 import { CANDIDATE_FAST_TRIAGE_PROMPT_VERSION } from '../providers/ai/openrouter/prompts/candidate-fast-triage-v1';
 import { ProviderError, ProviderErrorCode } from '../providers/provider-error';
 import { deepEvidenceHash, fastEvidenceHash } from './ai-evidence-hash';
@@ -46,6 +46,7 @@ interface DeepReviewContext {
   readonly requestedModel: string;
 }
 
+/** Runs the advisory DEEP review only after persisted routing requests escalation. */
 @Injectable()
 export class DeepAiReviewService {
   private readonly logger = new Logger(DeepAiReviewService.name);
@@ -62,6 +63,7 @@ export class DeepAiReviewService {
     private readonly config: ConfigService,
   ) {}
 
+  /** Coalesces concurrent DEEP requests for the same persisted candidate. */
   reviewCandidate(candidateId: string): Promise<DeepReviewExecutionResult> {
     const existing = this.inFlight.get(candidateId);
     if (existing) return existing;

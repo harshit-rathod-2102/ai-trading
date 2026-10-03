@@ -9,7 +9,10 @@ export interface PipelineJobSummaryInput {
   readonly eligibleEquities: number;
   readonly evaluatedEquities: number;
   readonly qualifiedSetups: number;
-  readonly shortlistedCandidates: number;
+  readonly shortlistedSetups: number;
+  readonly candidatesCreated: number;
+  readonly candidatesRiskRejected: number;
+  readonly candidateMessagesSent: number;
 }
 
 export interface PipelineJobSummaryResult {

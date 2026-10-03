@@ -65,6 +65,16 @@ async function main() {
       templateId: 'trade_candidate_alert',
       templateVariables: { symbol: 'RELIANCE', score: 88 },
     });
+    const interactiveResult = await provider.sendMessage({
+      recipient: '919999999999',
+      messageType: MessageType.INTERACTIVE,
+      body: 'RELIANCE\nChoose an action below.',
+      buttons: [
+        { id: 'BUY 2920 20', title: 'Buy' },
+        { id: 'SKIP', title: 'Skip' },
+      ],
+      footer: 'No broker order is placed.',
+    });
     assert.equal(requests[0].url, 'https://graph.example/v26.0/1234567890/messages');
     assert.equal(requests[0].options.headers.Authorization, 'Bearer verification-access-token');
     assert.equal(requests[0].body.type, 'text');
@@ -75,9 +85,17 @@ async function main() {
     assert.deepEqual(requests[1].body.template.components[0].parameters, [
       { type: 'text', text: 'RELIANCE' }, { type: 'text', text: '88' },
     ]);
+    assert.equal(requests[2].body.type, 'interactive');
+    assert.equal(requests[2].body.interactive.type, 'button');
+    assert.equal(requests[2].body.interactive.body.text, 'RELIANCE\nChoose an action below.');
+    assert.deepEqual(requests[2].body.interactive.action.buttons, [
+      { type: 'reply', reply: { id: 'BUY 2920 20', title: 'Buy' } },
+      { type: 'reply', reply: { id: 'SKIP', title: 'Skip' } },
+    ]);
     assert.equal(textResult.status, 'ACCEPTED');
     assert.equal(textResult.sentAt, null);
     assert.equal(templateResult.providerMessageId, 'wamid.2');
+    assert.equal(interactiveResult.providerMessageId, 'wamid.3');
 
     const rawBody = Buffer.from('{"object":"whatsapp_business_account"}');
     const signature = `sha256=${createHmac('sha256', config.appSecret).update(rawBody).digest('hex')}`;
@@ -103,6 +121,11 @@ async function main() {
         contacts: [{ profile: { name: 'Owner' }, wa_id: '919999999999' }],
         messages: [
           { from: '919999999999', id: 'wamid.inbound', timestamp: '1789305300', type: 'text', text: { body: 'BUY 2920 20' } },
+          {
+            from: '919999999999', id: 'wamid.button', timestamp: '1789305300', type: 'interactive',
+            context: { id: 'wamid.candidate-alert' },
+            interactive: { type: 'button_reply', button_reply: { id: 'SKIP', title: 'Skip' } },
+          },
           { from: '919999999999', id: 'wamid.image', timestamp: '1789305300', type: 'image', image: {} },
           { from: '918888888888', id: 'wamid.unauthorized', timestamp: '1789305300', type: 'text', text: { body: 'BUY 1 1' } },
         ],
@@ -111,12 +134,12 @@ async function main() {
     };
     const first = await webhook.process(payload);
     const replay = await webhook.process(payload);
-    assert.equal(first.textMessagesAccepted, 1);
+    assert.equal(first.messagesAccepted, 2);
     assert.equal(first.unauthorizedIgnored, 1);
     assert.equal(first.unsupportedIgnored, 1);
     assert.equal(first.statusesObserved, 1);
-    assert.equal(replay.duplicatesIgnored, 1);
-    assert.equal(handled.length, 1);
+    assert.equal(replay.duplicatesIgnored, 2);
+    assert.equal(handled.length, 2);
     assert.deepEqual(handled[0], {
       sender: '919999999999',
       text: 'BUY 2920 20',
@@ -127,6 +150,8 @@ async function main() {
         displayPhoneNumber: '15550001111', contactName: 'Owner',
       },
     });
+    assert.equal(handled[1].text, 'SKIP');
+    assert.equal(handled[1].replyToProviderMessageId, 'wamid.candidate-alert');
 
     for (const [status, code, ErrorType] of [
       [401, 190, ProviderAuthenticationError],

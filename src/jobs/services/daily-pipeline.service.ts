@@ -41,6 +41,7 @@ interface PipelineMetadata extends Record<string, unknown> {
   failureStageByCandidate?: Record<string, CandidateFailureStage>;
 }
 
+/** Coordinates the shared daily scan stages and independent candidate analysis jobs. */
 @Injectable()
 export class DailyPipelineService {
   private readonly logger = new Logger(DailyPipelineService.name);
@@ -60,6 +61,7 @@ export class DailyPipelineService {
     private readonly pipelineJobSummary: PipelineJobSummaryService,
   ) {}
 
+  /** Runs one market-date pipeline while preserving idempotent run ownership. */
   async run(data: PostMarketJobData, job?: Job): Promise<Record<string, unknown>> {
     const marketDate = data.marketDate as string;
     const universeCode = this.config.getOrThrow<string>('marketData.universe');

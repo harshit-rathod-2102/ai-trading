@@ -15,6 +15,7 @@ interface CachedSearch {
   readonly articles: readonly NewsArticle[];
 }
 
+/** GNews-backed implementation of the provider-neutral news contract. */
 @Injectable()
 export class GNewsProvider implements NewsProvider {
   private readonly logger = new Logger(GNewsProvider.name);

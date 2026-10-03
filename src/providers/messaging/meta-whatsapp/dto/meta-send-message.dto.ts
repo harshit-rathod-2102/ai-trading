@@ -23,4 +23,23 @@ export interface MetaTemplateMessageDto {
   };
 }
 
-export type MetaSendMessageDto = MetaTextMessageDto | MetaTemplateMessageDto;
+export interface MetaInteractiveMessageDto {
+  readonly messaging_product: 'whatsapp';
+  readonly recipient_type: 'individual';
+  readonly to: string;
+  readonly type: 'interactive';
+  readonly interactive: {
+    readonly type: 'button';
+    readonly body: { readonly text: string };
+    readonly action: {
+      readonly buttons: readonly {
+        readonly type: 'reply';
+        readonly reply: { readonly id: string; readonly title: string };
+      }[];
+    };
+    readonly footer?: { readonly text: string };
+  };
+}
+
+export type MetaSendMessageDto =
+  MetaTextMessageDto | MetaTemplateMessageDto | MetaInteractiveMessageDto;

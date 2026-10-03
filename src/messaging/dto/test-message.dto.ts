@@ -1,4 +1,4 @@
-import { IsEnum, IsObject, IsOptional, IsString, ValidateIf } from 'class-validator';
+import { IsIn, IsObject, IsOptional, IsString, ValidateIf } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { JsonPrimitive } from '../../common/types/json-value';
 import { MessageType } from '../../providers/messaging/models/message.enums';
@@ -11,9 +11,9 @@ export class TestMessageDto {
   @IsString()
   recipient!: string;
 
-  @ApiProperty({ enum: MessageType })
-  @IsEnum(MessageType)
-  messageType!: MessageType;
+  @ApiProperty({ enum: [MessageType.TEXT, MessageType.TEMPLATE] })
+  @IsIn([MessageType.TEXT, MessageType.TEMPLATE])
+  messageType!: MessageType.TEXT | MessageType.TEMPLATE;
 
   @ApiPropertyOptional({ example: 'Swagger development test message' })
   @ValidateIf((value) => value.messageType === MessageType.TEXT)

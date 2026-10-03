@@ -10,6 +10,7 @@ import { META_WHATSAPP_CONFIG, MetaWhatsAppConfig } from './meta-whatsapp.config
 import { elapsedMilliseconds, structuredError } from '../../../logging/logging.utils';
 import { ProviderError } from '../../provider-error';
 
+/** Sends application messages through Meta WhatsApp Cloud API. */
 @Injectable()
 export class MetaWhatsAppProvider implements MessagingProvider {
   private readonly logger = new Logger(MetaWhatsAppProvider.name);

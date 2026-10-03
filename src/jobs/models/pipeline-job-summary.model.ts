@@ -1,4 +1,4 @@
-export const PIPELINE_JOB_SUMMARY_VERSION = 'pipeline-job-summary-v2';
+export const PIPELINE_JOB_SUMMARY_VERSION = 'pipeline-job-summary-v3';
 
 export interface PipelineJobSummaryDispatch {
   readonly jobId: string;
@@ -21,7 +21,10 @@ export interface PipelineJobSummarySnapshot {
   readonly eligibleEquities: number;
   readonly evaluatedEquities: number;
   readonly qualifiedSetups: number;
-  readonly shortlistedCandidates: number;
+  readonly shortlistedSetups: number;
+  readonly candidatesCreated: number;
+  readonly candidatesRiskRejected: number;
+  readonly candidateMessagesSent: number;
   readonly aiSummary: string;
   readonly aiGenerated: boolean;
   readonly aiWarning: string | null;

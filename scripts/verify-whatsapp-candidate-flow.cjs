@@ -21,7 +21,7 @@ async function main() {
   const { Trade } = require('../dist/trades/entities/trade.entity');
   const { CandidateStatus } = require('../dist/common/enums/candidate-status.enum');
   const { InstrumentType } = require('../dist/common/enums/instrument-type.enum');
-  const { MessageDeliveryStatus } = require('../dist/providers/messaging/models/message.enums');
+  const { MessageDeliveryStatus, MessageType } = require('../dist/providers/messaging/models/message.enums');
   const { ProviderUnavailableError } = require('../dist/providers/provider-error');
   const { parseWhatsAppCommand } = require('../dist/messaging/command-parser');
 
@@ -157,7 +157,7 @@ async function main() {
     };
   }
 
-  function webhookPayload(message) {
+  function webhookPayload(message, messageType = 'text') {
     return {
       object: 'whatsapp_business_account',
       entry: [{ changes: [{ field: 'messages', value: {
@@ -167,10 +167,17 @@ async function main() {
           from: message.sender,
           id: message.providerMessageId,
           timestamp: String(Math.floor(Date.now() / 1000)),
-          type: 'text',
+          type: messageType,
           ...(message.replyToProviderMessageId
             ? { context: { id: message.replyToProviderMessageId } } : {}),
-          text: { body: message.text },
+          ...(messageType === 'interactive'
+            ? {
+                interactive: {
+                  type: 'button_reply',
+                  button_reply: { id: message.text, title: 'Verification action' },
+                },
+              }
+            : { text: { body: message.text } }),
         }],
       } }] }],
     };
@@ -190,10 +197,15 @@ async function main() {
     assert.equal(notification.body.newStatus, CandidateStatus.NOTIFIED);
     assert.equal(outbound.length, beforeNotificationCalls + 1);
     const alert = outbound.at(-1);
-    assert.match(alert.text, new RegExp(notifiedCandidate.symbol));
-    assert.match(alert.text, /Entry: ₹2920\.0000/);
-    assert.match(alert.text, /No broker order is placed/);
-    assert.ok(alert.text.length < 4096);
+    assert.equal(alert.messageType, MessageType.INTERACTIVE);
+    assert.match(alert.body, new RegExp(notifiedCandidate.symbol));
+    assert.match(alert.body, /Entry: ₹2920\.0000/);
+    assert.match(alert.footer, /No broker order is placed/);
+    assert.deepEqual(alert.buttons, [
+      { id: 'BUY 2920.0000 33', title: 'Buy' },
+      { id: 'SKIP', title: 'Skip' },
+    ]);
+    assert.ok(alert.body.length <= 1024);
     const notifiedPersisted = await candidateRepository.findOneByOrFail({ id: notifiedCandidate.id });
     assert.equal(notifiedPersisted.status, CandidateStatus.NOTIFIED);
     assert.equal(notifiedPersisted.notificationProviderMessageId, notification.body.providerMessageId);
@@ -330,7 +342,7 @@ async function main() {
     const outboundBeforeWebhook = outbound.length;
     const firstWebhook = await webhook.process(webhookPayload(duplicateInbound));
     const secondWebhook = await webhook.process(webhookPayload(duplicateInbound));
-    assert.equal(firstWebhook.textMessagesAccepted, 1);
+    assert.equal(firstWebhook.messagesAccepted, 1);
     assert.equal(secondWebhook.duplicatesIgnored, 1);
     assert.equal(outbound.length, outboundBeforeWebhook + 1);
     assert.equal(await tradeRepository.countBy({ candidateId: dedupCandidate.id }), 1);
@@ -339,7 +351,18 @@ async function main() {
        WHERE candidate_id=$1 AND event_type='TRADE_OPENED'`, [dedupCandidate.id],
     ))[0].count, 1);
 
-    // I: SKIP uses CandidatesService and records WHATSAPP as the source.
+    // I: an interactive reply resolves its originating candidate and records the same manual BUY.
+    const buttonCandidate = await createCandidate('BUTTONBUY');
+    const buttonNotification = await notificationService.notifyCandidate(buttonCandidate.id);
+    const buttonClick = inbound('BUY 2925 10', {
+      providerMessageId: `wamid.verify.button.${randomUUID()}`,
+      replyToProviderMessageId: buttonNotification.providerMessageId,
+    });
+    const buttonResult = await webhook.process(webhookPayload(buttonClick, 'interactive'));
+    assert.equal(buttonResult.messagesAccepted, 1);
+    assert.equal(await tradeRepository.countBy({ candidateId: buttonCandidate.id }), 1);
+
+    // J: SKIP uses CandidatesService and records WHATSAPP as the source.
     const skipCandidate = await createCandidate('SKIPME');
     const skipped = await commandService.handle(inbound(`SKIP ${skipCandidate.symbol}`));
     assert.equal(skipped.success, true);
@@ -358,7 +381,7 @@ async function main() {
        WHERE candidate_id=$1 AND event_type='CANDIDATE_SKIPPED'`, [skipCandidate.id],
     ))[0].count, 1);
 
-    // J: bare SKIP never guesses while several candidates are actionable.
+    // K: bare SKIP never guesses while several candidates are actionable.
     const ambiguousOne = await createCandidate('AMBIGA');
     const ambiguousTwo = await createCandidate('AMBIGB');
     const ambiguous = await commandService.handle(inbound('SKIP'));
@@ -368,7 +391,7 @@ async function main() {
     assert.equal((await candidateRepository.findOneByOrFail({ id: ambiguousTwo.id })).status,
       CandidateStatus.QUALIFIED);
 
-    // K: unauthorized webhook sender never reaches command/business services.
+    // L: unauthorized webhook sender never reaches command/business services.
     const unauthorizedTarget = await createCandidate('UNAUTH');
     const unauthorized = inbound(`SKIP ${unauthorizedTarget.symbol}`, {
       sender: '918888888888', providerMessageId: `wamid.verify.unauthorized.${randomUUID()}`,
@@ -380,7 +403,7 @@ async function main() {
     assert.equal((await candidateRepository.findOneByOrFail({ id: unauthorizedTarget.id })).status,
       CandidateStatus.QUALIFIED);
 
-    // L: malformed BUY receives concise usage help and changes no state.
+    // M: malformed BUY receives concise usage help and changes no state.
     const invalid = await commandService.handle(inbound('BUY not-a-price 3'));
     assert.equal(invalid.errorCode, 'INVALID_BUY_PRICE');
     assert.match(invalid.responseText, /BUY <price> <qty>/);
@@ -390,7 +413,7 @@ async function main() {
     assert.match(status.responseText, /Qualified candidates awaiting decision/);
     assert.match(status.responseText, /Open tracked trades/);
 
-    console.log('PASS: WhatsApp candidate delivery and command scenarios A-L, STATUS, parser, sender auth, and Redis deduplication.');
+    console.log('PASS: WhatsApp candidate delivery, interactive buttons, commands, sender auth, and Redis deduplication.');
   } finally {
     for (const key of dedupKeys) await redis.getClient().del(key);
     if (candidateIds.length) {

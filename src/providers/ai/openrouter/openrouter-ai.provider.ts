@@ -41,7 +41,7 @@ import {
   CANDIDATE_DEEP_REVIEW_SYSTEM_PROMPT,
   CANDIDATE_DEEP_REVIEW_TEMPERATURE,
   candidateDeepReviewUserPrompt,
-} from './prompts/candidate-deep-review-v1';
+} from './prompts/candidate-deep-review-v2';
 import { CANDIDATE_DEEP_REVIEW_SCHEMA } from './prompts/candidate-deep-review.schema';
 import { PipelineJobSummaryInput, PipelineJobSummaryResult } from '../models/pipeline-job-summary';
 import {
@@ -68,6 +68,7 @@ interface CachedDeepReview {
   readonly result: DeepReviewResult;
 }
 
+/** OpenRouter adapter for advisory FAST, DEEP, and pipeline-summary analysis. */
 @Injectable()
 export class OpenRouterAiProvider implements AiProvider {
   private readonly logger = new Logger(OpenRouterAiProvider.name);
@@ -390,13 +391,46 @@ export class OpenRouterAiProvider implements AiProvider {
         );
       }
 
-      const result = mapOpenRouterDeepReview(response, {
+      const mapperContext = {
         requestedModel,
         promptVersion: options.promptVersion,
         routingVersion: input.routingDecision.version,
         analyzedAt: new Date().toISOString(),
         structuredOutput,
-      });
+      };
+      let result: DeepReviewResult;
+      try {
+        result = mapOpenRouterDeepReview(response, mapperContext);
+      } catch (error: unknown) {
+        if (
+          !structuredOutput ||
+          !(error instanceof ProviderError) ||
+          error.code !== ProviderErrorCode.INVALID_RESPONSE
+        ) {
+          throw error;
+        }
+        structuredOutput = false;
+        this.logger.warn(
+          {
+            event: 'provider.request.retrying',
+            ...fields,
+            attempt: 2,
+            maxAttempts: 2,
+            reason: 'invalid_structured_output',
+            ...deepResponseDiagnostics(response),
+          },
+          'OpenRouter DEEP review is retrying without structured output',
+        );
+        response = await this.client.createChatCompletion(
+          this.deepRequest(input, requestedModel, false),
+          context,
+        );
+        result = mapOpenRouterDeepReview(response, {
+          ...mapperContext,
+          analyzedAt: new Date().toISOString(),
+          structuredOutput,
+        });
+      }
       if (!options.bypassCache) this.rememberDeep(cacheKey, result);
       this.logger.debug(
         {
@@ -605,6 +639,33 @@ export class OpenRouterAiProvider implements AiProvider {
     }
     this.deepCache.set(key, { expiresAt: Date.now() + this.config.cacheTtlMs, result });
   }
+}
+
+function deepResponseDiagnostics(response: unknown): Readonly<Record<string, unknown>> {
+  if (typeof response !== 'object' || response === null || Array.isArray(response)) {
+    return { responseShape: 'invalid' };
+  }
+  const value = response as Record<string, unknown>;
+  const choices = value.choices;
+  const firstChoice = Array.isArray(choices) ? choices[0] : undefined;
+  const choice =
+    typeof firstChoice === 'object' && firstChoice !== null && !Array.isArray(firstChoice)
+      ? (firstChoice as Record<string, unknown>)
+      : undefined;
+  const rawMessage = choice?.message;
+  const message =
+    typeof rawMessage === 'object' && rawMessage !== null && !Array.isArray(rawMessage)
+      ? (rawMessage as Record<string, unknown>)
+      : undefined;
+  const content = message?.content;
+  return {
+    responseModelPresent: typeof value.model === 'string' && value.model.trim().length > 0,
+    choiceCount: Array.isArray(choices) ? choices.length : undefined,
+    finishReason: choice?.finish_reason,
+    contentType: content === null ? 'null' : typeof content,
+    contentLength: typeof content === 'string' ? content.length : undefined,
+    reasoningPresent: message?.reasoning !== undefined && message.reasoning !== null,
+  };
 }
 
 function validateInput(input: CandidateAnalysisInput): void {

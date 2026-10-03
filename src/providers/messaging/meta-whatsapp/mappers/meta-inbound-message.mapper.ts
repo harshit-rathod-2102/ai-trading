@@ -17,9 +17,7 @@ export function mapMetaInboundMessage(
   if (!isRecord(value)) throw invalid('Meta WhatsApp inbound message is invalid');
   const providerMessageId = requiredString(value.id, 'message ID');
   const sender = normalizePhoneNumber(value.from, 'Inbound sender');
-  if (value.type !== 'text') throw invalid('Meta WhatsApp inbound message is not text');
-  if (!isRecord(value.text)) throw invalid('Meta WhatsApp inbound text object is missing');
-  const text = requiredString(value.text.body, 'message text');
+  const text = inboundCommand(value);
   const timestamp = requiredString(value.timestamp, 'message timestamp');
   if (!/^\d+$/.test(timestamp)) throw invalid('Meta WhatsApp message timestamp is invalid');
   const receivedAt = new Date(Number(timestamp) * 1000);
@@ -31,7 +29,7 @@ export function mapMetaInboundMessage(
     : undefined;
   const metadata: JsonObject = {
     provider: 'meta-whatsapp',
-    messageType: 'text',
+    messageType: value.type === 'interactive' ? 'interactive' : 'text',
     ...(context.phoneNumberId ? { phoneNumberId: context.phoneNumberId } : {}),
     ...(context.displayPhoneNumber ? { displayPhoneNumber: context.displayPhoneNumber } : {}),
     ...(context.contactName ? { contactName: context.contactName } : {}),
@@ -45,6 +43,23 @@ export function mapMetaInboundMessage(
     receivedAt: receivedAt.toISOString(),
     metadata,
   };
+}
+
+function inboundCommand(value: MetaWebhookMessageDto): string {
+  if (value.type === 'text') {
+    if (!isRecord(value.text)) throw invalid('Meta WhatsApp inbound text object is missing');
+    return requiredString(value.text.body, 'message text');
+  }
+  if (value.type === 'interactive') {
+    if (!isRecord(value.interactive) || value.interactive.type !== 'button_reply') {
+      throw invalid('Meta WhatsApp interactive message is not a button reply');
+    }
+    if (!isRecord(value.interactive.button_reply)) {
+      throw invalid('Meta WhatsApp button reply object is missing');
+    }
+    return requiredString(value.interactive.button_reply.id, 'button reply ID');
+  }
+  throw invalid('Meta WhatsApp inbound message type is unsupported');
 }
 
 function optionalString(value: unknown): string | undefined {

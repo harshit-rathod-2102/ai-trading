@@ -42,6 +42,7 @@ interface CandidateContext {
   readonly evidenceHash: string;
 }
 
+/** Runs advisory FAST analysis and persists its deterministic routing decision. */
 @Injectable()
 export class AiTriageService {
   private readonly logger = new Logger(AiTriageService.name);
@@ -59,6 +60,7 @@ export class AiTriageService {
     private readonly config: ConfigService,
   ) {}
 
+  /** Coalesces concurrent FAST requests for the same persisted candidate. */
   triageCandidate(candidateId: string): Promise<AiTriageExecutionResult> {
     const existing = this.inFlight.get(candidateId);
     if (existing) return existing;

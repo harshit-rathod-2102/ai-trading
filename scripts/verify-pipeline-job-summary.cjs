@@ -31,13 +31,17 @@ async function main() {
     summarizePipelineJob: async (input) => {
       aiCalls += 1;
       assert.deepEqual(input.indexSymbols, ['NIFTY50', 'INDIAVIX']);
+      assert.equal(input.shortlistedSetups, 1);
+      assert.equal(input.candidatesCreated, 0);
+      assert.equal(input.candidatesRiskRejected, 1);
+      assert.equal(input.candidateMessagesSent, 0);
       return {
         summary:
-          'The market regime was bearish, and the scan produced two qualified setups from ten evaluated equities.',
+          'The market regime was bearish. One setup was shortlisted but risk-rejected, so no candidate alerts were produced.',
         provider: 'openrouter',
         requestedModel: 'fast-model',
         resolvedModel: 'resolved-model',
-        promptVersion: 'pipeline-job-summary-v1',
+        promptVersion: 'pipeline-job-summary-v2',
         requestId: 'ai-request-1',
       };
     },
@@ -74,7 +78,10 @@ async function main() {
     'Eligible equities: 10',
     'Evaluated equities: 10',
     'Qualified setups: 2',
-    'Shortlisted candidates: 1',
+    'Shortlisted setups: 1',
+    'Risk-approved candidates: 0',
+    'Risk-rejected setups: 1',
+    'Candidate messages sent: 0',
     'AI summary:',
   ]) {
     assert.ok(messages[0].text.includes(expected), `message is missing ${expected}`);
@@ -126,7 +133,7 @@ async function main() {
           provider: 'openrouter',
           requestedModel: 'fast-model',
           resolvedModel: 'resolved-model',
-          promptVersion: 'pipeline-job-summary-v1',
+          promptVersion: 'pipeline-job-summary-v2',
         };
       },
     },
@@ -174,6 +181,9 @@ function pipelineRun(id, scannerRunId) {
     triggerSource: 'MANUAL',
     startedAt: new Date('2026-09-21T05:15:00.000Z'),
     completedAt: new Date('2026-09-21T05:20:00.000Z'),
+    candidatesCreated: 0,
+    candidatesRiskRejected: 1,
+    notified: 0,
     metadata: { marketData: { requiredBenchmarks: ['NIFTY50', 'INDIAVIX'] } },
   };
 }

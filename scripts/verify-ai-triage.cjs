@@ -32,7 +32,7 @@ async function main() {
   const config = context.get(ConfigService);
   const candidates = dataSource.getRepository(TradeCandidate);
   const instruments = dataSource.getRepository(Instrument);
-  assert.equal(config.get('openrouter.deepModel'), 'nvidia/nemotron-3-ultra-550b-a55b:free');
+  assert.equal(config.get('openrouter.deepModel'), 'dots-studio/dots-3-note-preview:free');
   assert.equal(config.get('aiRouting.topRankThreshold'), 3);
   const runId = randomUUID();
   const candidateIds = [];
@@ -46,7 +46,7 @@ async function main() {
     triageCandidate: async (input, options) => {
       providerCalls += 1;
       assert.equal(options.tier, AiAnalysisTier.FAST);
-      assert.equal(options.promptVersion, 'candidate-fast-triage-v1');
+      assert.equal(options.promptVersion, 'candidate-fast-triage-v3');
       if (input.symbol.startsWith('TIME')) throw new ProviderTimeoutError('verification');
       if (options.tier === AiAnalysisTier.DEEP) deepCalls += 1;
       const highEvent = input.symbol.startsWith('EVENT');
@@ -186,10 +186,10 @@ async function main() {
   try {
     await dataSource.query(
       `INSERT INTO scan_runs (
-        id, market_date, scanner_version, status, market_regime_snapshot,
+        id, market_date, universe_code, execution_key, scanner_version, status, market_regime_snapshot,
         total_universe, eligible_universe, evaluated_symbols, qualified_setups,
         shortlisted_setups, started_at, completed_at
-      ) VALUES ($1,CURRENT_DATE,$2,'SUCCESS',$3,20,20,20,10,7,NOW(),NOW())`,
+      ) VALUES ($1::uuid,CURRENT_DATE,'verification-universe',CONCAT('verification:', $1::text),$2,'SUCCESS',$3,20,20,20,10,7,NOW(),NOW())`,
       [runId, `verify-${randomUUID().slice(0, 8)}`, { version: 'market-regime-v1', regime: 'BULLISH' }],
     );
 
@@ -241,7 +241,7 @@ async function main() {
     assert.equal((await candidates.findOneByOrFail({ id: timeoutId })).aiAnalysis, null);
 
     // G: malformed JSON and malformed fields are rejected by the adapter mapper.
-    const mapperContext = { requestedModel: 'verification/fast', promptVersion: 'candidate-fast-triage-v1',
+    const mapperContext = { requestedModel: 'verification/fast', promptVersion: 'candidate-fast-triage-v3',
       analyzedAt: new Date().toISOString(), structuredOutput: true };
     assert.throws(() => mapOpenRouterFastTriage({ model: 'resolved', choices: [{ finish_reason: 'stop',
       message: { content: '{bad json' } }] }, mapperContext),
@@ -266,7 +266,7 @@ async function main() {
     const adapterConfig = {
       apiKey: 'verification-key', baseUrl: 'https://openrouter.example/api/v1',
       model: 'legacy/model', fastModel: 'verification/fast-model',
-      deepModel: 'nvidia/nemotron-3-ultra-550b-a55b:free', httpTimeoutMs: 1000,
+      deepModel: 'openrouter/free', httpTimeoutMs: 1000,
       appName: 'verification', siteUrl: null, maxRetries: 0,
       retryBaseDelayMs: 1, cacheTtlMs: 0,
     };
@@ -278,7 +278,7 @@ async function main() {
     } }, adapterConfig);
     const adapterResult = await adapter.triageCandidate(adapterInput, {
       tier: AiAnalysisTier.FAST, requestedModel: adapterConfig.fastModel,
-      promptVersion: 'candidate-fast-triage-v1',
+      promptVersion: 'candidate-fast-triage-v3',
     });
     assert.equal(adapterBodies[0].model, adapterConfig.fastModel);
     assert.equal(adapterBodies[0].temperature, 0.1);
@@ -300,7 +300,7 @@ async function main() {
     const fallbackResult = await fallbackAdapter.triageCandidate(
       { ...adapterInput, symbol: 'FALLBACK' },
       { tier: AiAnalysisTier.FAST, requestedModel: adapterConfig.fastModel,
-        promptVersion: 'candidate-fast-triage-v1' },
+        promptVersion: 'candidate-fast-triage-v3' },
     );
     assert.equal(fallbackCalls, 2);
     assert.equal(fallbackBodies[1].response_format, undefined);

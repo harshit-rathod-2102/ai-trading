@@ -24,6 +24,7 @@ import {
   CandidateOrchestrationResult,
 } from './models/candidate-orchestration-result.model';
 
+/** Converts one persisted scanner result into an idempotent, risk-approved candidate. */
 @Injectable()
 export class CandidateOrchestrationService {
   private readonly logger = new Logger(CandidateOrchestrationService.name);
@@ -38,6 +39,7 @@ export class CandidateOrchestrationService {
     private readonly journal: JournalService,
   ) {}
 
+  /** Snapshots scanner and risk evidence before any news or AI enrichment begins. */
   async createFromScanResult(
     scanResultId: string,
     evaluatedAt = new Date(),

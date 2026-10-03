@@ -5,6 +5,11 @@ import { TriageRiskLevel } from '../../../../ai-analysis/models/fast-triage-resu
 import { JsonObject } from '../../../../common/types/json-value';
 import { ProviderError, ProviderErrorCode } from '../../../provider-error';
 import {
+  DEEP_REVIEW_LIST_ITEM_MAX_LENGTH,
+  DEEP_REVIEW_LIST_MAX_ITEMS,
+  DEEP_REVIEW_TEXT_MAX_LENGTH,
+} from '../prompts/candidate-deep-review.schema';
+import {
   OpenRouterChatResponseDto,
   OpenRouterChoiceDto,
   OpenRouterMessageDto,
@@ -46,16 +51,15 @@ export function mapOpenRouterDeepReview(
 ): DeepReviewResult {
   const responseRecord = record(response, 'response');
   const id = optionalString(responseRecord.id, 'response id');
-  const resolvedModel = requiredString(responseRecord.model, 'resolved model', 200);
+  // The free router can omit its selected downstream model. The requested route
+  // remains useful audit metadata; the response content is still fully validated.
+  const resolvedModel =
+    optionalString(responseRecord.model, 'resolved model') ?? context.requestedModel;
   const choices = responseRecord.choices;
   if (!Array.isArray(choices) || choices.length === 0)
     throw invalid('OpenRouter response has no choices');
   const choice = record(choices[0] as OpenRouterChoiceDto, 'first choice');
-  if (
-    choice.finish_reason !== undefined &&
-    choice.finish_reason !== null &&
-    choice.finish_reason !== 'stop'
-  ) {
+  if (!completedOrStructurallyValidLength(choice.finish_reason)) {
     throw invalid(
       `OpenRouter DEEP review did not finish normally: ${String(choice.finish_reason)}`,
     );
@@ -83,19 +87,27 @@ export function mapOpenRouterDeepReview(
     eventRisk: risk(value.eventRisk, 'eventRisk'),
     uncertainty: risk(value.uncertainty, 'uncertainty'),
     confidence: confidenceString(value.confidence),
-    marketContextSummary: requiredString(value.marketContextSummary, 'marketContextSummary', 3000),
-    sectorContextSummary: requiredString(value.sectorContextSummary, 'sectorContextSummary', 3000),
-    newsSummary: requiredString(value.newsSummary, 'newsSummary', 3000),
+    marketContextSummary: requiredString(
+      value.marketContextSummary,
+      'marketContextSummary',
+      DEEP_REVIEW_TEXT_MAX_LENGTH,
+    ),
+    sectorContextSummary: requiredString(
+      value.sectorContextSummary,
+      'sectorContextSummary',
+      DEEP_REVIEW_TEXT_MAX_LENGTH,
+    ),
+    newsSummary: requiredString(value.newsSummary, 'newsSummary', DEEP_REVIEW_TEXT_MAX_LENGTH),
     bullishFactors: stringList(value.bullishFactors, 'bullishFactors', true),
     bearishFactors: stringList(value.bearishFactors, 'bearishFactors', true),
     contradictions: stringList(value.contradictions, 'contradictions'),
     redFlags: stringList(value.redFlags, 'redFlags'),
     missingEvidence: stringList(value.missingEvidence, 'missingEvidence'),
-    thesis: requiredString(value.thesis, 'thesis', 3000),
+    thesis: requiredString(value.thesis, 'thesis', DEEP_REVIEW_TEXT_MAX_LENGTH),
     invalidationConcerns: stringList(value.invalidationConcerns, 'invalidationConcerns'),
     recommendation: recommendation(value.recommendation),
     recommendationReasons: stringList(value.recommendationReasons, 'recommendationReasons', true),
-    summary: requiredString(value.summary, 'summary', 3000),
+    summary: requiredString(value.summary, 'summary', DEEP_REVIEW_TEXT_MAX_LENGTH),
     modelMetadata: {
       analysisTier: AiAnalysisTier.DEEP,
       provider: 'openrouter',
@@ -132,10 +144,25 @@ function optionalString(value: unknown, field: string): string | null {
 }
 
 function stringList(value: unknown, field: string, nonEmpty = false): readonly string[] {
-  if (!Array.isArray(value) || value.length > 20 || (nonEmpty && value.length === 0)) {
+  if (
+    !Array.isArray(value) ||
+    value.length > DEEP_REVIEW_LIST_MAX_ITEMS ||
+    (nonEmpty && value.length === 0)
+  ) {
     throw invalid(`OpenRouter ${field} is invalid`);
   }
-  return value.map((item, index) => requiredString(item, `${field}[${index}]`, 800));
+  return value.map((item, index) =>
+    requiredString(item, `${field}[${index}]`, DEEP_REVIEW_LIST_ITEM_MAX_LENGTH),
+  );
+}
+
+function completedOrStructurallyValidLength(finishReason: unknown): boolean {
+  return (
+    finishReason === undefined ||
+    finishReason === null ||
+    finishReason === 'stop' ||
+    finishReason === 'length'
+  );
 }
 
 function risk(value: unknown, field: string): TriageRiskLevel {

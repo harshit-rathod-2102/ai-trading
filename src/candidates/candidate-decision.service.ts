@@ -14,7 +14,7 @@ import { TradeEventType } from '../common/enums/trade-event-type.enum';
 import { elapsedMilliseconds, structuredError } from '../logging/logging.utils';
 import { Instrument } from '../instruments/entities/instrument.entity';
 import { JournalService } from '../journal/journal.service';
-import { CANDIDATE_DEEP_REVIEW_PROMPT_VERSION } from '../providers/ai/openrouter/prompts/candidate-deep-review-v1';
+import { CANDIDATE_DEEP_REVIEW_PROMPT_VERSION } from '../providers/ai/openrouter/prompts/candidate-deep-review-v2';
 import { CANDIDATE_FAST_TRIAGE_PROMPT_VERSION } from '../providers/ai/openrouter/prompts/candidate-fast-triage-v1';
 import { TradeCandidate } from './entities/trade-candidate.entity';
 import {
@@ -41,6 +41,7 @@ interface DecisionLogContext {
   previousStatus?: CandidateStatus;
 }
 
+/** Commits the application-owned deterministic decision for a trading candidate. */
 @Injectable()
 export class CandidateDecisionService {
   private readonly logger = new Logger(CandidateDecisionService.name);
@@ -50,6 +51,9 @@ export class CandidateDecisionService {
     private readonly journal: JournalService,
   ) {}
 
+  /**
+   * Qualifies a complete deterministic setup; news and AI remain advisory in V1.
+   */
   async finalizeCandidate(candidateId: string): Promise<CandidateDecisionResult> {
     const startedAt = performance.now();
     const context: DecisionLogContext = {};

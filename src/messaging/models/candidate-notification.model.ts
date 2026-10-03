@@ -9,7 +9,7 @@ export interface CandidateNotificationSnapshot {
   readonly providerMessageId: string;
   readonly deliveryStatus: MessageDeliveryStatus;
   readonly providerSentAt: string | null;
-  readonly messageType: MessageType.TEXT;
+  readonly messageType: MessageType.TEXT | MessageType.INTERACTIVE;
   readonly recordedAt: string;
 }
 

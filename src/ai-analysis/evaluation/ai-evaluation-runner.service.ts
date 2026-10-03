@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { CANDIDATE_DEEP_REVIEW_PROMPT_VERSION } from '../../providers/ai/openrouter/prompts/candidate-deep-review-v1';
+import { CANDIDATE_DEEP_REVIEW_PROMPT_VERSION } from '../../providers/ai/openrouter/prompts/candidate-deep-review-v2';
 import { CANDIDATE_FAST_TRIAGE_PROMPT_VERSION } from '../../providers/ai/openrouter/prompts/candidate-fast-triage-v1';
 import { ProviderError, ProviderErrorCode } from '../../providers/provider-error';
 import { buildDeepReviewInput, buildFastTriageInput } from '../ai-evidence-builder';

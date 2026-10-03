@@ -50,6 +50,7 @@ interface SummaryClaim {
   readonly reused: boolean;
 }
 
+/** Builds and delivers an end-of-day report from persisted trading state. */
 @Injectable()
 export class DailySummaryService {
   private readonly logger = new Logger(DailySummaryService.name);
@@ -216,6 +217,7 @@ export class DailySummaryService {
     }
   }
 
+  /** Sends one idempotent WhatsApp summary for the requested NSE market date. */
   async sendSummary(marketDate: string): Promise<DailySummaryResult> {
     this.validateDate(marketDate);
     const startedAt = performance.now();

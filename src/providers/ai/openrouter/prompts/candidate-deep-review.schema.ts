@@ -2,11 +2,15 @@ import { AiAnalysisTier } from '../../../../ai-analysis/models/ai-analysis-tier.
 import { DeepReviewRecommendation } from '../../../../ai-analysis/models/deep-review-recommendation.enum';
 import { TriageRiskLevel } from '../../../../ai-analysis/models/fast-triage-result.model';
 
-const text = { type: 'string', minLength: 1, maxLength: 3000 } as const;
+export const DEEP_REVIEW_TEXT_MAX_LENGTH = 500;
+export const DEEP_REVIEW_LIST_ITEM_MAX_LENGTH = 220;
+export const DEEP_REVIEW_LIST_MAX_ITEMS = 3;
+
+const text = { type: 'string', minLength: 1, maxLength: DEEP_REVIEW_TEXT_MAX_LENGTH } as const;
 const textList = {
   type: 'array',
-  items: { type: 'string', minLength: 1, maxLength: 800 },
-  maxItems: 20,
+  items: { type: 'string', minLength: 1, maxLength: DEEP_REVIEW_LIST_ITEM_MAX_LENGTH },
+  maxItems: DEEP_REVIEW_LIST_MAX_ITEMS,
 } as const;
 const balancedTextList = { ...textList, minItems: 1 } as const;
 

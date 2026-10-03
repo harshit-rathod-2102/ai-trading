@@ -82,7 +82,7 @@ async function main() {
       deepInputs.push(input);
       assert.equal(options.tier, AiAnalysisTier.DEEP);
       assert.equal(options.requestedModel, 'verification/deep');
-      assert.equal(options.promptVersion, 'candidate-deep-review-v1');
+      assert.equal(options.promptVersion, 'candidate-deep-review-v2');
       assert.equal(options.bypassCache, true);
       const highEvent = ['BETATECH', 'THETAPH', 'IOTAAUTO'].includes(input.symbol);
       const reject = input.symbol === 'IOTAAUTO';

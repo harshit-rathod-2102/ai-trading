@@ -43,12 +43,49 @@ export function mapMetaOutboundMessage(
       },
     };
   }
+  if (message.messageType === MessageType.INTERACTIVE) {
+    const body = requiredText(message.body, 'Interactive message body');
+    if (body.length > 1024)
+      throw rejected('Interactive message body must not exceed 1024 characters');
+    const buttons = message.buttons.map((button) => ({
+      type: 'reply' as const,
+      reply: {
+        id: interactiveButtonValue(button.id, 'Interactive button ID', 256),
+        title: interactiveButtonValue(button.title, 'Interactive button title', 20),
+      },
+    }));
+    if (buttons.length < 1 || buttons.length > 3) {
+      throw rejected('Interactive messages must contain between one and three buttons');
+    }
+    const footer = message.footer?.trim();
+    if (footer && footer.length > 60)
+      throw rejected('Interactive message footer must not exceed 60 characters');
+    return {
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to: recipient,
+      type: 'interactive',
+      interactive: {
+        type: 'button',
+        body: { text: body },
+        action: { buttons },
+        ...(footer ? { footer: { text: footer } } : {}),
+      },
+    };
+  }
   throw rejected('Unsupported outbound message type');
 }
 
 function requiredText(value: unknown, field: string): string {
   if (typeof value !== 'string' || !value.trim()) throw rejected(`${field} is required`);
   return value.trim();
+}
+
+function interactiveButtonValue(value: unknown, field: string, maximumLength: number): string {
+  const text = requiredText(value, field);
+  if (text.length > maximumLength)
+    throw rejected(`${field} must not exceed ${maximumLength} characters`);
+  return text;
 }
 
 function rejected(message: string): ProviderError {

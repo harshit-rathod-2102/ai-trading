@@ -42,6 +42,7 @@ const MONITOR_EVENT_TYPES = [
   TradeEventType.TARGET2_REACHED,
 ] as const;
 
+/** Observes tracked trades and emits alerts without executing exits. */
 @Injectable()
 export class TradeMonitorService {
   private readonly logger = new Logger(TradeMonitorService.name);
@@ -57,6 +58,7 @@ export class TradeMonitorService {
     private readonly alerts: TradeMonitorAlertService,
   ) {}
 
+  /** Coalesces overlapping observations for one open trade. */
   monitorTrade(tradeId: string): Promise<TradeMonitorResult> {
     const current = this.inFlight.get(tradeId);
     if (current) return current;

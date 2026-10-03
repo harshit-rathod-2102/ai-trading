@@ -14,6 +14,7 @@ export interface OpenTradeCommand {
   quantity: number;
 }
 
+/** Records user-confirmed trade lifecycle changes; it never sends broker orders. */
 @Injectable()
 export class TradesService {
   constructor(
@@ -21,7 +22,7 @@ export class TradesService {
     private readonly journal: JournalService,
   ) {}
 
-  // Called only by candidate acceptance, within its locked transaction.
+  /** Records the user's manual BUY entry within candidate acceptance's locked transaction. */
   openFromCandidate(
     manager: EntityManager,
     candidate: TradeCandidate,
