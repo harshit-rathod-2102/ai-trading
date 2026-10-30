@@ -41,11 +41,23 @@ Pino redaction censors authorization fields and common nested `password`, `secre
 Interactive API documentation is available during local development:
 
 ```text
-Swagger UI:   http://localhost:3000/api/docs
-OpenAPI JSON: http://localhost:3000/api/docs-json
+Demo Swagger UI:   http://localhost:3000/api/docs
+Demo OpenAPI JSON: http://localhost:3000/api/docs-json
+Full Swagger UI:   http://localhost:3000/api/docs-all
+Full OpenAPI JSON: http://localhost:3000/api/docs-all-json
 ```
 
-Swagger documents the existing REST API and does not replace runtime validation. Normal endpoints can be exercised with **Try it out**. Meta WhatsApp webhook requests still require the provider's raw-body signature, so Swagger cannot generate a valid signed webhook event.
+The demo view contains only the 16 operations used in `PRODUCT_DEMO_RECORDING_GUIDE.md`, each in its own numbered section in recording order. Only health and trading profile have live execution controls; the other operations display a request preview and saved response/evidence under **Responses → Example Value**. Section 08 is reused for candidate evidence, AI results, and the persisted risk plan. The full view retains the complete executable API reference. This changes documentation only, not route availability or runtime validation. Meta WhatsApp webhook requests still require the provider's raw-body signature.
+
+Before recording, capture existing records using read-only GET requests:
+
+```bash
+npm run demo:capture
+```
+
+The script selects a scanner-linked candidate with available news, AI, decision, and trade evidence. Optional `DEMO_API_URL` and `DEMO_CANDIDATE_ID` select the source API and candidate. It writes `docs/demo-snapshots.local.json`, ignored by Git because it contains local trading records. Run it against your demo database on the Mac, or transfer the local capture separately. Refresh Swagger after capture; documentation requests reload the file without running market scans, AI calls, or decisions. An API restart is needed only to load code changes.
+
+Saved GET responses retain actual record status and timestamps, with sensitive delivery/credential fields redacted. POST operations show explicitly labeled **persisted stage evidence**, not newly executed or reconstructed POST HTTP responses. For example, a saved trade may now be `CANCELLED`; capture does not turn it into an `OPEN` trade. If evidence is missing, Swagger says so instead of fabricating a successful response. The capture is timestamped historical evidence, not live market data. No business POST is executed during capture or by opening an operation.
 
 ```env
 SWAGGER_ENABLED=true
@@ -141,10 +153,10 @@ OpenRouter is selected centrally behind `AiProvider`. `AiAnalysisService` and ot
 AI_PROVIDER=openrouter
 OPENROUTER_API_KEY=replace_with_local_key
 OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
-# Legacy/default model; FAST falls back to this when OPENROUTER_FAST_MODEL is omitted.
+# Legacy/default model used by the older generic analysis path.
 OPENROUTER_MODEL=openrouter/free
-OPENROUTER_FAST_MODEL=openrouter/free
-# Use a fixed model for DEEP; the free router can select incompatible models per request.
+OPENROUTER_FAST_MODEL=dots-studio/dots-3-note-preview:free
+# Use fixed models for FAST and DEEP; the free router can select incompatible models per request.
 OPENROUTER_DEEP_MODEL=dots-studio/dots-3-note-preview:free
 AI_ROUTING_TOP_RANK_THRESHOLD=3
 OPENROUTER_HTTP_TIMEOUT_MS=30000
@@ -821,11 +833,11 @@ A successful provider response with no relevant recent articles persists a valid
 
 `POST /api/candidates/:id/ai/triage` runs the first qualitative review stage for an orchestrated candidate that is still `NEW` and has complete technical, regime, strategy, ranking, risk, and news snapshots. A successful zero-article news snapshot is valid input. A failed or absent news enrichment is not. Candidate detail responses expose the persisted result through `aiAnalysis`.
 
-V1 defines `FAST` and `DEEP` analysis tiers behind the single existing `AiProvider` SPI. `OPENROUTER_FAST_MODEL` selects the FAST model and falls back to the backward-compatible `OPENROUTER_MODEL` setting when omitted. `OPENROUTER_DEEP_MODEL` defaults to the fixed `dots-studio/dots-3-note-preview:free` route; only the DEEP review service invokes it after deterministic routing selects DEEP. The retired Nemotron routes and `openrouter/free` are automatically upgraded to that fixed route.
+V1 defines `FAST` and `DEEP` analysis tiers behind the single existing `AiProvider` SPI. `OPENROUTER_FAST_MODEL` and `OPENROUTER_DEEP_MODEL` default to the fixed `dots-studio/dots-3-note-preview:free` route. The general `openrouter/free` router is automatically upgraded for both stages because it can select incompatible reasoning models per request. Only the DEEP review service invokes the DEEP model after deterministic routing selects DEEP.
 
 The versioned `candidate-fast-triage-v1` prompt sends only persisted candidate evidence: symbol/company, strategy identity and scores, ranks, regime, technical and risk snapshots, and the completed news snapshot. It tells the model to use no external facts, avoid trading advice and deterministic parameter changes, and treat news titles and descriptions as untrusted evidence. Instructions embedded in article text must be ignored. Temperature is centralized at `0.1`.
 
-OpenRouter first receives a strict JSON Schema request. If the selected model explicitly does not support structured output, the adapter makes one bounded fallback request for JSON only. Runtime mapping rejects malformed JSON, extra or missing fields, invalid enums, non-decimal confidence, oversized arrays/text, abnormal completion status, refusals, and missing resolved-model metadata. It never fills absent model fields with defaults. The compact FAST result contains event risk, uncertainty, confidence, evidence summaries/factors, contradictions, missing evidence, red flags, an escalation suggestion, and audit metadata. It contains no `QUALIFIED`, `WAIT`, or `REJECT` decision.
+OpenRouter first receives a strict JSON Schema request. If the selected model does not support structured output or returns truncated/malformed structured content, the adapter makes one bounded fallback request for JSON only. A `length` completion is accepted only when its content is already complete JSON and passes the full runtime schema. Runtime mapping rejects malformed JSON, extra or missing fields, invalid enums, non-decimal confidence, oversized arrays/text, other abnormal completion statuses, refusals, and missing resolved-model metadata. It never fills absent fields with defaults. The compact FAST result contains event risk, uncertainty, confidence, evidence summaries/factors, contradictions, missing evidence, red flags, an escalation suggestion, and audit metadata. It contains no `QUALIFIED`, `WAIT`, or `REJECT` decision.
 
 `AiRoutingPolicy` applies `ai-routing-v1` after FAST completes. It escalates on high event risk, high uncertainty, confidence below `0.70`, any contradiction, any reported missing evidence (treated as critical in V1), a model escalation suggestion, or a `strategyRank`/`globalRank` inside `AI_ROUTING_TOP_RANK_THRESHOLD` (default `3`). The decision stores only triggered typed reasons and selects `DEEP` or `FAST`; it does not execute DEEP.
 

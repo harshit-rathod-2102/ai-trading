@@ -269,12 +269,45 @@ export class OpenRouterAiProvider implements AiProvider {
         );
       }
 
-      const result = mapOpenRouterFastTriage(response, {
+      const mapperContext = {
         requestedModel,
         promptVersion: options.promptVersion,
         analyzedAt: new Date().toISOString(),
         structuredOutput,
-      });
+      };
+      let result: FastTriageResult;
+      try {
+        result = mapOpenRouterFastTriage(response, mapperContext);
+      } catch (error: unknown) {
+        if (
+          !structuredOutput ||
+          !(error instanceof ProviderError) ||
+          error.code !== ProviderErrorCode.INVALID_RESPONSE
+        ) {
+          throw error;
+        }
+        structuredOutput = false;
+        this.logger.warn(
+          {
+            event: 'provider.request.retrying',
+            ...fields,
+            attempt: 2,
+            maxAttempts: 2,
+            reason: 'invalid_structured_output',
+            ...responseDiagnostics(response),
+          },
+          'OpenRouter FAST triage is retrying without structured output',
+        );
+        response = await this.client.createChatCompletion(
+          this.fastRequest(input, requestedModel, false),
+          context,
+        );
+        result = mapOpenRouterFastTriage(response, {
+          ...mapperContext,
+          analyzedAt: new Date().toISOString(),
+          structuredOutput,
+        });
+      }
       if (!options.bypassCache) this.rememberFast(cacheKey, result);
       this.logger.debug(
         {
@@ -417,7 +450,7 @@ export class OpenRouterAiProvider implements AiProvider {
             attempt: 2,
             maxAttempts: 2,
             reason: 'invalid_structured_output',
-            ...deepResponseDiagnostics(response),
+            ...responseDiagnostics(response),
           },
           'OpenRouter DEEP review is retrying without structured output',
         );
@@ -641,7 +674,7 @@ export class OpenRouterAiProvider implements AiProvider {
   }
 }
 
-function deepResponseDiagnostics(response: unknown): Readonly<Record<string, unknown>> {
+function responseDiagnostics(response: unknown): Readonly<Record<string, unknown>> {
   if (typeof response !== 'object' || response === null || Array.isArray(response)) {
     return { responseShape: 'invalid' };
   }

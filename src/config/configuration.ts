@@ -105,8 +105,17 @@ export interface ApplicationConfiguration {
 
 const LEGACY_OPENROUTER_DEEP_MODEL = 'nvidia/nemotron-3-ultra:free';
 const RETIRED_OPENROUTER_DEEP_MODEL = 'nvidia/nemotron-3-ultra-550b-a55b:free';
-const FREE_ROUTER_OPENROUTER_DEEP_MODEL = 'openrouter/free';
+const FREE_ROUTER_OPENROUTER_MODEL = 'openrouter/free';
+const DEFAULT_OPENROUTER_FAST_MODEL = 'dots-studio/dots-3-note-preview:free';
 const DEFAULT_OPENROUTER_DEEP_MODEL = 'dots-studio/dots-3-note-preview:free';
+
+function configuredFastModel(): string {
+  const model = process.env.OPENROUTER_FAST_MODEL?.trim() || process.env.OPENROUTER_MODEL?.trim();
+  // FAST requires predictable structured output. The free router can select a
+  // different reasoning model on each request and exhaust the completion budget
+  // before emitting the bounded JSON result.
+  return !model || model === FREE_ROUTER_OPENROUTER_MODEL ? DEFAULT_OPENROUTER_FAST_MODEL : model;
+}
 
 function configuredDeepModel(): string {
   const model = process.env.OPENROUTER_DEEP_MODEL?.trim();
@@ -117,7 +126,7 @@ function configuredDeepModel(): string {
     [
       LEGACY_OPENROUTER_DEEP_MODEL,
       RETIRED_OPENROUTER_DEEP_MODEL,
-      FREE_ROUTER_OPENROUTER_DEEP_MODEL,
+      FREE_ROUTER_OPENROUTER_MODEL,
     ].includes(model)
     ? DEFAULT_OPENROUTER_DEEP_MODEL
     : model;
@@ -163,8 +172,7 @@ export default (): ApplicationConfiguration => ({
     apiKey: process.env.OPENROUTER_API_KEY || null,
     baseUrl: process.env.OPENROUTER_BASE_URL ?? 'https://openrouter.ai/api/v1',
     model: process.env.OPENROUTER_MODEL ?? 'openrouter/free',
-    fastModel:
-      process.env.OPENROUTER_FAST_MODEL ?? process.env.OPENROUTER_MODEL ?? 'openrouter/free',
+    fastModel: configuredFastModel(),
     deepModel: configuredDeepModel(),
     httpTimeoutMs: Number.parseInt(process.env.OPENROUTER_HTTP_TIMEOUT_MS ?? '30000', 10),
     appName: process.env.OPENROUTER_APP_NAME ?? 'swing-trading-assistant',

@@ -4,6 +4,8 @@ import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { Logger } from 'nestjs-pino';
 import { AppModule } from './app.module';
+import { createDemoDocument } from './swagger/demo-document';
+import { loadDemoSnapshots } from './swagger/demo-snapshots';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule, { rawBody: true, bufferLogs: true });
@@ -27,9 +29,38 @@ async function bootstrap(): Promise<void> {
       .setVersion('1.0')
       .build();
     const document = SwaggerModule.createDocument(app, swaggerConfig);
-    SwaggerModule.setup('api/docs', app, document, {
-      jsonDocumentUrl: 'api/docs-json',
+    SwaggerModule.setup('api/docs-all', app, document, {
+      jsonDocumentUrl: 'api/docs-all-json',
+      customSiteTitle: 'Swing Trading System — Full API',
       swaggerOptions: { persistAuthorization: true },
+    });
+    SwaggerModule.setup('api/docs', app, createDemoDocument(document), {
+      patchDocumentOnRequest: () => createDemoDocument(document, loadDemoSnapshots()),
+      jsonDocumentUrl: 'api/docs-json',
+      customSiteTitle: 'AI-Assisted Trading Demo',
+      customCss:
+        '.opblock .try-out { display: none; } ' +
+        '[id$="-HealthController_check"] .try-out, ' +
+        '[id$="-TradingProfileController_getActiveProfile"] .try-out { display: block; }',
+      swaggerOptions: {
+        persistAuthorization: true,
+        tagsSorter: 'alpha',
+        docExpansion: 'list',
+        defaultModelsExpandDepth: -1,
+        deepLinking: true,
+        filter: true,
+        supportedSubmitMethods: ['get'],
+        requestInterceptor: (request: { url: string; method: string }) => {
+          const path = new URL(request.url, 'http://localhost').pathname;
+          if (
+            request.method.toUpperCase() !== 'GET' ||
+            !['/api/health', '/api/settings/trading-profile'].includes(path)
+          ) {
+            throw new Error('Demo preview: execute only health and trading profile.');
+          }
+          return request;
+        },
+      },
     });
   }
 

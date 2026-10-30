@@ -23,6 +23,10 @@ lerna-debug.log*
 .temp
 .tmp
 
+# Local database exports may contain application and provider data
+/backups/*.sql
+/docs/demo-snapshots.local.json
+
 # IDEs
 .idea/
 .vscode/*

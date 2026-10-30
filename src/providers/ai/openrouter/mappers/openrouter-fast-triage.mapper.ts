@@ -45,11 +45,10 @@ export function mapOpenRouterFastTriage(
   if (!Array.isArray(choices) || choices.length === 0)
     throw invalid('OpenRouter response has no choices');
   const choice = record(choices[0] as OpenRouterChoiceDto, 'first choice');
-  if (
-    choice.finish_reason !== undefined &&
-    choice.finish_reason !== null &&
-    choice.finish_reason !== 'stop'
-  ) {
+  // Some reasoning endpoints report `length` after emitting a complete schema-valid
+  // JSON object because hidden reasoning shares the completion budget. The content
+  // below still has to pass every strict runtime validation before use.
+  if (!completedOrStructurallyValidLength(choice.finish_reason)) {
     throw invalid(`OpenRouter completion did not finish normally: ${String(choice.finish_reason)}`);
   }
   const message = record(choice.message as OpenRouterMessageDto, 'assistant message');
@@ -123,6 +122,15 @@ function optionalString(value: unknown, field: string): string | null {
 function stringList(value: unknown, field: string): readonly string[] {
   if (!Array.isArray(value) || value.length > 12) throw invalid(`OpenRouter ${field} is invalid`);
   return value.map((item, index) => requiredString(item, `${field}[${index}]`, 500));
+}
+
+function completedOrStructurallyValidLength(finishReason: unknown): boolean {
+  return (
+    finishReason === undefined ||
+    finishReason === null ||
+    finishReason === 'stop' ||
+    finishReason === 'length'
+  );
 }
 
 function risk(value: unknown, field: string): TriageRiskLevel {

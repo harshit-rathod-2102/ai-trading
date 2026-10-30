@@ -32,6 +32,7 @@ async function main() {
   const config = context.get(ConfigService);
   const candidates = dataSource.getRepository(TradeCandidate);
   const instruments = dataSource.getRepository(Instrument);
+  assert.equal(config.get('openrouter.fastModel'), 'dots-studio/dots-3-note-preview:free');
   assert.equal(config.get('openrouter.deepModel'), 'dots-studio/dots-3-note-preview:free');
   assert.equal(config.get('aiRouting.topRankThreshold'), 3);
   const runId = randomUUID();
@@ -256,6 +257,10 @@ async function main() {
       bullishFactors: [], bearishFactors: [], contradictions: [], missingEvidence: [], redFlags: [],
       requiresDeepReviewSuggested: false, summary: 'No deeper review trigger was identified.',
     });
+    const completeLengthResult = mapOpenRouterFastTriage({ model: 'resolved', choices: [{
+      finish_reason: 'length', message: { content: validFastContent },
+    }] }, mapperContext);
+    assert.equal(completeLengthResult.tier, 'FAST');
     const adapterInput = {
       symbol: 'ADAPTER', companyName: 'Adapter Verification Limited',
       strategy: 'MOMENTUM_BREAKOUT', strategyVersion: 'verification-v1',
@@ -306,6 +311,29 @@ async function main() {
     assert.equal(fallbackBodies[1].response_format, undefined);
     assert.match(fallbackBodies[1].messages[1].content, /JSON object only/);
     assert.equal(fallbackResult.modelMetadata.structuredOutput, false);
+
+    let invalidOutputFallbackCalls = 0;
+    const invalidOutputFallbackBodies = [];
+    const invalidOutputFallbackAdapter = new OpenRouterAiProvider({
+      createChatCompletion: async body => {
+        invalidOutputFallbackCalls += 1;
+        invalidOutputFallbackBodies.push(body);
+        if (invalidOutputFallbackCalls === 1) {
+          return { id: 'truncated-fast', model: 'resolved/truncated',
+            choices: [{ finish_reason: 'length', message: { content: '{"tier":"FAST"' } }] };
+        }
+        return { id: 'plain-fast', model: 'resolved/plain',
+          choices: [{ finish_reason: 'stop', message: { content: validFastContent } }] };
+      },
+    }, adapterConfig);
+    const invalidOutputFallback = await invalidOutputFallbackAdapter.triageCandidate(
+      { ...adapterInput, symbol: 'INVALID_OUTPUT_FALLBACK' },
+      { tier: AiAnalysisTier.FAST, requestedModel: adapterConfig.fastModel,
+        promptVersion: 'candidate-fast-triage-v3' },
+    );
+    assert.equal(invalidOutputFallbackCalls, 2);
+    assert.equal(invalidOutputFallbackBodies[1].response_format, undefined);
+    assert.equal(invalidOutputFallback.modelMetadata.structuredOutput, false);
 
     // H: unchanged evidence reuses PostgreSQL state without invoking the model.
     const beforeReuse = providerCalls;
