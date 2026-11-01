@@ -1,241 +1,218 @@
+I will begin my task soon. Here is the workflow in my mind
+
 # AI-Assisted Trading Demo — Actions and Speech
 
-**Action 1 — GitHub:** Open the existing repository README. Show the product description and Docker setup instructions.
+**Action 1 — Visual Studio Code:** Open the matching local checkout and the Markdown preview of `README.md`.
 
 **Speech:**
 
-> "Hi everyone. I'm going to open the project repository in GitHub and scroll to the README's product description and Docker setup instructions, because I want to introduce the workflow before showing its APIs.
->
-> The application is already running. I'll execute only health and trading profile. For the remaining APIs, I'll show saved requests and responses or persisted stage evidence, with their capture and record dates visible."
+> "Let's open Visual Studio Code, select README.md in the Explorer on the left, and open its Markdown preview. It has the product description and Architecture detais, I am showing this because I want to establish the problem this application addresses: bringing screening evidence, risk limits, advisory analysis, and decisions into one traceable workflow.
+
 
 ---
 
-**Action 2 — Visual Studio Code:** Open the matching local checkout and `docker-compose.yml`. Point to the API, PostgreSQL, Redis, and Flyway services.
+**Action 2 — Visual Studio Code:** Open `docker-compose.yml` and point to API, PostgreSQL, Redis, and Flyway.
 
 **Speech:**
 
-> "I'm going to switch to Visual Studio Code, select `docker-compose.yml` in the Explorer on the left, and point to its service definitions in the editor. This shows the API, PostgreSQL, Redis, and Flyway configuration.
->
-> I'm reviewing this file because I want to explain the responsibilities behind the running application: PostgreSQL stores records, Redis supports background jobs, and Flyway manages database migrations."
+> "Now, I'm going to select docker-compose.yml in the Explorer on the left and point to the API, PostgreSQL, Redis, and Flyway definitions in the editor. I'm reviewing those definitions because the workflow depends on more than the API alone. PostgreSQL holds the records, Redis supports background jobs, and Flyway applies database migrations. Understanding those roles helps distinguish a service problem from a screening or decision problem later."
 
 ---
 
-**Action 3 — Visual Studio Code:** Open `src/main.ts`. Show the `/api` prefix and Swagger configuration.
+**Action 3 — Docker Desktop:** In Containers, select the prepared, stopped Compose project and click Start. Show API, PostgreSQL, and Redis starting. Do not open logs. Flyway may exit successfully after migrations.
 
 **Speech:**
 
-> "In Visual Studio Code's Explorer, I'm going to open `src/main.ts` and locate the API prefix, validation pipe, and Swagger setup. I'm showing these lines because they connect the application code to the documentation we'll use in Chrome.
+> "I'm going to open Docker Desktop, select Containers in the left sidebar, and click the Start control beside the stopped project. I'll keep that list visible while API, PostgreSQL, and Redis start because the first step is to make the application and its dependencies available. Showing the transition from stopped to running makes startup visible rather than relying on an application that was already running before the recording.
 >
-> The demo documentation lets us execute health and trading profile. Other operations show saved examples so we can explain the workflow without changing records or calling external providers."
+> API, PostgreSQL, and Redis are long-running services. Flyway is a migration task, so it can finish and exit successfully."
 
 ---
 
-**Action 4 — Docker Desktop:** Open Docker Desktop's Containers view and show the API, PostgreSQL, and Redis containers in the already-running Compose project.
+**Action 4 — Chrome, section 01:** Open `http://localhost:3000/api/docs`. Show the MOCK RESPONSES title. Expand `GET /api/health`, click Try it out and Execute. Show the server response and `X-Demo-Mock` header.
 
 **Speech:**
 
-> "I'm going to open Docker Desktop and select Containers to show the API, PostgreSQL, and Redis containers in the running application project.
+> "I'm going to open Chrome and load the Swagger API documentation. I'll show the ordered sections at the top because they let us follow one opportunity from screening to decision history.
 >
-> I'm showing these containers because I want to confirm that the application and its core dependencies are running before we verify the API in Chrome."
+> In section 01, I'll expand the health endpoint, click Try it out on the right of the operation panel, and click Execute. I'll scroll to the Server response area below the operation and point to the HTTP status and response body because I want to confirm that the application accepts the HTTP request and returns a readable response before moving into business operations. This separates basic API access from the later questions about screening evidence and trading decisions."
 
 ---
 
-**Action 5 — Chrome:** Open `http://localhost:3000/api/docs`. Expand section 01, Health check, click `GET /api/health`, then Try it out and Execute. Show the response body below.
+**Action 5 — Chrome, section 02:** Execute `GET /api/settings/trading-profile`. Show capital, risk per trade, position and portfolio limits, and minimum reward-to-risk.
 
 **Speech:**
 
-> "I'm going to open `http://localhost:3000/api/docs` in Chrome to access Swagger. In section 01, Health check, I'll open `GET /api/health`, click Try it out, and then Execute. The response appears below the operation.
+> "In section 02, I'll open GET /api/settings/trading-profile, click Try it out on the right of the operation panel, and click Execute. In the server response body below, I'll point to capital, risk per trade, position and portfolio limits, and minimum reward-to-risk because a promising stock setup still needs to fit the account's loss budget, position limits, and existing exposure. Establishing those constraints before reviewing a candidate makes the sizing decision explainable instead of letting enthusiasm about a stock determine the quantity.
 >
-> I'm checking this response because I want to verify the API, PostgreSQL, and Redis are ready before demonstrating business operations. External providers have separate authentication and availability requirements."
+> The profile shown here has 500,000 rupees of capital and a half-percent risk allowance per trade, giving a 2,500-rupee budget. Position and portfolio limits can reduce the allowed quantity further."
 
 ---
 
-**Action 6 — Chrome:** Open section 02, Trading profile, and execute `GET /api/settings/trading-profile`. Point to capital, risk per trade, position limits, portfolio risk, and minimum reward-to-risk.
+**Action 6 — Chrome, section 03:** Execute `GET /api/market-data/provider`. Show `synthetic-demo` and `SYNTHETIC_DEMO`.
 
 **Speech:**
 
-> "In Swagger's section 02, Trading profile, I'm going to open `GET /api/settings/trading-profile`, click Try it out, and then click Execute. I'll scroll to the response body below and point to capital, risk per trade, position limits, and portfolio-risk settings.
->
-> I'm reading these settings because they define the deterministic limits for the risk plan. For illustration, half a percent of 500,000 rupees is a 2,500-rupee risk budget. Other constraints can reduce the allowed quantity further; AI does not choose these limits."
+> "I'm going to expand section 03, Market-data source, and open GET /api/market-data/provider. I'll click Try it out and Execute, then point to the provider and universe fields in the server response body below because every indicator and ranking depends on the data source and the stocks included. Identifying both helps us understand the scope of the results and the inputs we would need to verify before using an analysis for a decision."
 
 ---
 
-**Action 7 — Chrome:** Open section 03, Market-data source. Show the request preview and saved response under Responses, Example Value.
+**Action 7 — Chrome, section 04:** Execute `POST /api/scanner/run`. Show `run`, `results`, and `shortlist`. Copy `run.id`.
 
 **Speech:**
 
-> "In section 03, I'm going to open the market-data provider operation, point to its GET request preview, and scroll to Responses, Example Value. I'm showing the saved provider identity because the audience needs to know which source supplied the data.
+> "I'm going to expand section 04, Run screening, and open POST /api/scanner/run. I'll click Try it out and Execute, then scroll to run, results, and shortlist in the server response body below because screening is intended to narrow a broad universe using a consistent set of rules before asking for detailed human or AI review. The evaluated and shortlisted counts show the scale of that reduction, while the run ID gives the later evidence a common reference.
 >
-> The capture time tells us when this response was retrieved. It is not a fresh provider call, and historical candles should not be described as today's market data."
+> The response shows three evaluated symbols and one shortlisted setup. I'll copy the run ID from the response because using one run reference keeps the counts, indicators, and shortlist tied to the same screening context."
 
 ---
 
-**Action 8 — Chrome: Open section 04, Run screening. Show the request preview and saved scan evidence.**
+**Action 8 — Chrome, section 05:** Open `GET /api/scanner/runs/{id}`, click Try it out, paste the run ID into `id`, and Execute. Show date, counts, status, and regime.
 
 **Speech:**
 
-> "In section 04, I'm going to open the screening operation and point to its request preview and saved scan evidence under Responses, Example Value.
->
-> I'm showing this API because it evaluates the configured universe using finalized daily candles and identifies qualifying setups. The saved example explains an existing screening run; I'm not launching a new scan."
+> "I'm going to expand section 05, Inspect scan run, and open GET /api/scanner/runs/{id}. I'll click Try it out, paste the copied run ID into the id path-parameter field, and click Execute. In the response body below, I'll point to market date, status, counts, and regime because a shortlist is meaningful only when we know when it applies, whether its run completed, and how much of the universe it covered. The market regime adds broader context, while the date helps us avoid interpreting an older setup as a current opportunity."
 
 ---
 
-**Action 9 — Chrome: Open section 05, Inspect scan run. Show the run ID, market date, counts, and market-regime snapshot in the saved response.**
+**Action 9 — Chrome, section 06:** Execute `GET /api/scanner/runs/{id}/results` with the run ID and `shortlisted=true`. Show NORTHSTAR's scores, ranks, and technical snapshot. Copy the result's `id`.
 
 **Speech:**
 
-> "In section 05, I'm going to show the run ID in Request preview, then point to the market date, evaluated population, qualification counts, and market-regime snapshot in the saved response.
+> "I'm going to expand section 06, Shortlisted results and indicators, and open GET /api/scanner/runs/{id}/results. I'll click Try it out, paste the run ID into id, select true in shortlisted, and click Execute. In the response body below, I'll point to NORTHSTAR's scores, ranks, moving averages, relative strength, and volume because a rank alone does not explain why a setup deserves attention. Moving averages describe the trend, relative strength compares performance with the benchmark, and volume adds participation context. Reading those fields together makes the ranking easier to question and interpret; none establishes future profitability.
 >
-> I'm inspecting these fields because I want to explain when this run happened, how much of the universe it evaluated, and the broader market conditions it used. Zero qualifying opportunities is a valid outcome."
+> I'll copy the scan-result ID from this response because that reference links the candidate review to the specific setup and evidence we just inspected."
 
 ---
 
-**Action 10 — Chrome: Open section 06, Shortlisted results and indicators. Show the shortlisted filter, one stock's score and ranks, and its technical snapshot.**
+**Action 10 — Chrome, section 07:** Execute `POST /api/candidates/from-scan-result/{scanResultId}` using the result ID. Show the creation outcome and accepted risk evidence. Copy `candidateId`.
 
 **Speech:**
 
-> "In section 06, I'm going to point to the run ID and shortlisted filter in Request preview. In the saved response below, I'll select one result and show its strategy, version, score, ranks, moving averages, relative strength against NIFTY, and volume evidence.
+> "I'm going to expand section 07, Create candidate, and open POST /api/candidates/from-scan-result/{scanResultId}. I'll click Try it out, paste the copied result ID into scanResultId, and click Execute. I'll show the outcome, candidate ID, and accepted risk evidence in the response body below because passing screening and fitting an account are separate questions. This response illustrates the point where a setup is considered alongside deterministic risk constraints, so a high ranking alone is not treated as sufficient reason to proceed.
 >
-> I'm showing this shortlist because it narrows the opportunity set. The score measures fit to strategy rules, the ranks compare qualifying setups, and the technical snapshot preserves the calculated evidence behind selection. These values do not establish future profitability."
+> I'll copy candidateId from the response because a consistent candidate reference lets us follow the same opportunity through news, advisory review, qualification, and its journal."
 
 ---
 
-**Action 11 — Chrome: Open section 07, Create candidate. Show the scan-result ID and stored candidate evidence.**
+**Action 11 — Chrome, section 08:** Execute `GET /api/candidates/{id}` with the candidate ID. Show scan linkage and the full `riskSnapshot`.
 
 **Speech:**
 
-> "In section 07, I'm going to show the scan-result ID in Request preview and the stored candidate evidence under Responses, Example Value.
+> "I'm going to expand section 08, Candidate evidence and risk plan, and open GET /api/candidates/{id}. I'll click Try it out, paste the candidate ID into id, and click Execute. I'll scroll within the response body below to the scan linkage and riskSnapshot because a decision needs an explicit downside and position size, not just a favorable chart. Comparing entry, stop, quantity caps, and targets shows which limit determines the quantity and what planned loss the account would take if the stop were reached. A stop level does not guarantee an execution price.
 >
-> I'm showing this operation because it turns a shortlisted setup into a candidate while checking deterministic risk against the portfolio. A rejected risk plan creates no new candidate, and a repeated request can reuse an existing record. This is stored evidence rather than a new candidate creation."
+> Entry at 1,000 and a stop at 975 gives 25 rupees of planned risk per share. The 2,500-rupee budget allows 100 shares, but the ten-percent position cap limits this example to 50. Planned risk is therefore 1,250 rupees, and a first target of 1,050 gives two-to-one reward-to-risk."
 
 ---
 
-**Action 12 — Chrome: Open section 08, Candidate evidence and risk plan. Show the saved candidate response, scan linkage, and complete risk snapshot.**
+**Action 12 — Chrome, section 09:** Execute `POST /api/candidates/{id}/news/enrich` with the candidate ID. Show article count, source, title, URL, and date.
 
 **Speech:**
 
-> "In section 08, I'm going to show the saved candidate response and point to its scan linkage and evidence snapshots. Then, within this same response, I'll locate the risk plan and show the entry, stop, risk budget, quantity caps, recommended quantity, planned loss, and reward-to-risk.
->
-> I'm showing these together because I want to explain how the selected opportunity fitted the account and portfolio limits at the time. An entry of 1,000 and stop of 975, for example, means 25 rupees of planned risk per share. A 2,500-rupee budget allows 100 shares before other caps. This stored plan is not a new evaluation of today's portfolio."
+> "I'm going to expand section 09, News enrichment, and open POST /api/candidates/{id}/news/enrich. I'll click Try it out, paste the candidate ID into id, and click Execute. In the response body below, I'll show the article count, title, source, URL, and publication time because price and volume may not explain an earnings announcement, corporate update, or other event affecting the setup. The source and URL let a reviewer inspect the underlying article, while publication time helps judge its relevance. An article count on its own is not enough evidence."
 
 ---
 
-**Action 13 — Chrome:** Open section 09, News enrichment. Show the request preview and stored news snapshot under Responses, Example Value.
+**Action 13 — Chrome, section 10:** Execute `POST /api/candidates/{id}/ai/triage`. Show FAST summary, event risk, uncertainty, recommendation, and routing reasons.
 
 **Speech:**
 
-> "In section 09, I'm going to open news enrichment, point to the candidate ID in Request preview, and show the stored news snapshot below. I'll point to its article count, any available source, and publication time.
+> "I'm going to expand section 10, FAST AI evaluation, and open POST /api/candidates/{id}/ai/triage. I'll click Try it out, paste the candidate ID into id, and click Execute. In the response body below, I'll point to the summary, event risk, uncertainty, recommendation, and routing reasons because a concise qualitative review can help a person notice concerns that deserve attention beyond the technical score. Event risk, uncertainty, and routing reasons make the advice easier to challenge and help explain whether a deeper review would be useful.
 >
-> I'm showing this evidence because news review needs identifiable, dated information. This is the saved snapshot from that candidate; opening the API does not search for new articles."
+> In the product workflow, AI advice does not replace deterministic risk limits, and confidence is not a calibrated probability of winning."
 
 ---
 
-**Action 14 — Chrome: Open section 10, FAST AI evaluation. Show the request preview and stored FAST summary, event risk, uncertainty, and routing reasons.**
+**Action 14 — Chrome, section 11:** Execute `POST /api/candidates/{id}/finalize`. Show `decisionSnapshot`, outcome, source tier, warnings, and time.
 
 **Speech:**
 
-> "In section 10, I'm going to point to the candidate ID in Request preview, then show the stored FAST summary, event risk, uncertainty, and routing reasons under Responses, Example Value.
+> "I'm going to expand section 11, Final qualification, and open POST /api/candidates/{id}/finalize. I'll click Try it out, paste the candidate ID into id, and click Execute. I'll locate decisionSnapshot in the response body below and point to its outcome, source tier, warnings, and time because an advisory opinion and permission to proceed are different stages of the intended workflow. The source tier identifies the basis for qualification, while warnings show what still needs attention. Reading both helps prevent a positive AI summary from being treated as a trade authorization.
 >
-> I'm showing these fields because they explain the qualitative review and why deeper analysis may be selected. The response must pass structured validation, and model confidence is not a calibrated win probability. AI remains advisory; opening this example makes no new AI call."
+> The response shows QUALIFIED with a deterministic source tier. I'll also review its warnings because the outcome needs to be read alongside its supporting context."
 
 ---
 
-**Action 15 — Chrome:** Open section 11, Final qualification. Show the request preview and persisted decision snapshot, including source tier, outcome, warnings, and date.
+**Action 15 — Chrome, section 12:** Execute `POST /api/candidates/{id}/buy` using the candidate ID and body `{"actualEntry":"1000.0000","quantity":50}`. Show the OPEN trade response and copy its `id`.
 
 **Speech:**
 
-> "In section 11, I'm going to show the finalize request preview and the stored decision snapshot below. I'll point to the deterministic source tier, outcome, warnings, and decision time.
+> "I'm going to expand section 12, Record BUY, and open POST /api/candidates/{id}/buy. I'll click Try it out, paste the candidate ID into id, and enter actualEntry as the string 1000.0000 and quantity as 50 in the request-body editor. I'll click Execute and show the trade ID, OPEN status, entry, quantity, and stop in the response body below because a BUY decision needs an explicit entry and quantity to connect the plan to the trade representation. Those fields make planned risk understandable and give later review a concrete reference, rather than leaving only a general statement that the setup looked attractive.
 >
-> I'm showing these because qualification belongs to application logic. Strategy and risk evidence control it, while news and AI remain advisory. This example explains a recorded qualification; opening it does not finalize a candidate or create a trade."
+> In the product workflow, BUY records an entry executed manually; it does not place a broker order. I'll copy the trade ID from the response because it links the trade details to the journal we will inspect next."
 
 ---
 
-**Action 16 — Chrome:** Open section 12, Record BUY. Show the request-body example and stored linked-trade evidence. Retain its actual current status and timestamps on screen.
+**Action 16 — Chrome, section 13:** Execute `POST /api/candidates/{id}/skip` with the separate example ID `00000000-0000-4000-8000-000000000004` and body `{"reason":"Entry no longer matches my plan"}`. Show SKIPPED.
 
 **Speech:**
 
-> "In section 12, I'm going to show the example entry price and quantity, then the stored linked trade under Responses, Example Value. I'm showing the relationship because BUY records an entry executed manually and creates an internally tracked trade.
+> "I'm going to expand section 13, Record SKIP, and open POST /api/candidates/{id}/skip. I'll click Try it out and enter the separate candidate ID shown in the action into id. In the request-body editor, I'll set reason to 'Entry no longer matches my plan,' then click Execute and show SKIPPED in the response body below because declining a setup is also a deliberate trading decision. Keeping a reason supports later review of why an opportunity was passed over, rather than treating every qualified setup as an obligation to buy.
 >
-> This is the trade's captured state, not the original BUY response. If its current status is CANCELLED, that is what the example shows. I'm not submitting BUY, changing that state, or sending a broker order."
+> I'll point to SKIPPED in the response because it distinguishes declining an opportunity from accepting a trade. This step uses a separate candidate reference from the BUY example."
 
 ---
 
-**Action 17 — Chrome:** Open section 13, Record SKIP. Show the illustrative request reason and the separate saved skipped candidate under Responses, Example Value.
+**Action 17 — Chrome, section 14:** Execute `GET /api/candidates/{id}/events` with the original candidate ID. Show CANDIDATE_CREATED and TRADE_OPENED, timestamps, sources, and mock markers.
 
 **Speech:**
 
-> "In section 13, I'm going to show the illustrative reason in Request preview and the separate stored skipped candidate below. I'm showing this alternative because a decision not to trade should also remain in the history.
->
-> The request reason is illustrative, and the response evidence identifies the actual saved record, including any verification label. Opening this example does not skip another candidate."
+> "I'm going to expand section 14, Candidate journal, and open GET /api/candidates/{id}/events. I'll click Try it out, paste the original candidate ID into id, and click Execute. I'll show CANDIDATE_CREATED and TRADE_OPENED, their timestamps, and sources in the response body below because a final status alone cannot explain the path to a decision. Event types, sources, and timestamps make that path reviewable, showing how candidate and trade activity relate and providing a structure for investigating missing or inconsistent transitions."
 
 ---
 
-**Action 18 — Chrome: Open section 14, Candidate journal. Show the saved event types, timestamps, sources, and decision history.**
+**Action 18 — Chrome, section 15:** Execute `GET /api/trades/{id}` with the trade ID copied from section 12. Show candidate linkage, entry, quantity, stop, and status.
 
 **Speech:**
 
-> "In section 14, I'm going to open the candidate journal and point to the recorded event types, timestamps, sources, and decisions under Responses, Example Value.
->
-> I'm showing these events because they connect the candidate's creation and qualification to its later decision history. These records already exist; I'm not submitting another BUY or SKIP."
+> "I'm going to expand section 15, Tracked trade, and open GET /api/trades/{id}. I'll click Try it out, paste the trade ID copied from section 12 into id, and click Execute. In the response body below, I'll point to the candidate link, entry, quantity, stop, and status because a candidate describes an opportunity, while a trade describes the position being tracked. Comparing the candidate link, entry, size, and stop helps a reviewer understand how the trade relates to the original plan. I'll also point to OPEN because current status answers a different question from the earlier decision history."
 
 ---
 
-**Action 19 — Chrome: Open section 15, Tracked trade. Show the trade ID, candidate link, actual entry, quantity, initial stop, and current status.**
+**Action 19 — Chrome, section 16:** Execute `GET /api/trades/{id}/events` with the same trade ID. Show TRADE_OPENED and the mock header. Keep the server response visible.
 
 **Speech:**
 
-> "In section 15, I'm going to show the trade ID in Request preview, then point to the candidate link, actual entry, quantity, initial stop, and current status in the saved response.
+> "I'm going to expand section 16, Trade journal, and open GET /api/trades/{id}/events. I'll click Try it out, paste the same trade ID into id, and click Execute. I'll point to TRADE_OPENED, its price, quantity, source, and timestamp in the response body below because the trade record shows a current state, while journal events provide a chronological account of the activity associated with it. Reading price, quantity, source, and time together supports later review of what an entry event represents and how it relates to the trade details. I'll leave this response visible for the closing remarks.
 >
-> I'm showing this record because it explains how a manually executed entry is tracked inside the application. The captured current status is retained, including CANCELLED if that is the saved trade's state."
+> This completes the API interaction walkthrough in Swagger's section order. We have followed the API sequence from the screening response to the candidate, trade, and journal representations."
 
 ---
 
-**Action 20 — Chrome: Open section 16, Trade journal. Show the saved chronological events and keep this response visible for the closing remarks.**
+**Action 20 — Chrome, closing result:** Keep section 16's executed response visible.
 
 **Speech:**
 
-> "In section 16, I'm going to open the trade journal and point to the historical events under Responses, Example Value.
+> "With that, I have completed the demonstration of the core workflow of an AI-assisted trading system through this API walkthrough.
 >
-> I'm showing this history because the trade's earlier events and its current state answer different questions. A recorded entry remains part of the audit trail even if the trade has since been cancelled. This completes the API walkthrough, from health through the trade journal."
+> I'm going to keep the executed trade-journal response visible in section 16 while explaining the result because the journal is where the earlier screening, risk, and decision concepts come together in a reviewable structure. It gives us a concrete place to explain what the walkthrough covered and what still requires end-to-end verification. We reviewed the README and local project in Visual Studio Code, started the containers, and executed all sixteen demo endpoints. The responses illustrated screening, risk, AI advice, BUY/SKIP, and the structure of the candidate and trade journals."
 
 ---
 
-**Action 21 — Chrome, closing result:** Keep the saved journal example and its capture label visible.
+**Action 21 — Chrome, closing choices:** Keep the same response visible.
 
 **Speech:**
 
-> "With that, I have completed the demonstration of the core workflow of an AI-assisted trading system.
+> "Now, I'll explaining the design choices because it shows why the responsibilities are separated: rules make screening and risk repeatable, AI adds advisory context, and the journal supports review. That separation makes it easier to identify which part supplied an opinion, enforced a limit, or represented a decision.
 >
-> I'm going to leave the saved journal visible while I explain the result, because it connects the API walkthrough to recorded evidence.
->
-> We reviewed the project, inspected the running containers, executed health and trading profile, and used saved examples to explain screening, AI review, risk, decisions, and journaling. We did not execute those business operations during the recording, and this walkthrough does not establish profitability."
+> The product separates deterministic screening and risk from advisory AI, keeps broker execution manual, and preserves decision evidence."
 
 ---
 
-**Action 22 — Chrome, closing choices: Keep section 16's saved trade journal visible.**
+**Action 22 — Chrome, closing challenges:** Keep the same response visible.
 
 **Speech:**
 
-> "I'm going to keep this trade journal visible in Chrome while explaining the design choices, because it brings together the history of the workflow we've just reviewed.
+> "I also want to discuss about the challenges because a well-formed final response is useful only when the inputs and preceding stages are dependable. Stale data can weaken indicators, unavailable providers can leave gaps, and retries can duplicate actions. These are reasons to preserve clear failure states and verify transitions.
 >
-> Screening and risk are deterministic, AI is advisory, and broker execution remains manual. Provider-neutral interfaces separate external integrations from application logic, while snapshots preserve the evidence behind decisions."
+> The main challenges are market-data freshness, provider authentication and quotas, AI response validation, duplicate actions, and partial failures. Those integrations and failure paths need separate verification."
 
 ---
 
-**Action 23 — Chrome, closing challenges:** Keep the same screen visible.
+**Action 23 — Chrome, closing improvements:** Keep the response visible and finish the recording.
 
 **Speech:**
 
-> "I'm going to stay on the journal response in Chrome while discussing the challenges, because a usable decision history depends on trustworthy inputs and reliable recording.
+> "I'll finish with improvements because improvements should strengthen confidence in the entire decision path, rather than only add more endpoints. Verifying data coverage, risk behavior, and decision-to-journal consistency would make the workflow easier to assess before broader use.
 >
-> The challenges include fresh market history, provider authentication and quotas, unpredictable AI responses, and duplicate actions. Missing evidence and failed stages need to remain visible so an incomplete result is not presented as a successful one."
-
----
-
-**Action 24 — Chrome, closing improvements and limitations:** Keep the journal visible and finish the recording.
-
-**Speech:**
-
-> "I'm going to leave the journal visible in Chrome and close with improvements and limitations, because the recorded decision is the starting point for evaluating what this workflow needs next.
->
-> I would prioritize REST access control, complete trade-management and exit commands, stronger data coverage, and broader strategy and AI evaluation. The application does not submit broker orders. AI can be unavailable or wrong, and STOP, SELL, NOTE, and PORTFOLIO commands are not implemented in the current flow. Thanks for watching."
+> That means checking market-data coverage, evaluating screening and analysis, and verifying that saved decisions and journal events remain consistent. I would also prioritize access control, trade-management coverage, and broader strategy evaluation."

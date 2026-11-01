@@ -43,11 +43,16 @@ export class MarketDataService {
     private readonly qualityService: DataQualityService,
   ) {}
 
-  async providerInfo() {
-    return {
+  async providerInfo(includeDetails = false) {
+    const summary = {
       id: this.provider.id,
       isSynthetic: this.provider.isSynthetic,
       adjustmentBasis: this.provider.adjustmentBasis,
+    };
+    if (!includeDetails) return summary;
+
+    return {
+      ...summary,
       instruments: await this.providerCall('getInstruments', (signal) =>
         this.provider.getInstruments(undefined, { signal }),
       ),

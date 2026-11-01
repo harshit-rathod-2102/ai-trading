@@ -5,12 +5,23 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { Logger } from 'nestjs-pino';
 import { AppModule } from './app.module';
 import { createDemoDocument } from './swagger/demo-document';
-import { loadDemoSnapshots } from './swagger/demo-snapshots';
+import { DemoMockInterceptor } from './swagger/demo-mock.interceptor';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule, { rawBody: true, bufferLogs: true });
   const configService = app.get(ConfigService);
   app.useLogger(app.get(Logger));
+
+  const mockResponses = configService.get<string>('DEMO_MOCK_RESPONSES') === 'true';
+  if (mockResponses) {
+    if (configService.getOrThrow<string>('app.nodeEnv') === 'production') {
+      throw new Error('DEMO_MOCK_RESPONSES is only supported outside production.');
+    }
+    app.useGlobalInterceptors(new DemoMockInterceptor());
+    new NestLogger('Bootstrap').warn(
+      'MOCK RESPONSE MODE: demo endpoints return synthetic fixtures; operations are not performed.',
+    );
+  }
 
   app.setGlobalPrefix('api');
   app.enableShutdownHooks();
@@ -24,8 +35,15 @@ async function bootstrap(): Promise<void> {
 
   if (configService.getOrThrow<boolean>('swagger.enabled')) {
     const swaggerConfig = new DocumentBuilder()
-      .setTitle('Swing Trading System API')
-      .setDescription('Backend API for the personal AI-assisted swing trading system.')
+      .setTitle(
+        mockResponses ? 'Swing Trading System API — MOCK RESPONSES' : 'Swing Trading System API',
+      )
+      .setDescription(
+        mockResponses
+          ? 'MOCK RESPONSE MODE: the 16 curated demo routes return synthetic fixed responses. ' +
+              'Other routes retain normal behavior.'
+          : 'Backend API for the personal AI-assisted swing trading system.',
+      )
       .setVersion('1.0')
       .build();
     const document = SwaggerModule.createDocument(app, swaggerConfig);
@@ -34,14 +52,11 @@ async function bootstrap(): Promise<void> {
       customSiteTitle: 'Swing Trading System — Full API',
       swaggerOptions: { persistAuthorization: true },
     });
-    SwaggerModule.setup('api/docs', app, createDemoDocument(document), {
-      patchDocumentOnRequest: () => createDemoDocument(document, loadDemoSnapshots()),
+    SwaggerModule.setup('api/docs', app, createDemoDocument(document, mockResponses), {
       jsonDocumentUrl: 'api/docs-json',
-      customSiteTitle: 'AI-Assisted Trading Demo',
-      customCss:
-        '.opblock .try-out { display: none; } ' +
-        '[id$="-HealthController_check"] .try-out, ' +
-        '[id$="-TradingProfileController_getActiveProfile"] .try-out { display: block; }',
+      customSiteTitle: mockResponses
+        ? 'AI-Assisted Trading Demo — MOCK RESPONSES'
+        : 'AI-Assisted Trading Demo',
       swaggerOptions: {
         persistAuthorization: true,
         tagsSorter: 'alpha',
@@ -49,17 +64,7 @@ async function bootstrap(): Promise<void> {
         defaultModelsExpandDepth: -1,
         deepLinking: true,
         filter: true,
-        supportedSubmitMethods: ['get'],
-        requestInterceptor: (request: { url: string; method: string }) => {
-          const path = new URL(request.url, 'http://localhost').pathname;
-          if (
-            request.method.toUpperCase() !== 'GET' ||
-            !['/api/health', '/api/settings/trading-profile'].includes(path)
-          ) {
-            throw new Error('Demo preview: execute only health and trading profile.');
-          }
-          return request;
-        },
+        supportedSubmitMethods: ['get', 'post'],
       },
     });
   }

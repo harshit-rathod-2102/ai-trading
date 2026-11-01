@@ -1,7 +1,6 @@
-import { OpenAPIObject, OperationObject, PathsObject } from '@nestjs/swagger';
-import { DemoSnapshot, DemoSnapshots } from './demo-snapshots';
+import { OpenAPIObject, PathsObject } from '@nestjs/swagger';
 
-const DEMO_OPERATIONS = [
+export const DEMO_OPERATIONS = [
   ['get', '/api/health', '01. Health check'],
   ['get', '/api/settings/trading-profile', '02. Trading profile'],
   ['get', '/api/market-data/provider', '03. Market-data source'],
@@ -21,10 +20,7 @@ const DEMO_OPERATIONS = [
 ] as const;
 
 /** Curates documentation only; the registered application routes stay unchanged. */
-export function createDemoDocument(
-  document: OpenAPIObject,
-  snapshots?: DemoSnapshots,
-): OpenAPIObject {
+export function createDemoDocument(document: OpenAPIObject, mockResponses = false): OpenAPIObject {
   const paths: PathsObject = {};
 
   for (const [method, path, tag] of DEMO_OPERATIONS) {
@@ -34,8 +30,6 @@ export function createDemoDocument(
       throw new Error(`Demo Swagger operation is missing: ${method.toUpperCase()} ${path}`);
     }
 
-    const example = snapshots?.operations[`${method.toUpperCase()} ${path}`];
-    const live = path === '/api/health' || path === '/api/settings/trading-profile';
     paths[path] = {
       ...(source.parameters ? { parameters: source.parameters } : {}),
       ...(source.servers ? { servers: source.servers } : {}),
@@ -43,11 +37,15 @@ export function createDemoDocument(
       [method]: {
         ...operation,
         tags: [tag],
-        ...(live
+        ...(mockResponses
           ? {
-              description: `${operation.description || ''}\n\nExecute this GET live during the demo.`,
+              description:
+                `${operation.description || ''}\n\n` +
+                '**MOCK RESPONSE MODE:** Execute returns a fixed synthetic fixture. ' +
+                'No screening, provider call, decision, or journal write is performed. ' +
+                'Inputs are ignored and records do not change.',
             }
-          : savedExample(operation, example)),
+          : {}),
       },
     };
   }
@@ -56,76 +54,18 @@ export function createDemoDocument(
     ...document,
     info: {
       ...document.info,
-      title: 'AI-Assisted Trading Demo',
-      description:
-        'Execute only sections 01 (health) and 02 (trading profile). For all other sections, ' +
-        'open the operation and show its request preview and saved response/evidence below. ' +
-        (snapshots
-          ? `Read-only capture: ${snapshots.capturedAt}. Record timestamps remain visible; ` +
-            'these are saved examples, not live executions. '
-          : 'No local capture loaded. Run npm run demo:capture before recording. ') +
-        'POST examples show persisted stage evidence, not newly executed HTTP responses. ' +
-        'BUY records a manual entry; it does not place an order. Full reference: /api/docs-all.',
+      title: mockResponses
+        ? 'AI-Assisted Trading Demo — MOCK RESPONSES'
+        : 'AI-Assisted Trading Demo',
+      description: mockResponses
+        ? 'MOCK RESPONSE MODE: All 16 demo operations return fixed synthetic data on Execute. ' +
+          'This is an API interaction demonstration, not evidence of real workflow processing. ' +
+          'Health is simulated; no database readiness is checked. ' +
+          'Inputs are ignored; BUY/SKIP and journals do not persist changes. ' +
+          'Non-demo routes retain normal behavior. Full reference: /api/docs-all.'
+        : '',
     },
     paths,
     tags: DEMO_OPERATIONS.map(([, , name]) => ({ name })),
-  };
-}
-
-function savedExample(
-  operation: OperationObject,
-  example: DemoSnapshot | undefined,
-): Partial<OperationObject> {
-  if (!example) {
-    return {
-      description:
-        `${operation.description || ''}\n\n` +
-        '**Preview only. No saved evidence available for this operation.** ' +
-        'Run `npm run demo:capture` before recording. No request is executed by opening this API.',
-    };
-  }
-  const request = {
-    path: example.request.path,
-    ...(example.request.parameters ? { parameters: example.request.parameters } : {}),
-    ...(example.request.body ? { body: example.request.body } : {}),
-  };
-  return {
-    description:
-      `${operation.description || ''}\n\n` +
-      `**Request preview**\n\n\`\`\`json\n${JSON.stringify(request, null, 2)}\n\`\`\``,
-    parameters: operation.parameters?.map((parameter) =>
-      '$ref' in parameter
-        ? parameter
-        : {
-            ...parameter,
-            ...(example.request.parameters?.[parameter.name] !== undefined
-              ? { example: example.request.parameters[parameter.name] }
-              : {}),
-          },
-    ),
-    ...(operation.requestBody && !('$ref' in operation.requestBody) && example.request.body
-      ? {
-          requestBody: {
-            ...operation.requestBody,
-            content: {
-              ...operation.requestBody.content,
-              'application/json': {
-                ...operation.requestBody.content['application/json'],
-                example: example.request.body,
-              },
-            },
-          },
-        }
-      : {}),
-    responses: {
-      [example.statusCode ?? 'default']: {
-        description: 'Saved example',
-        content: {
-          'application/json': {
-            example: example.body,
-          },
-        },
-      },
-    },
   };
 }

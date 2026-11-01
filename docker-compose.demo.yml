@@ -1,0 +1,6 @@
+# Explicit local mock mode. Use together with docker-compose.yml.
+services:
+  api:
+    environment:
+      DEMO_MOCK_RESPONSES: 'true'
+      SCHEDULER_ENABLED: 'false'

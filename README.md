@@ -561,7 +561,7 @@ The seed script uses the provider's advertised catalog and preserves existing in
 | PUT        | /api/universes/:code/instruments/:id     | Add membership idempotently                                                                   |
 | GET        | /api/universes/:code/instruments         | Read all members, including inactive instruments                                              |
 | GET        | /api/market-data/universe                | Read active members of the configured universe                                                |
-| GET        | /api/market-data/provider                | Read provenance, supported fixture catalog, and calendar                                      |
+| GET        | /api/market-data/provider                | Compact provider metadata; opt into catalog/calendar with `?includeDetails=true`               |
 | POST       | /api/market-data/instruments/sync        | Import or update the selected provider's NSE equity/index catalog idempotently                |
 | POST       | /api/market-data/refresh-universe        | Enqueue one refresh for each active configured member                                         |
 | POST       | /api/market-data/instruments/:id/refresh | Enqueue daily refresh                                                                         |

@@ -4,7 +4,6 @@ const { Module } = require('@nestjs/common');
 const { NestFactory } = require('@nestjs/core');
 const { DocumentBuilder, SwaggerModule } = require('@nestjs/swagger');
 const { createDemoDocument } = require('../dist/swagger/demo-document');
-const { loadDemoSnapshots } = require('../dist/swagger/demo-snapshots');
 
 // Generate the real controller documentation without databases, queues, or provider calls.
 const controllers = [
@@ -69,45 +68,25 @@ async function main() {
       Object.values(value).forEach(checkReferences);
     }
     checkReferences(demo);
-    const snapshot = {
-      capturedAt: '2026-10-30T00:00:00.000Z',
-      operations: {
-        'POST /api/candidates/{id}/buy': {
-          kind: 'persisted-evidence',
-          source: 'GET /api/trades/saved-trade',
-          request: {
-            path: '/api/candidates/saved-candidate/buy',
-            parameters: { id: 'saved-candidate' },
-            body: { actualEntry: '100.0000', quantity: 5 },
-          },
-          body: { id: 'saved-trade', status: 'CANCELLED' },
-        },
-      },
-    };
-    const preview = createDemoDocument(full, snapshot);
-    const buyPreview = preview.paths['/api/candidates/{id}/buy'].post;
-    assert.equal(buyPreview.requestBody.content['application/json'].example.quantity, 5);
-    assert.equal(buyPreview.parameters.find((p) => p.name === 'id').example, 'saved-candidate');
-    assert.equal(buyPreview.responses.default.content['application/json'].example.status, 'CANCELLED');
-    assert.match(buyPreview.description, /Request preview/);
-    assert.doesNotMatch(buyPreview.description, /Source:|Captured:|Record timestamp:|Persisted stage evidence/);
-    assert.equal(buyPreview.responses.default.description, 'Saved example');
-    assert.match(preview.paths['/api/candidates/{id}/news/enrich'].post.description, /No saved evidence/);
-    assert.match(preview.paths['/api/health'].get.description, /Execute this GET live/);
-    assert.match(preview.paths['/api/settings/trading-profile'].get.description, /Execute this GET live/);
-    assert.equal(JSON.stringify(full), original, 'Preview must not mutate full documentation');
-    const localSnapshots = loadDemoSnapshots();
-    if (localSnapshots) {
-      const captured = createDemoDocument(full, localSnapshots);
-      for (const [key, saved] of Object.entries(localSnapshots.operations)) {
-        const [method, path] = key.split(' ');
-        const operation = captured.paths[path][method.toLowerCase()];
-        const example = operation.responses[saved.statusCode || 'default'].content['application/json'].example;
-        assert.deepEqual(example, saved.body);
-      }
-      console.log(`PASS: ${Object.keys(localSnapshots.operations).length} local captured examples rendered.`);
+    for (const { path, method, operation } of operations) {
+      assert.deepEqual(operation.responses, full.paths[path][method].responses);
+      assert.deepEqual(operation.parameters, full.paths[path][method].parameters);
+      assert.deepEqual(operation.requestBody, full.paths[path][method].requestBody);
+      assert.doesNotMatch(operation.description || '', /Request preview|No saved evidence/);
     }
-    console.log('PASS: ordered routes, request previews, honest evidence labels, missing-data handling, full API preserved.');
+    const mock = createDemoDocument(full, true);
+    assert.match(mock.info.title, /MOCK RESPONSES/);
+    for (const { path, method } of operations) {
+      const operation = mock.paths[path][method];
+      assert.match(operation.description, /MOCK RESPONSE MODE/);
+      assert.deepEqual(operation.responses, full.paths[path][method].responses);
+      assert.deepEqual(operation.parameters, full.paths[path][method].parameters);
+      assert.deepEqual(operation.requestBody, full.paths[path][method].requestBody);
+    }
+    assert.equal(JSON.stringify(full), original, 'Documentation must not be mutated');
+    console.log(
+      'PASS: ordered routes, no injected request/response examples in either mode, mock labels and full API preserved.',
+    );
   } finally {
     await app.close();
   }

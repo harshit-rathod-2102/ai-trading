@@ -13,7 +13,9 @@ async function request(path, method = 'GET', body, expected = 200) {
   return { status: response.status, body: result };
 }
 async function seed() {
-  const provider = (await request('/market-data/provider')).body;
+  const summary = (await request('/market-data/provider')).body;
+  assert.equal(summary.isSynthetic, true, 'This seed command is only for synthetic development data');
+  const provider = (await request('/market-data/provider?includeDetails=true')).body;
   assert.equal(provider.isSynthetic, true, 'This seed command is only for synthetic development data');
   const universe = process.env.MARKET_DATA_UNIVERSE || 'DEVELOPMENT';
   await request('/universes', 'POST', { code: universe, name: 'Synthetic market-data development universe' }, [201, 409]);

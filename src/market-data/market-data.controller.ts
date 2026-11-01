@@ -1,5 +1,16 @@
-import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
-import { ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
+import {
+  Body,
+  Controller,
+  DefaultValuePipe,
+  Get,
+  HttpCode,
+  Param,
+  ParseBoolPipe,
+  ParseUUIDPipe,
+  Post,
+  Query,
+} from '@nestjs/common';
+import { ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { DateRangeDto } from './dto/date-range.dto';
 import { MarketDataService } from './market-data.service';
 import { MarketDataJobs } from './market-data.jobs';
@@ -12,8 +23,19 @@ export class MarketDataController {
     private readonly jobs: MarketDataJobs,
   ) {}
 
-  @Get('provider') provider() {
-    return this.marketData.providerInfo();
+  @Get('provider')
+  @ApiOperation({ summary: 'Read a compact provider summary without external calls' })
+  @ApiQuery({
+    name: 'includeDetails',
+    required: false,
+    type: Boolean,
+    description:
+      'Default false. True fetches the full catalog and calendar and may be slow or large.',
+  })
+  provider(
+    @Query('includeDetails', new DefaultValuePipe(false), ParseBoolPipe) includeDetails: boolean,
+  ) {
+    return this.marketData.providerInfo(includeDetails);
   }
 
   @Post('instruments/sync')
